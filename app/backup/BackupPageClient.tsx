@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -13,17 +13,31 @@ interface BackupFile {
   createdAt: string;
 }
 
+interface ImportResult {
+  success: true;
+  anime: {
+    created: number;
+    updated: number;
+  };
+  watchHistory: {
+    imported: number;
+    skipped: number;
+  };
+}
+
 type SessionUser = { role?: string };
 
 export default function BackupPageClient() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const role = (session?.user as SessionUser | undefined)?.role;
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const [backups, setBackups] = useState<BackupFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
@@ -99,6 +113,47 @@ export default function BackupPageClient() {
     }
   };
 
+  const handleImportClick = () => {
+    if (importing) {
+      return;
+    }
+
+    importInputRef.current?.click();
+  };
+
+  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      toast.error('请选择 JSON 文件');
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      const result = await fetchJson<ImportResult>('/api/admin/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }, '导入失败');
+
+      toast.success(
+        `导入完成：新增 ${result.anime.created} 部，更新 ${result.anime.updated} 部，导入 ${result.watchHistory.imported} 条历史`
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '导入失败');
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -128,7 +183,7 @@ export default function BackupPageClient() {
       <section className="glass-panel rounded-3xl border border-white/5 p-6 md:p-8">
         <h2 className="text-lg font-medium text-zinc-200 mb-2">导出数据</h2>
         <p className="text-sm text-zinc-500 mb-5">
-          导出全部番剧列表和观看记录。CSV 格式可以直接用 Excel 打开，JSON 适合程序处理或备用。
+          导出全部番剧列表和观看记录。CSV 格式可以直接用 Excel 打开，JSON 适合程序处理、备份后回导或迁移。
         </p>
         <div className="flex flex-wrap gap-3">
           <button
@@ -151,7 +206,27 @@ export default function BackupPageClient() {
             </svg>
             {exporting === 'json' ? '导出中...' : '导出 JSON'}
           </button>
+          <button
+            onClick={handleImportClick}
+            disabled={importing}
+            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm font-medium hover:bg-amber-500/20 transition-all disabled:opacity-50"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20V10m0 0l-4 4m4-4l4 4M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1" />
+            </svg>
+            {importing ? '导入中...' : '导入 JSON'}
+          </button>
         </div>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={handleImportFile}
+        />
+        <p className="text-xs text-zinc-500 mt-4">
+          支持导入当前系统导出的 JSON 文件。导入时会按标题合并番剧，观看历史按番剧、集数、时间去重，避免重复导入后无限叠加。
+        </p>
       </section>
 
       {/* Backup Section */}
