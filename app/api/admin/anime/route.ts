@@ -1,6 +1,7 @@
+import { type ResultSetHeader, type RowDataPacket } from 'mysql2';
 import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
+import { listAnimeRecordsWithLastWatched } from '@/lib/anime';
 import { query } from '@/lib/db';
-import { type RowDataPacket, type ResultSetHeader } from 'mysql2';
 
 export async function GET(request: Request) {
   const { authorized, response } = await requireAdmin();
@@ -11,27 +12,26 @@ export async function GET(request: Request) {
   const pageSize = Math.min(Math.max(Number(searchParams.get('pageSize') ?? '50'), 10), 200);
   const search = searchParams.get('search') || undefined;
 
-  const offset = (page - 1) * pageSize;
-  const params: (string | number)[] = [];
+  try {
+    const offset = (page - 1) * pageSize;
 
-  let where = '';
-  if (search) {
-    where = 'WHERE title LIKE ? OR original_title LIKE ?';
-    params.push(`%${search}%`, `%${search}%`);
+    // 并行查询：列表 + 真实总数
+    const [all, totalResult] = await Promise.all([
+      listAnimeRecordsWithLastWatched({ search, limit: pageSize, offset }),
+      search
+        ? query<(RowDataPacket & { total: number })[]>(
+            'SELECT COUNT(*) as total FROM anime WHERE title LIKE ? OR original_title LIKE ?',
+            [`%${search}%`, `%${search}%`]
+          )
+        : query<(RowDataPacket & { total: number })[]>('SELECT COUNT(*) as total FROM anime'),
+    ]);
+
+    const total = Number(totalResult[0]?.total ?? 0);
+    return apiSuccess({ records: all, total, page, pageSize });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '读取失败';
+    return apiError(message);
   }
-
-  const countRows = await query<RowDataPacket[]>(`SELECT COUNT(*) as total FROM anime ${where}`, params);
-  const total = countRows[0].total;
-
-  const selectParams = [...params, Math.floor(pageSize), Math.floor(offset)];
-  const rows = await query<RowDataPacket[]>(
-    `SELECT id, title, original_title, status, score, progress, totalEpisodes, 
-            DATE_FORMAT(createdAt, '%Y-%m-%d %H:%i:%s') as createdAt
-     FROM anime ${where} ORDER BY id DESC LIMIT ? OFFSET ?`,
-    selectParams
-  );
-
-  return apiSuccess({ records: rows, total, page, pageSize });
 }
 
 export async function DELETE(request: Request) {
@@ -45,14 +45,15 @@ export async function DELETE(request: Request) {
     return apiError('请提供有效的 ID 数组', 400);
   }
 
-  if (ids.length > 100) {
-    return apiError('单次最多删除 100 条记录', 400);
+  if (ids.length > 100) return apiError('单次最多删除 100 条记录', 400);
+
+  try {
+    const placeholders = ids.map(() => '?').join(',');
+    await query<ResultSetHeader>(`DELETE FROM watch_history WHERE animeId IN (${placeholders})`, ids);
+    const result = await query<ResultSetHeader>(`DELETE FROM anime WHERE id IN (${placeholders})`, ids);
+    return apiSuccess({ deleted: result.affectedRows });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '删除失败';
+    return apiError(message);
   }
-
-  const placeholders = ids.map(() => '?').join(',');
-  // Delete related history first
-  await query<ResultSetHeader>(`DELETE FROM watch_history WHERE animeId IN (${placeholders})`, ids);
-  const result = await query<ResultSetHeader>(`DELETE FROM anime WHERE id IN (${placeholders})`, ids);
-
-  return apiSuccess({ deleted: result.affectedRows });
 }

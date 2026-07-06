@@ -1,32 +1,7 @@
-import { getAnimeRecord, updateAnimeRecord, CreateAnimeDTO } from '@/lib/anime';
+import { getAnimeRecord, updateAnimeRecord, CreateAnimeDTO, parseAnimeId, animeRecordToDTO } from '@/lib/anime';
 import { enrichAnimeInput } from '@/lib/anime-enrichment';
-import metadataMergePolicy from '@/lib/metadata/merge-policy.js';
+import { DEFAULT_METADATA_FIELDS, buildMetadataPatch } from '@/lib/metadata/merge-policy';
 import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
-
-type MetadataPatchInput = Partial<CreateAnimeDTO>;
-
-const { DEFAULT_METADATA_FIELDS, buildMetadataPatch } = metadataMergePolicy as unknown as {
-  DEFAULT_METADATA_FIELDS: string[];
-  buildMetadataPatch: (
-    current: Partial<CreateAnimeDTO>,
-    candidateLike: MetadataPatchInput | { candidate: MetadataPatchInput; source?: Record<string, string> },
-    options?: {
-      fields?: string[];
-      force?: boolean;
-      allowReplaceFilledCover?: boolean;
-      allowCastAliasAugment?: boolean;
-      allowIsFinishedUpgrade?: boolean;
-    }
-  ) => { patch: Partial<CreateAnimeDTO>; sources: Record<string, string> };
-};
-
-function parseId(idParam: string) {
-  const id = Number(idParam);
-  if (!Number.isFinite(id) || id <= 0) {
-    return null;
-  }
-  return id;
-}
 
 export async function POST(
   _request: Request,
@@ -37,7 +12,7 @@ export async function POST(
     return auth.response;
   }
 
-  const id = parseId(context.params.id);
+  const id = parseAnimeId(context.params.id);
   if (!id) {
     return apiError('Invalid ID', 400);
   }
@@ -47,25 +22,7 @@ export async function POST(
     return apiError('Not found', 404);
   }
 
-  const baseInput: CreateAnimeDTO = {
-    title: record.title,
-    originalTitle: record.originalTitle,
-    coverUrl: record.coverUrl,
-    status: record.status,
-    score: record.score,
-    progress: record.progress,
-    totalEpisodes: record.totalEpisodes,
-    durationMinutes: record.durationMinutes,
-    notes: record.notes,
-    tags: record.tags,
-    cast: record.cast,
-    castAliases: record.castAliases,
-    summary: record.summary,
-    startDate: record.startDate,
-    endDate: record.endDate,
-    premiereDate: record.premiereDate,
-    isFinished: record.isFinished,
-  };
+  const baseInput = animeRecordToDTO(record);
 
   const enriched = await enrichAnimeInput(baseInput, {
     mode: 'create',

@@ -16,6 +16,11 @@
 
 # production
 /build
+/dist
+
+# Tauri (desktop app)
+/src-tauri/target/
+/src-tauri/icons/extracted-*.png
 
 # IDE / Editor
 .vscode/
@@ -27,6 +32,7 @@
 /docs-private/
 database/*.db
 database/*.sqlite
+anime-track-export.json
 
 # Misc
 .DS_Store

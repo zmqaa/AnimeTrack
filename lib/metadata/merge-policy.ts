@@ -1,6 +1,46 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { containsCjkText, uniqueStrings } from '../anime-cast';
+import { normalizeDateString } from '../date-utils';
+
 const MAX_METADATA_CAST_MEMBERS = 10;
 
-const DEFAULT_METADATA_FIELDS = [
+type MetadataField =
+  | 'originalTitle' | 'coverUrl' | 'score' | 'totalEpisodes'
+  | 'durationMinutes' | 'summary' | 'tags' | 'premiereDate'
+  | 'cast' | 'castAliases' | 'isFinished';
+
+type SourceName = 'provider' | 'ai';
+
+type MetadataSource = Record<string, any>;
+
+interface NormalizedMetadata {
+  originalTitle?: string;
+  coverUrl?: string;
+  score?: number;
+  totalEpisodes?: number;
+  durationMinutes?: number;
+  summary?: string;
+  tags?: string[];
+  premiereDate?: string;
+  cast?: string[];
+  castAliases?: string[];
+  isFinished?: boolean;
+}
+
+interface MetadataCandidate {
+  candidate: Partial<NormalizedMetadata>;
+  source: Record<string, string>;
+}
+
+interface MergeOptions {
+  fields?: string[];
+  force?: boolean;
+  allowIsFinishedUpgrade?: boolean;
+  allowCastAliasAugment?: boolean;
+  allowReplaceFilledCover?: boolean;
+}
+
+export const DEFAULT_METADATA_FIELDS: MetadataField[] = [
   'originalTitle',
   'coverUrl',
   'score',
@@ -14,7 +54,7 @@ const DEFAULT_METADATA_FIELDS = [
   'isFinished',
 ];
 
-const AI_CAPABLE_METADATA_FIELDS = new Set([
+export const AI_CAPABLE_METADATA_FIELDS = new Set<MetadataField>([
   'originalTitle',
   'coverUrl',
   'totalEpisodes',
@@ -25,7 +65,7 @@ const AI_CAPABLE_METADATA_FIELDS = new Set([
   'isFinished',
 ]);
 
-const FIELD_SOURCE_PRIORITY = {
+const FIELD_SOURCE_PRIORITY: Record<MetadataField, SourceName[]> = {
   originalTitle: ['provider', 'ai'],
   coverUrl: ['provider', 'ai'],
   score: ['provider'],
@@ -39,41 +79,17 @@ const FIELD_SOURCE_PRIORITY = {
   isFinished: ['provider', 'ai'],
 };
 
-const ALL_METADATA_FIELDS = Object.keys(FIELD_SOURCE_PRIORITY);
+export const ALL_METADATA_FIELDS = Object.keys(FIELD_SOURCE_PRIORITY) as MetadataField[];
 
-function uniqueStrings(values) {
-  const seen = new Set();
-  const result = [];
-
-  for (const value of values) {
-    const normalized = typeof value === 'string' ? value.trim() : '';
-    if (!normalized || seen.has(normalized)) {
-      continue;
-    }
-
-    seen.add(normalized);
-    result.push(normalized);
-  }
-
-  return result;
-}
-
-function containsCjkText(value) {
-  return /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(String(value || ''));
-}
-
-function isBlank(value) {
+function isBlank(value: unknown): boolean {
   return typeof value !== 'string' || !value.trim();
 }
 
-function hasPlaceholderCover(value) {
+function hasPlaceholderCover(value: unknown): boolean {
   return typeof value === 'string' && /placeholder/i.test(value);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { normalizeDateString } = require('../date-utils.js');
-
-function parseStringArray(value) {
+function parseStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
     return uniqueStrings(value.map((item) => (typeof item === 'string' ? item : String(item ?? ''))));
   }
@@ -88,15 +104,15 @@ function parseStringArray(value) {
       return [];
     }
 
-    return uniqueStrings(parsed.map((item) => (typeof item === 'string' ? item : String(item ?? ''))));
+    return uniqueStrings(parsed.map((item: unknown) => (typeof item === 'string' ? item : String(item ?? ''))));
   } catch {
     return [];
   }
 }
 
-const normalizeMetadataDate = normalizeDateString;
+export const normalizeMetadataDate = normalizeDateString;
 
-function normalizeMetadataFieldValue(field, value) {
+export function normalizeMetadataFieldValue(field: string, value: unknown): unknown {
   if (value === undefined || value === null) {
     return undefined;
   }
@@ -168,7 +184,7 @@ function normalizeMetadataFieldValue(field, value) {
   }
 }
 
-function isMetadataFieldMissing(field, value) {
+export function isMetadataFieldMissing(field: string, value: unknown): boolean {
   if (field === 'summary') {
     return normalizeMetadataFieldValue(field, value) === undefined;
   }
@@ -197,11 +213,11 @@ function isMetadataFieldMissing(field, value) {
   }
 }
 
-function sameString(left, right) {
+function sameString(left: unknown, right: unknown): boolean {
   return String(left || '').trim() === String(right || '').trim();
 }
 
-function sameNumber(left, right) {
+function sameNumber(left: unknown, right: unknown): boolean {
   if (left === undefined && right === undefined) {
     return true;
   }
@@ -215,9 +231,9 @@ function sameNumber(left, right) {
   return Math.abs(a - b) < 0.0001;
 }
 
-function sameArray(left, right) {
-  const a = uniqueStrings(Array.isArray(left) ? left : []).sort();
-  const b = uniqueStrings(Array.isArray(right) ? right : []).sort();
+function sameArray(left: unknown, right: unknown): boolean {
+  const a = uniqueStrings(Array.isArray(left) ? left.map(String) : []).sort();
+  const b = uniqueStrings(Array.isArray(right) ? right.map(String) : []).sort();
 
   if (a.length !== b.length) {
     return false;
@@ -232,7 +248,7 @@ function sameArray(left, right) {
   return true;
 }
 
-function sameBoolean(left, right) {
+function sameBoolean(left: unknown, right: unknown): boolean {
   if (left === undefined && right === undefined) {
     return true;
   }
@@ -244,7 +260,7 @@ function sameBoolean(left, right) {
   return Boolean(left) === Boolean(right);
 }
 
-function sameMetadataFieldValue(field, left, right) {
+export function sameMetadataFieldValue(field: string, left: unknown, right: unknown): boolean {
   switch (field) {
     case 'originalTitle':
     case 'coverUrl':
@@ -267,9 +283,9 @@ function sameMetadataFieldValue(field, left, right) {
   }
 }
 
-function isStrictStringArraySuperset(nextValue, currentValue) {
-  const next = uniqueStrings(Array.isArray(nextValue) ? nextValue : []);
-  const current = uniqueStrings(Array.isArray(currentValue) ? currentValue : []);
+function isStrictStringArraySuperset(nextValue: unknown, currentValue: unknown): boolean {
+  const next = uniqueStrings(Array.isArray(nextValue) ? nextValue.map(String) : []);
+  const current = uniqueStrings(Array.isArray(currentValue) ? currentValue.map(String) : []);
 
   if (next.length <= current.length) {
     return false;
@@ -278,25 +294,28 @@ function isStrictStringArraySuperset(nextValue, currentValue) {
   return current.every((item) => next.includes(item));
 }
 
-function normalizeSourceMetadata(source) {
+function normalizeSourceMetadata(source: MetadataSource): NormalizedMetadata {
   const value = source || {};
 
   return {
-    originalTitle: normalizeMetadataFieldValue('originalTitle', value.originalTitle),
-    coverUrl: normalizeMetadataFieldValue('coverUrl', value.coverUrl),
-    score: normalizeMetadataFieldValue('score', value.score),
-    totalEpisodes: normalizeMetadataFieldValue('totalEpisodes', value.totalEpisodes),
-    durationMinutes: normalizeMetadataFieldValue('durationMinutes', value.durationMinutes),
-    summary: normalizeMetadataFieldValue('summary', value.summary ?? value.synopsis ?? value.description),
-    tags: normalizeMetadataFieldValue('tags', value.tags),
-    premiereDate: normalizeMetadataFieldValue('premiereDate', value.premiereDate),
-    cast: normalizeMetadataFieldValue('cast', value.cast),
-    castAliases: normalizeMetadataFieldValue('castAliases', value.castAliases),
-    isFinished: normalizeMetadataFieldValue('isFinished', value.isFinished),
+    originalTitle: normalizeMetadataFieldValue('originalTitle', value.originalTitle) as string | undefined,
+    coverUrl: normalizeMetadataFieldValue('coverUrl', value.coverUrl) as string | undefined,
+    score: normalizeMetadataFieldValue('score', value.score) as number | undefined,
+    totalEpisodes: normalizeMetadataFieldValue('totalEpisodes', value.totalEpisodes) as number | undefined,
+    durationMinutes: normalizeMetadataFieldValue('durationMinutes', value.durationMinutes) as number | undefined,
+    summary: normalizeMetadataFieldValue('summary', value.summary ?? (value as Record<string, any>).synopsis ?? (value as Record<string, any>).description) as string | undefined,
+    tags: normalizeMetadataFieldValue('tags', value.tags) as string[] | undefined,
+    premiereDate: normalizeMetadataFieldValue('premiereDate', value.premiereDate) as string | undefined,
+    cast: normalizeMetadataFieldValue('cast', value.cast) as string[] | undefined,
+    castAliases: normalizeMetadataFieldValue('castAliases', value.castAliases) as string[] | undefined,
+    isFinished: normalizeMetadataFieldValue('isFinished', value.isFinished) as boolean | undefined,
   };
 }
 
-function pickPreferredValue(field, normalizedSources) {
+function pickPreferredValue(
+  field: MetadataField,
+  normalizedSources: { provider: NormalizedMetadata; ai: NormalizedMetadata },
+): unknown {
   if (field === 'castAliases') {
     const providerAliases = Array.isArray(normalizedSources.provider.castAliases) ? normalizedSources.provider.castAliases : [];
     const aiAliases = Array.isArray(normalizedSources.ai.castAliases) ? normalizedSources.ai.castAliases : [];
@@ -316,7 +335,11 @@ function pickPreferredValue(field, normalizedSources) {
   return undefined;
 }
 
-function resolveSourceLabel(field, normalizedSources, candidateValue) {
+function resolveSourceLabel(
+  field: MetadataField,
+  normalizedSources: { provider: NormalizedMetadata; ai: NormalizedMetadata },
+  candidateValue: unknown,
+): string | undefined {
   if (field === 'castAliases') {
     const providerAliases = Array.isArray(normalizedSources.provider.castAliases) ? normalizedSources.provider.castAliases : [];
     const aiAliases = Array.isArray(normalizedSources.ai.castAliases) ? normalizedSources.ai.castAliases : [];
@@ -335,14 +358,17 @@ function resolveSourceLabel(field, normalizedSources, candidateValue) {
   return undefined;
 }
 
-function buildMetadataCandidate(provider, ai) {
+export function buildMetadataCandidate(
+  provider: MetadataSource | null | undefined,
+  ai: MetadataSource | null | undefined,
+): MetadataCandidate {
   const normalizedSources = {
-    provider: normalizeSourceMetadata(provider),
-    ai: normalizeSourceMetadata(ai),
+    provider: normalizeSourceMetadata(provider || {}),
+    ai: normalizeSourceMetadata(ai || {}),
   };
 
-  const candidate = {};
-  const source = {};
+  const candidate: Record<string, unknown> = {};
+  const source: Record<string, string> = {};
 
   for (const field of ALL_METADATA_FIELDS) {
     const candidateValue = pickPreferredValue(field, normalizedSources);
@@ -361,16 +387,22 @@ function buildMetadataCandidate(provider, ai) {
   return { candidate, source };
 }
 
-function fieldPrefersAi(field) {
+function fieldPrefersAi(field: MetadataField): boolean {
   return FIELD_SOURCE_PRIORITY[field]?.[0] === 'ai';
 }
 
-function fieldSupportsAi(field) {
+function fieldSupportsAi(field: MetadataField): boolean {
   return AI_CAPABLE_METADATA_FIELDS.has(field) && FIELD_SOURCE_PRIORITY[field]?.includes('ai');
 }
 
-function shouldUseAiForMetadata(current, providerCandidate, options = {}) {
-  const fields = Array.isArray(options.fields) && options.fields.length > 0 ? options.fields : DEFAULT_METADATA_FIELDS;
+export function shouldUseAiForMetadata(
+  current: NormalizedMetadata | null | undefined,
+  providerCandidate: NormalizedMetadata | null | undefined,
+  options: MergeOptions = {},
+): boolean {
+  const fields = (Array.isArray(options.fields) && options.fields.length > 0
+    ? options.fields
+    : DEFAULT_METADATA_FIELDS) as MetadataField[];
   const force = Boolean(options.force);
 
   for (const field of fields) {
@@ -409,7 +441,12 @@ function shouldUseAiForMetadata(current, providerCandidate, options = {}) {
   return false;
 }
 
-function shouldUpdateMetadataField(field, currentValue, nextValue, options = {}) {
+function shouldUpdateMetadataField(
+  field: string,
+  currentValue: unknown,
+  nextValue: unknown,
+  options: MergeOptions = {},
+): boolean {
   if (nextValue === undefined) {
     return false;
   }
@@ -438,23 +475,27 @@ function shouldUpdateMetadataField(field, currentValue, nextValue, options = {})
   return !sameMetadataFieldValue(field, currentValue, nextValue);
 }
 
-function buildMetadataPatch(current, candidateLike, options = {}) {
+export function buildMetadataPatch(
+  current: Record<string, any> | null | undefined,
+  candidateLike: MetadataCandidate | Record<string, any> | null | undefined,
+  options: MergeOptions = {},
+): { patch: Record<string, any>; sources: Record<string, string> } {
   const fields = Array.isArray(options.fields) && options.fields.length > 0 ? options.fields : DEFAULT_METADATA_FIELDS;
-  const candidate = candidateLike?.candidate || candidateLike || {};
-  const source = candidateLike?.source || {};
-  const patch = {};
-  const sources = {};
+  const candidate = (candidateLike as MetadataCandidate)?.candidate || candidateLike || {};
+  const source = (candidateLike as MetadataCandidate)?.source || {};
+  const patch: Record<string, any> = {};
+  const sources: Record<string, string> = {};
 
   for (const field of fields) {
-    const normalizedNext = normalizeMetadataFieldValue(field, candidate[field]);
+    const normalizedNext = normalizeMetadataFieldValue(field, (candidate as Record<string, any>)[field]);
     if (normalizedNext === undefined) {
       continue;
     }
 
     if (shouldUpdateMetadataField(field, current?.[field], normalizedNext, options)) {
       patch[field] = normalizedNext;
-      if (source[field]) {
-        sources[field] = source[field];
+      if ((source as Record<string, string>)[field]) {
+        sources[field] = (source as Record<string, string>)[field];
       }
     }
   }
@@ -462,7 +503,11 @@ function buildMetadataPatch(current, candidateLike, options = {}) {
   return { patch, sources };
 }
 
-function applyMetadataPatch(current, candidateLike, options = {}) {
+export function applyMetadataPatch(
+  current: Record<string, any> | null | undefined,
+  candidateLike: MetadataCandidate | Record<string, any> | null | undefined,
+  options: MergeOptions = {},
+): { data: Record<string, any>; patch: Record<string, any>; sources: Record<string, string> } {
   const { patch, sources } = buildMetadataPatch(current, candidateLike, options);
   return {
     data: {
@@ -473,17 +518,3 @@ function applyMetadataPatch(current, candidateLike, options = {}) {
     sources,
   };
 }
-
-module.exports = {
-  ALL_METADATA_FIELDS,
-  AI_CAPABLE_METADATA_FIELDS,
-  DEFAULT_METADATA_FIELDS,
-  buildMetadataCandidate,
-  buildMetadataPatch,
-  applyMetadataPatch,
-  isMetadataFieldMissing,
-  normalizeMetadataDate,
-  normalizeMetadataFieldValue,
-  sameMetadataFieldValue,
-  shouldUseAiForMetadata,
-};

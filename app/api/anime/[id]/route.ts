@@ -1,20 +1,9 @@
-import { deleteAnimeRecord, getAnimeRecord, updateAnimeRecord, AnimeRecord } from '@/lib/anime';
+import { deleteAnimeRecord, getAnimeRecord, updateAnimeRecord, AnimeRecord, parseAnimeId } from '@/lib/anime';
 import { buildVoiceActorAliases } from '@/lib/ai';
-import { normalizeStringArray } from '@/lib/anime-cast';
+import { normalizeStringArray, areStringArraysEqual } from '@/lib/anime-cast';
 import { addBatchWatchHistory, deleteWatchHistoryByAnime } from '@/lib/history';
 import { query } from '@/lib/db';
 import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
-
-function areStringArraysEqual(left: unknown, right: unknown) {
-  const leftValues = normalizeStringArray(left) || [];
-  const rightValues = normalizeStringArray(right) || [];
-
-  if (leftValues.length !== rightValues.length) {
-    return false;
-  }
-
-  return leftValues.every((value, index) => value === rightValues[index]);
-}
 
 function areAllowedFieldValuesEqual(key: string, nextValue: unknown, currentValue: unknown) {
   if (key === 'tags' || key === 'cast' || key === 'castAliases') {
@@ -32,19 +21,11 @@ function areAllowedFieldValuesEqual(key: string, nextValue: unknown, currentValu
   return nextValue === currentValue;
 }
 
-function parseId(idParam: string) {
-  const id = Number(idParam);
-  if (!Number.isFinite(id) || id <= 0) {
-    return null;
-  }
-  return id;
-}
-
 export async function GET(
   _request: Request,
   context: { params: { id: string } }
 ) {
-  const id = parseId(context.params.id);
+  const id = parseAnimeId(context.params.id);
   if (!id) return apiError('Invalid ID', 400);
 
   const record = await getAnimeRecord(id);
@@ -60,7 +41,7 @@ export async function DELETE(
   const auth = await requireAdmin();
   if (!auth.authorized) return auth.response;
 
-  const id = parseId(context.params.id);
+  const id = parseAnimeId(context.params.id);
   if (!id) return apiError('Invalid ID', 400);
 
   await deleteAnimeRecord(id);
@@ -77,7 +58,7 @@ export async function PATCH(
   const auth = await requireAdmin();
   if (!auth.authorized) return auth.response;
 
-  const id = parseId(context.params.id);
+  const id = parseAnimeId(context.params.id);
   if (!id) return apiError('Invalid ID', 400);
 
   const before = await getAnimeRecord(id);

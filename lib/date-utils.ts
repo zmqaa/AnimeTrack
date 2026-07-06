@@ -1,4 +1,4 @@
-function normalizeDateString(value) {
+export function normalizeDateString(value: unknown): string | undefined {
   if (!value) {
     return undefined;
   }
@@ -33,7 +33,3 @@ function normalizeDateString(value) {
   const day = String(parsed.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
-
-module.exports = {
-  normalizeDateString,
-};

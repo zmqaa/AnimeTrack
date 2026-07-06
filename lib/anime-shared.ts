@@ -1,5 +1,12 @@
 export type AnimeStatus = 'watching' | 'completed' | 'dropped' | 'plan_to_watch';
 
+export const ANIME_STATUS_LABELS: Record<AnimeStatus, string> = {
+  watching: '追番中',
+  completed: '已看完',
+  dropped: '已弃坑',
+  plan_to_watch: '计划看',
+};
+
 export type AnimeSortBy = 'lastWatchedAt' | 'updatedAt' | 'createdAt' | 'score' | 'progress' | 'title' | 'startDate' | 'endDate';
 
 export interface SessionUser {

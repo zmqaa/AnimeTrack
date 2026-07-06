@@ -19,7 +19,6 @@
 
 const mysql = require('mysql2/promise');
 const { createDbConfig, loadDatabaseEnv } = require('../shared/db_env');
-const { isSeasonCompatible } = require('../shared/query_hint_ai');
 
 loadDatabaseEnv();
 
@@ -153,6 +152,15 @@ function extractSeasonNumber(value) {
     return map[token] || null;
   }
   return null;
+}
+
+function isSeasonCompatible(inputTitle, candidateTitles) {
+  const inputSeason = extractSeasonNumber(inputTitle);
+  if (!inputSeason) return true;
+  const candidates = Array.isArray(candidateTitles) ? candidateTitles : [candidateTitles];
+  const candidateSeasons = candidates.map((v) => extractSeasonNumber(v)).filter((v) => v != null);
+  if (inputSeason === 1) return candidateSeasons.length === 0 || candidateSeasons.includes(1);
+  return candidateSeasons.includes(inputSeason);
 }
 
 function stripSeasonTokens(value) {
