@@ -6,7 +6,7 @@ import { Providers } from "@/components/Providers";
 import RouteLoadingBar from "@/components/shared/RouteLoadingBar";
 import Toast from "@/components/shared/Toast";
 import ErrorBoundary from "@/components/shared/ErrorBoundary";
-import { DEFAULT_THEME, themeInitScript } from "@/lib/theme";
+import { themeInitScript } from "@/lib/theme";
 
 const sans = Noto_Sans_SC({
   subsets: ["latin"],
@@ -39,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" data-theme={DEFAULT_THEME} suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning>
       <body className={`${sans.variable} ${serif.variable} ${mono.variable} antialiased`}>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <Providers>

@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import type { EChartsOption } from 'echarts';
-import ReactECharts from 'echarts-for-react';
+import { ReactECharts } from './echarts-pie';
 
 interface PieChartItem {
   label: string;
@@ -102,5 +102,5 @@ export function PieChart({ data, size = 168 }: PieChartProps) {
     );
   }
 
-  return <ReactECharts option={option} notMerge lazyUpdate style={{ width: size, height: size }} />;
+  return <ReactECharts option={option} notMerge lazyUpdate opts={{ renderer: 'svg' }} style={{ width: size, height: size }} />;
 }

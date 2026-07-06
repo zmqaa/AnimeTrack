@@ -1,10 +1,10 @@
 import { NextRequest } from 'next/server';
-import { createAnimeRecord, findAnimeByTitle, updateAnimeRecord, CreateAnimeDTO, listAnimeRecordsByExactTitle, AnimeRecord } from '@/lib/anime';
+import { createAnimeRecord, findAnimeByTitle, updateAnimeRecord, CreateAnimeDTO, listAnimeRecordsByExactTitle, AnimeRecord, animeRecordToDTO } from '@/lib/anime';
 import { addBatchWatchHistory, addWatchHistory } from '@/lib/history';
 import { parseQuickRecordBatch, type ParsedQuickRecordIntent } from '@/lib/ai';
 import { enrichAnimeInput } from '@/lib/anime-enrichment';
 import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
-import metadataMergePolicy from '@/lib/metadata/merge-policy.js';
+import { DEFAULT_METADATA_FIELDS, buildMetadataPatch } from '@/lib/metadata/merge-policy';
 import {
   detectRewatchTag, resolveNextRewatchTag, shouldAutoResolveRewatch,
   normalizeDate, resolveRecordedDateString, resolveIntentStatus, resolveTargetProgress,
@@ -20,43 +20,6 @@ type QuickRecordResult = {
   recognition: ReturnType<typeof buildRecognition>;
   entry: AnimeRecord;
 };
-
-const { DEFAULT_METADATA_FIELDS, buildMetadataPatch } = metadataMergePolicy as unknown as {
-  DEFAULT_METADATA_FIELDS: string[];
-  buildMetadataPatch: (
-    current: Partial<CreateAnimeDTO>,
-    candidateLike: Partial<CreateAnimeDTO> | { candidate: Partial<CreateAnimeDTO>; source?: Record<string, string> },
-    options?: {
-      fields?: string[];
-      force?: boolean;
-      allowReplaceFilledCover?: boolean;
-      allowCastAliasAugment?: boolean;
-      allowIsFinishedUpgrade?: boolean;
-    }
-  ) => { patch: Partial<CreateAnimeDTO>; sources: Record<string, string> };
-};
-
-function toAnimeInput(record: AnimeRecord): CreateAnimeDTO {
-  return {
-    title: record.title,
-    originalTitle: record.originalTitle,
-    coverUrl: record.coverUrl,
-    status: record.status,
-    score: record.score,
-    progress: record.progress,
-    totalEpisodes: record.totalEpisodes,
-    durationMinutes: record.durationMinutes,
-    notes: record.notes,
-    tags: record.tags,
-    cast: record.cast,
-    castAliases: record.castAliases,
-    summary: record.summary,
-    startDate: record.startDate,
-    endDate: record.endDate,
-    premiereDate: record.premiereDate,
-    isFinished: record.isFinished,
-  };
-}
 
 async function processQuickRecordIntent(
   parsedInput: ParsedQuickRecordIntent,
@@ -153,7 +116,7 @@ async function processQuickRecordIntent(
   }
 
   // ── 更新已有作品 ──
-  const enriched = await enrichAnimeInput(toAnimeInput(anime), {
+  const enriched = await enrichAnimeInput(animeRecordToDTO(anime), {
     mode: 'fill-missing',
     originalUserTitle: parsed.originalTitle || parsed.animeTitle || anime.originalTitle || anime.title,
     skipVoiceActorAliases: true,

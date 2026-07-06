@@ -19,9 +19,13 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "next/link": ["./src/compat/next-link.tsx"],
+      "next/dynamic": ["./src/compat/next-dynamic.tsx"],
+      "next/image": ["./src/compat/next-image.tsx"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "src-tauri"],
+  "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -3,14 +3,21 @@ import { query } from './db';
 import { type ResultSetHeader, type RowDataPacket } from 'mysql2';
 import { parseJsonStringArray } from './anime-cast';
 import { extractSeasonNumber, hasSeasonMarker, normalizeTitleToken } from './chinese-parser';
+import type { AnimeStatus } from './anime-shared';
+
+export type { AnimeStatus };
+
+/** 解析路由参数中的 ID */
+export function parseAnimeId(idParam: string): number | null {
+  const id = Number(idParam);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  return id;
+}
 
 /** 将 Date 对象按 CST (UTC+8) 截取为 YYYY-MM-DD 字符串，避免 UTC 截断导致差一天 */
 function toDateStringCST(d: Date): string {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' }).format(d);
 }
-
-// Anime Status: watching, completed, dropped, plan_to_watch
-export type AnimeStatus = 'watching' | 'completed' | 'dropped' | 'plan_to_watch';
 
 export interface AnimeRecord {
   id: number;
@@ -54,6 +61,29 @@ export interface CreateAnimeDTO {
   endDate?: string;
   premiereDate?: string;
   isFinished?: boolean;
+}
+
+/** 将 AnimeRecord 转换为 CreateAnimeDTO（用于补全/更新场景） */
+export function animeRecordToDTO(record: AnimeRecord): CreateAnimeDTO {
+  return {
+    title: record.title,
+    originalTitle: record.originalTitle,
+    coverUrl: record.coverUrl,
+    status: record.status,
+    score: record.score,
+    progress: record.progress,
+    totalEpisodes: record.totalEpisodes,
+    durationMinutes: record.durationMinutes,
+    notes: record.notes,
+    tags: record.tags,
+    cast: record.cast,
+    castAliases: record.castAliases,
+    summary: record.summary,
+    startDate: record.startDate,
+    endDate: record.endDate,
+    premiereDate: record.premiereDate,
+    isFinished: record.isFinished,
+  };
 }
 
 interface AnimeRow extends RowDataPacket {
@@ -245,18 +275,29 @@ export interface ListAnimeOptions {
   status?: AnimeStatus;
   limit?: number;
   offset?: number;
+  search?: string;
 }
+
+/** 列表视图所需的列（排除 summary/notes/cast/cast_aliases 等大字段） */
+const LIST_COLUMNS = [
+  'id', 'title', 'original_title', 'coverUrl', 'status', 'score',
+  'progress', 'totalEpisodes', 'durationMinutes', 'tags',
+  'start_date', 'end_date', 'premiere_date', 'isFinished',
+  'createdAt', 'updatedAt',
+].join(', ');
+
+const LIST_COLUMNS_WITH_TABLE = LIST_COLUMNS.split(', ').map((col) => `anime.${col}`).join(', ');
 
 export async function listAnimeRecords(options: ListAnimeOptions = {}): Promise<AnimeRecord[]> {
   const { status, limit, offset } = options;
-  let sql = 'SELECT * FROM anime';
+  let sql = `SELECT ${LIST_COLUMNS} FROM anime`;
   const params: unknown[] = [];
-  
+
   if (status) {
     sql += ' WHERE status = ?';
     params.push(status);
   }
-  
+
   sql += ' ORDER BY updatedAt DESC';
 
   if (limit && limit > 0) {
@@ -273,9 +314,9 @@ export async function listAnimeRecords(options: ListAnimeOptions = {}): Promise<
 }
 
 export async function listAnimeRecordsWithLastWatched(options: ListAnimeOptions = {}): Promise<AnimeRecord[]> {
-  const { status, limit, offset } = options;
+  const { status, limit, offset, search } = options;
   let sql = `
-    SELECT anime.*, latest_watch.lastWatchedAt
+    SELECT ${LIST_COLUMNS_WITH_TABLE}, latest_watch.lastWatchedAt
     FROM anime
     LEFT JOIN (
       SELECT animeId, MAX(watchedAt) AS lastWatchedAt
@@ -284,10 +325,18 @@ export async function listAnimeRecordsWithLastWatched(options: ListAnimeOptions 
     ) AS latest_watch ON latest_watch.animeId = anime.id
   `;
   const params: unknown[] = [];
+  const conditions: string[] = [];
 
   if (status) {
-    sql += ' WHERE anime.status = ?';
+    conditions.push('anime.status = ?');
     params.push(status);
+  }
+  if (search) {
+    conditions.push('(anime.title LIKE ? OR anime.original_title LIKE ?)');
+    params.push(`%${search}%`, `%${search}%`);
+  }
+  if (conditions.length > 0) {
+    sql += ' WHERE ' + conditions.join(' AND ');
   }
 
   sql += ' ORDER BY anime.updatedAt DESC';

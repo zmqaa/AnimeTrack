@@ -171,7 +171,7 @@ export default function AnimeAtlasPage() {
     const castCounts: Record<string, number> = {};
 
     animeList.forEach((anime) => {
-      const episodeBucket = getEpisodeBucketLabel(anime.totalEpisodes);
+      const episodeBucket = getEpisodeBucketLabel(anime.totalEpisodes ?? undefined);
       if (episodeBucket) {
         episodeBucketCounts[episodeBucket] = (episodeBucketCounts[episodeBucket] || 0) + 1;
       }

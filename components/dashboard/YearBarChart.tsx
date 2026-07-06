@@ -1,9 +1,6 @@
 "use client";
 
 import { useMemo } from 'react';
-import type { EChartsOption } from 'echarts';
-import type { CallbackDataParams } from 'echarts/types/src/util/types.js';
-import ReactECharts from 'echarts-for-react';
 
 interface ChartItem {
   label: string;
@@ -18,7 +15,6 @@ interface YearBarChartProps {
 
 export function YearBarChart({ data, height = 220 }: YearBarChartProps) {
   const chartData = useMemo(() => {
-    // Sort data chronologically based on prefix year
     return [...data].sort((a, b) => {
       const yearA = parseInt(a.label);
       const yearB = parseInt(b.label);
@@ -27,91 +23,89 @@ export function YearBarChart({ data, height = 220 }: YearBarChartProps) {
     });
   }, [data]);
 
-  const option = useMemo<EChartsOption>(() => ({
-    animationDuration: 450,
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'shadow' },
-      backgroundColor: 'rgba(8, 14, 13, 0.96)',
-      borderColor: 'rgba(255,255,255,0.12)',
-      borderWidth: 1,
-      textStyle: {
-        color: '#eef9ff',
-        fontSize: 12,
-        fontFamily: 'var(--font-body), sans-serif',
-      },
-      extraCssText: 'box-shadow: 0 18px 40px rgba(0,0,0,0.35); border-radius: 14px; padding: 10px 12px;',
-      formatter: (params: CallbackDataParams | CallbackDataParams[]) => {
-        const item = Array.isArray(params) ? params[0] : params;
-        return [
-          `<div style="display:flex; align-items:center; gap:8px; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:#94a3b8;">`,
-          `<span style="width:8px; height:8px; border-radius:999px; background:${item.color || '#5dd6f2'}; display:inline-block;"></span>`,
-          `Year</div>`,
-          `<div style="margin-top:6px; color:#f8fafc; font-size:14px;">${item.name}</div>`,
-          `<div style="margin-top:4px; color:#cbd5e1;">${item.value} 部作品</div>`,
-        ].join('');
-      },
-    },
-    grid: {
-      top: 10,
-      right: 10,
-      bottom: 24,
-      left: 30,
-      containLabel: true,
-    },
-    xAxis: {
-      type: 'category',
-      data: chartData.map(d => d.label.replace(' 年', '')),
-      axisLine: { show: false },
-      axisTick: { show: false },
-      axisLabel: {
-        color: '#94a3b8',
-        fontSize: 10,
-        margin: 12,
-      },
-    },
-    yAxis: {
-      type: 'value',
-      splitLine: {
-        lineStyle: {
-          color: 'rgba(255, 255, 255, 0.05)',
-          type: 'dashed',
-        },
-      },
-      axisLabel: {
-        color: '#64748b',
-        fontSize: 10,
-      },
-    },
-    series: [
-      {
-        type: 'bar',
-        data: chartData.map(d => ({
-          value: d.value,
-          itemStyle: {
-            color: {
-              type: 'linear',
-              x: 0, y: 0, x2: 0, y2: 1,
-              colorStops: [
-                { offset: 0, color: d.color || '#5dd6f2' },
-                { offset: 1, color: d.color ? d.color + '40' : 'rgba(93, 214, 242, 0.2)' }
-              ]
-            },
-            borderRadius: [4, 4, 0, 0],
-          }
-        })),
-        barMaxWidth: 24,
-      },
-    ],
-  }), [chartData]);
+  const maxVal = Math.max(...chartData.map((d) => d.value), 1);
+  const barWidth = Math.max(12, Math.min(24, 100 / chartData.length - 8));
+  const chartAreaHeight = height - 40;
 
   return (
     <div style={{ height: `${height}px`, width: '100%' }}>
-      <ReactECharts 
-        option={option} 
-        style={{ height: '100%', width: '100%' }} 
-        opts={{ renderer: 'svg' }}
-      />
+      <svg width="100%" height={height} className="select-none">
+        {/* Y-axis grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+          const y = 12 + chartAreaHeight * (1 - ratio);
+          return (
+            <g key={ratio}>
+              <line x1={20} x2="100%" y1={y} y2={y} stroke="rgba(255,255,255,0.05)" strokeDasharray="4,4" />
+              <text x={16} y={y + 3} textAnchor="end" fill="#64748b" fontSize={9}>
+                {Math.round(maxVal * ratio)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Bars */}
+        {chartData.map((d, i) => {
+          const barH = Math.max(2, (d.value / maxVal) * chartAreaHeight);
+          const barX = 28 + i * ((100 - 28) / chartData.length);
+          const barY = 12 + chartAreaHeight - barH;
+          const color = d.color || '#5dd6f2';
+          const barId = `bar-grad-${i}`;
+          const labelText = d.label.replace(' 年', '');
+
+          return (
+            <g key={d.label} className="group relative">
+              <defs>
+                <linearGradient id={barId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={color} />
+                  <stop offset="100%" stopColor={color} stopOpacity={0.25} />
+                </linearGradient>
+              </defs>
+              <rect
+                x={barX}
+                y={barY}
+                width={barWidth}
+                height={barH}
+                rx={4}
+                fill={`url(#${barId})`}
+                className="transition-all duration-200 hover:brightness-125"
+              />
+              {/* Label */}
+              <text
+                x={barX + barWidth / 2}
+                y={height - 6}
+                textAnchor="middle"
+                fill="#94a3b8"
+                fontSize={9}
+              >
+                {labelText}
+              </text>
+              {/* Hover area (wider than the bar for easier targeting) */}
+              <rect
+                x={barX - 4}
+                y={0}
+                width={barWidth + 8}
+                height={height - 18}
+                fill="transparent"
+                className="peer"
+              />
+              {/* Tooltip on hover */}
+              <foreignObject
+                x={barX + barWidth / 2 - 60}
+                y={barY - 60}
+                width={120}
+                height={56}
+                className="pointer-events-none opacity-0 transition-opacity group-hover:opacity-100"
+                style={{ overflow: 'visible' }}
+              >
+                <div className="rounded-xl border border-white/10 bg-[#080e0d]/95 px-3 py-2.5 shadow-[0_18px_40px_rgba(0,0,0,0.35)] text-center">
+                  <div className="text-[10px] uppercase text-slate-400">{labelText}</div>
+                  <div className="mt-0.5 text-sm font-semibold text-slate-100">{d.value} 部</div>
+                </div>
+              </foreignObject>
+            </g>
+          );
+        })}
+      </svg>
     </div>
   );
 }

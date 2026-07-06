@@ -4,7 +4,7 @@ import { enrichAnimeData, buildVoiceActorAliases } from './ai';
 import { fetchAnimeMetadataByQueries } from './anime-provider';
 import { uniqueStrings } from './anime-cast';
 import type { CreateAnimeDTO } from './anime';
-import metadataMergePolicy from './metadata/merge-policy.js';
+import { DEFAULT_METADATA_FIELDS, applyMetadataPatch, buildMetadataCandidate } from './metadata/merge-policy';
 import {
   toOptionalString, toOptionalNumber, toOptionalBoolean, toOptionalDateString, toStringArray,
 } from './ai-validation';
@@ -12,25 +12,6 @@ import {
 type MetadataSourceInput = Partial<CreateAnimeDTO> & {
   description?: string;
   synopsis?: string;
-};
-
-const { DEFAULT_METADATA_FIELDS, applyMetadataPatch, buildMetadataCandidate } = metadataMergePolicy as unknown as {
-  DEFAULT_METADATA_FIELDS: string[];
-  applyMetadataPatch: (
-    current: CreateAnimeDTO,
-    candidateLike: MetadataSourceInput | { candidate: MetadataSourceInput; source?: Record<string, string> },
-    options?: {
-      fields?: string[];
-      force?: boolean;
-      allowReplaceFilledCover?: boolean;
-      allowCastAliasAugment?: boolean;
-      allowIsFinishedUpgrade?: boolean;
-    }
-  ) => { data: CreateAnimeDTO; patch: Partial<CreateAnimeDTO>; sources: Record<string, string> };
-  buildMetadataCandidate: (
-    provider?: MetadataSourceInput | null,
-    ai?: MetadataSourceInput | null
-  ) => { candidate: Partial<CreateAnimeDTO>; source: Record<string, string> };
 };
 
 export type AnimeEnrichmentMode = 'create' | 'fill-missing';
@@ -86,54 +67,72 @@ export async function enrichAnimeInput(input: CreateAnimeDTO, options: AnimeEnri
   let aiCandidate: MetadataSourceInput | null = null;
   let providerCandidate: MetadataSourceInput | null = null;
 
-  // ── 第一步：AI 先行，拿到标准官方中文名 + 原名 ──
-  try {
-    const enriched = await enrichAnimeData(originalUserTitle);
-    if (enriched) {
-      aiCandidate = sanitizeExternalCandidate({
-        originalTitle: enriched.originalTitle,
-        totalEpisodes: enriched.totalEpisodes,
-        durationMinutes: enriched.durationMinutes,
-        summary: enriched.synopsis,
-        tags: enriched.tags,
-        premiereDate: enriched.premiereDate,
-        isFinished: enriched.isFinished,
-        coverUrl: enriched.coverUrl,
-      });
+  // ── 第一步（并行）：AI 增强 + Provider 用原始标题搜索 ──
+  const initialProviderQueries = [data.originalTitle, data.title, originalUserTitle]
+    .map((item) => normalizeTitle(item))
+    .filter((item): item is string => Boolean(item))
+    .slice(0, providerQueryLimit);
 
-      const officialTitle = normalizeTitle(enriched.officialTitle);
-      if ((mode === 'create' || mode === 'fill-missing') && officialTitle) {
-        titleWasStandardized = officialTitle !== originalUserTitle;
-        data.title = officialTitle;
-      }
+  const [aiResult, initialProviderResult] = await Promise.allSettled([
+    enrichAnimeData(originalUserTitle),
+    initialProviderQueries.length > 0
+      ? fetchAnimeMetadataByQueries(...initialProviderQueries)
+      : Promise.resolve(null),
+  ]);
+
+  // 处理 AI 结果
+  if (aiResult.status === 'fulfilled' && aiResult.value) {
+    const enriched = aiResult.value;
+    aiCandidate = sanitizeExternalCandidate({
+      originalTitle: enriched.originalTitle,
+      totalEpisodes: enriched.totalEpisodes,
+      durationMinutes: enriched.durationMinutes,
+      summary: enriched.synopsis,
+      tags: enriched.tags,
+      premiereDate: enriched.premiereDate,
+      isFinished: enriched.isFinished,
+      coverUrl: enriched.coverUrl,
+    });
+
+    const officialTitle = normalizeTitle(enriched.officialTitle);
+    if ((mode === 'create' || mode === 'fill-missing') && officialTitle) {
+      titleWasStandardized = officialTitle !== originalUserTitle;
+      data.title = officialTitle;
     }
-  } catch (error) {
-    console.error('AI enrichment failed:', error);
+  } else if (aiResult.status === 'rejected') {
+    console.error('AI enrichment failed:', aiResult.reason);
   }
 
-  // ── 第二步：Provider 用 AI 返回的原名搜索（精度更高）──
-  // 搜索优先级：原名（日文）> AI 标准化中文名 > 用户原始输入
-  const providerQueries = Array.from(new Set(
-    (aiCandidate
-      ? [normalizeTitle(aiCandidate.originalTitle as string), data.title, originalUserTitle]
-      : [data.originalTitle, data.title, originalUserTitle])
-      .map((item) => normalizeTitle(item))
-      .filter((item): item is string => Boolean(item))
-  )).slice(0, providerQueryLimit);
+  // 处理 Provider 第一轮结果
+  if (initialProviderResult.status === 'fulfilled' && initialProviderResult.value) {
+    providerCandidate = sanitizeExternalCandidate(initialProviderResult.value);
+  } else if (initialProviderResult.status === 'rejected') {
+    console.error('Provider metadata enrichment failed:', initialProviderResult.reason);
+  }
 
-  try {
-    const metadata = await fetchAnimeMetadataByQueries(...providerQueries);
-    if (metadata) {
-      providerCandidate = sanitizeExternalCandidate(metadata);
+  // ── 第二步（条件）：如果 AI 返回了更好的搜索词（原名），用原名再搜一次 ──
+  const aiOriginalTitle = normalizeTitle(aiCandidate?.originalTitle as string);
+  const hasBetterQuery = aiOriginalTitle && !initialProviderQueries.includes(aiOriginalTitle);
 
-      const providerTitle = normalizeTitle(metadata.title);
-      if ((mode === 'create' || mode === 'fill-missing') && providerTitle && providerTitle !== data.title) {
-        titleWasStandardized = titleWasStandardized || providerTitle !== originalUserTitle;
-        data.title = providerTitle;
+  if (hasBetterQuery && !providerCandidate) {
+    // Provider 第一轮没命中，用 AI 原名重试
+    try {
+      const metadata = await fetchAnimeMetadataByQueries(aiOriginalTitle);
+      if (metadata) {
+        providerCandidate = sanitizeExternalCandidate(metadata);
       }
+    } catch (error) {
+      console.error('Provider retry with AI original title failed:', error);
     }
-  } catch (error) {
-    console.error('Provider metadata enrichment failed:', error);
+  }
+
+  // 提取 Provider 标题
+  if (providerCandidate) {
+    const providerTitle = normalizeTitle((providerCandidate as Record<string, unknown>).title as string);
+    if ((mode === 'create' || mode === 'fill-missing') && providerTitle && providerTitle !== data.title) {
+      titleWasStandardized = titleWasStandardized || providerTitle !== originalUserTitle;
+      data.title = providerTitle;
+    }
   }
 
   const mergedCandidate = buildMetadataCandidate(providerCandidate, aiCandidate);
@@ -142,7 +141,7 @@ export async function enrichAnimeInput(input: CreateAnimeDTO, options: AnimeEnri
     allowReplaceFilledCover: mode === 'create' && titleWasStandardized,
     allowCastAliasAugment: true,
     allowIsFinishedUpgrade: true,
-  }).data;
+  }).data as CreateAnimeDTO;
 
   if (!options.skipVoiceActorAliases && Array.isArray(data.cast) && data.cast.length > 0) {
     try {

@@ -78,3 +78,11 @@ export function matchesTextQuery(
 export function containsCjkText(value: string): boolean {
   return /[\u3040-\u30ff\u3400-\u9fff]/.test(value);
 }
+
+/** \u6bd4\u8f83\u4e24\u4e2a\u5b57\u7b26\u4e32\u6570\u7ec4\u662f\u5426\u5185\u5bb9\u4e00\u81f4\uff08\u987a\u5e8f\u65e0\u5173\uff09 */
+export function areStringArraysEqual(left: unknown, right: unknown): boolean {
+  const leftValues = normalizeStringArray(left) || [];
+  const rightValues = normalizeStringArray(right) || [];
+  if (leftValues.length !== rightValues.length) return false;
+  return leftValues.every((value, index) => value === rightValues[index]);
+}

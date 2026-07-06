@@ -1,29 +1,9 @@
+import type { AnimeStatus, AnimeDetailItem } from './anime-shared';
+import { ANIME_STATUS_LABELS } from './anime-shared';
 
-import type { AnimeStatus } from './anime-shared';
+// Re-export from shared to avoid duplicate type definitions
+export type AnimeRecord = AnimeDetailItem;
 export type { AnimeStatus };
-
-export interface AnimeRecord {
-  id: number;
-  title: string;
-  originalTitle?: string;
-  coverUrl?: string;
-  score?: number;
-  progress: number;
-  totalEpisodes?: number;
-  durationMinutes?: number;
-  status: AnimeStatus;
-  tags?: string[];
-  cast?: string[];
-  castAliases?: string[];
-  summary?: string;
-  startDate?: string;
-  endDate?: string;
-  premiereDate?: string;
-  isFinished?: boolean;
-  createdAt: string;
-  updatedAt: string;
-  lastWatchedAt?: string;
-}
 
 export interface WatchHistoryRecord {
   id: number;
@@ -41,12 +21,8 @@ export interface ParsedWatchHistory extends WatchHistoryRecord {
   year: number;
 }
 
-export const statusLabels: Record<AnimeStatus, string> = {
-  watching: '追番中',
-  completed: '已看完',
-  dropped: '已弃坑',
-  plan_to_watch: '计划看',
-};
+/** @deprecated 使用 ANIME_STATUS_LABELS */
+export const statusLabels = ANIME_STATUS_LABELS;
 
 export const statusColors: Record<AnimeStatus, string> = {
   watching: '#22c55e',
