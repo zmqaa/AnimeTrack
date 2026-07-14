@@ -1,20 +1,40 @@
 import { NextRequest } from 'next/server';
-import { listAnimeRecordsWithLastWatched, createAnimeRecord, CreateAnimeDTO, AnimeStatus } from '@/lib/anime';
+import { listAnimeRecordsWithLastWatched, listAnimeRecordsPaginated, createAnimeRecord, updateAnimeRecord, CreateAnimeDTO, AnimeStatus } from '@/lib/anime';
 import { normalizeStringArray } from '@/lib/anime-cast';
 import { enrichAnimeInput } from '@/lib/anime-enrichment';
 import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
 import { createAnimeSchema } from '@/lib/validations';
+import { resolveCoverImage } from '@/lib/cover-image';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const status = searchParams.get('status') as AnimeStatus | undefined;
+  const status = searchParams.get('status') as AnimeStatus | null;
   const limit = Number(searchParams.get('limit') || '0');
   const offset = Number(searchParams.get('offset') || '0');
-  
+  const search = searchParams.get('search') || undefined;
+  const sortBy = searchParams.get('sortBy') || undefined;
+  const sortOrder = (searchParams.get('sortOrder') as 'asc' | 'desc') || undefined;
+  const page = Number(searchParams.get('page') || '0');
+
   try {
+    // 分页模式：Client 传入 page / pageSize 时走服务端分页+排序
+    if (page > 0) {
+      const pageSize = Math.min(100, Math.max(1, Number(searchParams.get('pageSize') || '12')));
+      const result = await listAnimeRecordsPaginated({
+        status: status || undefined,
+        search,
+        sortBy,
+        sortOrder,
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+      });
+      return apiSuccess(result, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' });
+    }
+
+    // 兼容旧行为：无 page 参数时返回全部记录（Dashboard 使用）
     const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(limit, 5000) : undefined;
     const safeOffset = Number.isFinite(offset) && offset > 0 ? offset : undefined;
-    const list = await listAnimeRecordsWithLastWatched({ status: status || undefined, limit: safeLimit, offset: safeOffset });
+    const list = await listAnimeRecordsWithLastWatched({ status: status || undefined, limit: safeLimit, offset: safeOffset, search });
     return apiSuccess(list, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '读取失败';
@@ -69,6 +89,15 @@ export async function POST(request: NextRequest) {
     }
 
     const newRecord = await createAnimeRecord(data);
+
+    // 下载封面图到本地
+    if (newRecord.coverUrl) {
+      const resolved = await resolveCoverImage(newRecord.coverUrl, newRecord.id);
+      if (resolved !== newRecord.coverUrl) {
+        await updateAnimeRecord(newRecord.id, { coverUrl: resolved ?? undefined });
+        newRecord.coverUrl = resolved ?? undefined;
+      }
+    }
 
     return apiSuccess(newRecord);
   } catch (error: unknown) {

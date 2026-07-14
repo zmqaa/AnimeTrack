@@ -109,12 +109,12 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
     ? Math.min(100, (displayProgress / displayTotalEpisodes) * 100)
     : (displayStatus === 'completed' ? 100 : Math.min(displayProgress * 8, 100));
 
-  if (loading) return <div className="p-12 text-center text-zinc-500">Loading details...</div>;
+  if (loading) return <div className="p-12 text-center text-[var(--text-muted)]">Loading details...</div>;
   if (!item) return null;
 
   return (
     <div className="mx-auto w-full max-w-[1660px] px-4 md:px-6 xl:px-8 2xl:px-10 pb-20 animate-in fade-in zoom-in-95 duration-300">
-      <div className="relative overflow-hidden rounded-[32px] border border-slate-300/10 shadow-[0_30px_80px_rgba(0,0,0,0.45)]" style={{ backgroundColor: 'var(--bg-card)' }}>
+      <div className="relative overflow-hidden rounded-[32px] border border-[var(--border)] shadow-[0_30px_80px_rgba(0,0,0,0.45)]" style={{ backgroundColor: 'var(--bg-card)' }}>
         {/* Background blur from cover */}
         {(typeof formData.coverUrl === 'string' ? formData.coverUrl : item.coverUrl) && (
           <div className="absolute inset-0 opacity-[0.08]">
@@ -125,7 +125,7 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
         <div className="theme-detail-aura absolute inset-0" />
 
         <div className="relative p-5 md:p-8 xl:p-10 2xl:p-12">
-          <button onClick={() => router.push(returnTo, { scroll: false })} className="flex items-center gap-2 text-sm text-zinc-500 transition-colors hover:text-white mb-6">
+          <button onClick={() => router.push(returnTo, { scroll: false })} className="flex items-center gap-2 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] mb-6">
             <ArrowLeftIcon className="h-4 w-4" />
             <span>返回列表</span>
           </button>

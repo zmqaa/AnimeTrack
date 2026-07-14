@@ -17,6 +17,22 @@ export const APP_THEMES = [
     heroOverlay: 'linear-gradient(120deg, rgba(14,8,7,0.92), rgba(14,8,7,0.46) 44%, rgba(14,8,7,0.9))',
     premierePalette: ['#f2a65a', '#ef7d57', '#ffd166', '#fb7185', '#d6b38a', '#c97a63', '#facc15'],
   },
+  {
+    value: 'noir',
+    label: '深黑',
+    description: '纯黑基底高清对比',
+    preview: '#a0aec0',
+    heroOverlay: 'linear-gradient(120deg, rgba(0,0,0,0.94), rgba(0,0,0,0.5) 44%, rgba(0,0,0,0.94))',
+    premierePalette: ['#a0aec0', '#718096', '#e2e8f0', '#cbd5e0', '#90cdf4', '#fbb6ce', '#fbd38d'],
+  },
+  {
+    value: 'lumen',
+    label: '暖纸',
+    description: '书页暖米色调护眼舒适',
+    preview: '#faf5ed',
+    heroOverlay: 'linear-gradient(120deg, rgba(239,226,205,0.92), rgba(239,226,205,0.5) 44%, rgba(239,226,205,0.9))',
+    premierePalette: ['#c9782c', '#5a8a6f', '#b8594a', '#8b6c4e', '#d4952a', '#5c7a6a', '#c46b4a'],
+  },
 ] as const;
 
 export type AppTheme = (typeof APP_THEMES)[number]['value'];

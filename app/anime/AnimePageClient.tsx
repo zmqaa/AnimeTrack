@@ -28,29 +28,32 @@ import {
 const ANIME_LIST_CACHE_KEY = 'anime-list-items';
 const ANIME_LIST_SCROLL_KEY = 'anime-list-scroll-y';
 
-function getInitialAnimeListCache() {
-  return readSessionCache<AnimeListItem[]>(ANIME_LIST_CACHE_KEY);
-}
-
 export default function AnimePageClient() {
   const { data: session } = useSession();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const isAdmin = (session?.user as SessionUser | undefined)?.role === 'admin';
-  const [items, setItems] = useState<AnimeListItem[]>(() => getInitialAnimeListCache() || []);
-  const [loading, setLoading] = useState(() => getInitialAnimeListCache() === null);
+  const [items, setItems] = useState<AnimeListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(false);
+  const [paginatedRecords, setPaginatedRecords] = useState<AnimeListItem[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [quickInput, setQuickInput] = useState('');
   const [quickLoading, setQuickLoading] = useState(false);
   const [quickMessage, setQuickMessage] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    if (typeof window !== 'undefined') {
-      return (sessionStorage.getItem('anime_view_mode') as ViewMode) || 'grid';
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+
+  // 客户端挂载后从 sessionStorage 恢复视图模式
+  useEffect(() => {
+    const saved = sessionStorage.getItem('anime_view_mode');
+    if (saved === 'list' || saved === 'grid') {
+      setViewMode(saved);
     }
-    return 'grid';
-  });
+  }, []);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; title: string } | null>(null);
   
   // 筛选与排序状态
@@ -60,6 +63,8 @@ export default function AnimePageClient() {
   const [tagFilter, setTagFilter] = useState('');
   const [sortBy, setSortBy] = useState<AnimeSortBy>('lastWatchedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const hasSyncedUrlFilters = useRef(false);
   const lastFilterKeyRef = useRef('');
   const hasRestoredScrollRef = useRef(false);
@@ -119,6 +124,7 @@ export default function AnimePageClient() {
     isFinished: false,
   });
 
+  // 后台加载全量数据（给 Sidebar 统计用，缓存到 sessionStorage）
   const loadItems = useCallback(async (options?: { showLoading?: boolean }) => {
     const showLoading = options?.showLoading ?? true;
     if (showLoading) {
@@ -126,7 +132,7 @@ export default function AnimePageClient() {
     }
 
     try {
-      const data = await fetchJson<AnimeListItem[]>(`/api/anime?_t=${Date.now()}`, undefined, '加载番剧失败');
+      const data = await fetchJson<AnimeListItem[]>('/api/anime', undefined, '加载番剧失败');
       const entries = Array.isArray(data) ? data : [];
       setItems(entries);
       writeSessionCache(ANIME_LIST_CACHE_KEY, entries);
@@ -150,6 +156,52 @@ export default function AnimePageClient() {
 
     void loadItems();
   }, [loadItems]);
+
+  // 搜索防抖：输入停止 300ms 后才触发服务端请求
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [searchQuery]);
+
+  // 服务端分页加载（给 Grid 用，传递筛选条件给 API）
+  const loadPage = useCallback(async () => {
+    // 当有声优或标签筛选时，无法用服务端分页（这些字段是 JSON 文本列）
+    if (castQuery || tagFilter) return;
+
+    setPageLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('page', String(currentPage));
+      params.set('pageSize', String(pageSize));
+      if (filterStatus !== 'all') params.set('status', filterStatus);
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      params.set('sortBy', sortBy);
+      params.set('sortOrder', sortOrder);
+
+      const data = await fetchJson<{ records: AnimeListItem[]; total: number; page: number; totalPages: number }>(
+        `/api/anime?${params.toString()}`, undefined, '加载失败'
+      );
+      if (data) {
+        setPaginatedRecords(data.records || []);
+        setTotalCount(data.total || 0);
+        setTotalPages(data.totalPages || 1);
+      }
+    } catch (err) {
+      console.error('Failed to load page:', err);
+    } finally {
+      setPageLoading(false);
+    }
+  }, [currentPage, filterStatus, debouncedSearch, sortBy, sortOrder, castQuery, tagFilter, pageSize]);
+
+  // 筛选/排序/翻页变化时加载对应页
+  useEffect(() => {
+    loadPage();
+  }, [loadPage]);
 
   useEffect(() => {
     if (loading || hasRestoredScrollRef.current) {
@@ -270,13 +322,15 @@ export default function AnimePageClient() {
       await fetchJson<{ ok: true; entry: AnimeListItem }>(`/api/anime/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           progress: current,
           status: isFinishing ? 'completed' : undefined,
           recordHistory: true
         })
       }, '更新失败，请重试');
-      loadItems();
+      // 后台刷新全量数据和当前页
+      loadItems({ showLoading: false });
+      loadPage();
       if (isFinishing) {
         toast.success('🎉 恭喜完结！');
       } else {
@@ -325,7 +379,8 @@ export default function AnimePageClient() {
         body: JSON.stringify({ text }),
       }, 'AI录入失败');
 
-      await loadItems();
+      loadItems({ showLoading: false });
+      loadPage();
       setQuickInput('');
       toast.success('AI 录入成功');
       setQuickMessage(buildQuickRecordMessage(data));
@@ -358,7 +413,9 @@ export default function AnimePageClient() {
     return buildRecentWatchItems(items);
   }, [items]);
 
+  // 客户端筛选（仅在声优/标签筛选时使用，作为服务端分页的降级方案）
   const filteredItems = useMemo(() => {
+    if (!castQuery && !tagFilter) return [];
     return filterAndSortAnimeItems(items, {
       filterStatus,
       searchQuery,
@@ -369,8 +426,11 @@ export default function AnimePageClient() {
     });
   }, [items, filterStatus, searchQuery, castQuery, tagFilter, sortBy, sortOrder]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
+  // 是否使用服务端分页（无声优/标签筛选时启用）
+  const useServerPagination = !castQuery && !tagFilter;
+
+  const displayTotalPages = useServerPagination ? totalPages : Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const safePage = Math.min(currentPage, displayTotalPages);
 
   useEffect(() => {
     if (loading) {
@@ -383,9 +443,12 @@ export default function AnimePageClient() {
   }, [safePage, currentPage, loading, setCurrentPage]);
 
   const pagedItems = useMemo(() => {
+    if (useServerPagination) return paginatedRecords;
     const start = (safePage - 1) * pageSize;
     return filteredItems.slice(start, start + pageSize);
-  }, [filteredItems, safePage, pageSize]);
+  }, [useServerPagination, paginatedRecords, filteredItems, safePage, pageSize]);
+
+  const displayTotal = useServerPagination ? totalCount : filteredItems.length;
 
   const rememberListScroll = useCallback(() => {
     sessionStorage.setItem(ANIME_LIST_SCROLL_KEY, String(window.scrollY));
@@ -418,21 +481,21 @@ export default function AnimePageClient() {
             <div className="flex gap-3">
               <div className="theme-focus-parent relative group shadow-sm flex-1">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <MagnifyingGlassIcon className="theme-focus-icon h-5 w-5 text-zinc-500 transition-colors" />
+                  <MagnifyingGlassIcon className="theme-focus-icon h-5 w-5 text-[var(--text-muted)] transition-colors" />
                 </div>
                 <input
                   type="text"
                   placeholder="搜索番剧、原名或声优..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="surface-input theme-focus-accent block w-full pl-11 pr-4 py-3 rounded-2xl text-white placeholder-zinc-500 transition-all shadow-xl"
+                  className="surface-input theme-focus-accent block w-full pl-11 pr-4 py-3 rounded-2xl text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-all shadow-xl"
                 />
               </div>
               <div className="surface-card-muted flex items-center rounded-2xl overflow-hidden flex-shrink-0">
                 <button
                   type="button"
                   onClick={() => toggleViewMode('grid')}
-                  className={`p-3 transition-all ${viewMode === 'grid' ? 'theme-accent-soft' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}`}
+                  className={`p-3 transition-all ${viewMode === 'grid' ? 'theme-accent-soft' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}
                   aria-label="网格视图"
                 >
                   <Squares2X2Icon className="w-5 h-5" />
@@ -440,7 +503,7 @@ export default function AnimePageClient() {
                 <button
                   type="button"
                   onClick={() => toggleViewMode('list')}
-                  className={`p-3 transition-all ${viewMode === 'list' ? 'theme-accent-soft' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5'}`}
+                  className={`p-3 transition-all ${viewMode === 'list' ? 'theme-accent-soft' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}
                   aria-label="列表视图"
                 >
                   <ListBulletIcon className="w-5 h-5" />
@@ -458,16 +521,16 @@ export default function AnimePageClient() {
               setSortBy={setSortBy}
               sortOrder={sortOrder}
               setSortOrder={setSortOrder}
-              itemsCount={filteredItems.length}
+              itemsCount={displayTotal}
             />
 
             {tagFilter && (
-              <div className="flex items-center justify-between rounded-xl border border-purple-500/20 bg-purple-500/10 px-3 py-2">
-                <span className="text-xs text-purple-200">已按标签筛选：#{tagFilter}</span>
+              <div className="flex items-center justify-between rounded-xl status-plan-soft px-3 py-2">
+                <span className="text-xs text-[var(--color-plan)]">已按标签筛选：#{tagFilter}</span>
                 <button
                   type="button"
                   onClick={() => setTagFilter('')}
-                  className="text-[11px] text-purple-200/80 hover:text-white"
+                  className="text-[11px] text-[var(--color-plan)]/80 hover:text-[var(--text-primary)]"
                 >
                   清除
                 </button>
@@ -486,11 +549,11 @@ export default function AnimePageClient() {
             />
           )}
 
-          <AnimeGrid 
+          <AnimeGrid
             items={pagedItems}
             onEdit={startEdit}
             updateProgress={updateProgress}
-            loading={loading}
+            loading={loading || pageLoading}
             isAdmin={isAdmin}
             viewMode={viewMode}
             detailReturnTo={returnTo}
@@ -498,10 +561,10 @@ export default function AnimePageClient() {
           />
 
           <AnimePagination
-            loading={loading}
-            itemsCount={filteredItems.length}
+            loading={loading || pageLoading}
+            itemsCount={displayTotal}
             currentPage={safePage}
-            totalPages={totalPages}
+            totalPages={displayTotalPages}
             onPageChange={setCurrentPage}
           />
         </div>

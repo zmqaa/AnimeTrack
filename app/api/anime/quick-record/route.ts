@@ -5,6 +5,7 @@ import { parseQuickRecordBatch, type ParsedQuickRecordIntent } from '@/lib/ai';
 import { enrichAnimeInput } from '@/lib/anime-enrichment';
 import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
 import { DEFAULT_METADATA_FIELDS, buildMetadataPatch } from '@/lib/metadata/merge-policy';
+import { resolveCoverImage } from '@/lib/cover-image';
 import {
   detectRewatchTag, resolveNextRewatchTag, shouldAutoResolveRewatch,
   normalizeDate, resolveRecordedDateString, resolveIntentStatus, resolveTargetProgress,
@@ -102,6 +103,14 @@ async function processQuickRecordIntent(
     }
 
     const created = await createAnimeRecord(input);
+    // 下载封面图到本地
+    if (created.coverUrl) {
+      const resolved = await resolveCoverImage(created.coverUrl, created.id);
+      if (resolved !== created.coverUrl) {
+        await updateAnimeRecord(created.id, { coverUrl: resolved ?? undefined });
+        created.coverUrl = resolved ?? undefined;
+      }
+    }
     const shouldWriteHistory = Boolean(recordedDateString) && created.progress > 0 && created.status !== 'plan_to_watch';
     if (shouldWriteHistory) {
       await addWatchHistory(created.id, created.title, created.progress, watchedAt);
@@ -171,6 +180,14 @@ async function processQuickRecordIntent(
     const updated = await updateAnimeRecord(anime.id, patch);
     if (!updated) throw new Error('更新失败');
     entry = updated;
+    // 如果更新了 coverUrl，同步下载封面到本地
+    if (patch.coverUrl !== undefined) {
+      const resolved = await resolveCoverImage(patch.coverUrl, anime.id);
+      if (resolved !== (patch.coverUrl || null)) {
+        const reUpdated = await updateAnimeRecord(anime.id, { coverUrl: resolved ?? undefined });
+        if (reUpdated) entry = reUpdated;
+      }
+    }
   }
 
   let historyWritten = false;

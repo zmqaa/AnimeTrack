@@ -1,7 +1,7 @@
-import { type ResultSetHeader, type RowDataPacket } from 'mysql2';
 import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
 import { listAnimeRecordsWithLastWatched } from '@/lib/anime';
-import { query } from '@/lib/db';
+import { query, type DbResult } from '@/lib/db';
+import { deleteCoverImage } from '@/lib/cover-image';
 
 export async function GET(request: Request) {
   const { authorized, response } = await requireAdmin();
@@ -15,15 +15,15 @@ export async function GET(request: Request) {
   try {
     const offset = (page - 1) * pageSize;
 
-    // 并行查询：列表 + 真实总数
+    // Parallel: list + real total count
     const [all, totalResult] = await Promise.all([
       listAnimeRecordsWithLastWatched({ search, limit: pageSize, offset }),
       search
-        ? query<(RowDataPacket & { total: number })[]>(
+        ? query<{ total: number }[]>(
             'SELECT COUNT(*) as total FROM anime WHERE title LIKE ? OR original_title LIKE ?',
             [`%${search}%`, `%${search}%`]
           )
-        : query<(RowDataPacket & { total: number })[]>('SELECT COUNT(*) as total FROM anime'),
+        : query<{ total: number }[]>('SELECT COUNT(*) as total FROM anime'),
     ]);
 
     const total = Number(totalResult[0]?.total ?? 0);
@@ -49,8 +49,12 @@ export async function DELETE(request: Request) {
 
   try {
     const placeholders = ids.map(() => '?').join(',');
-    await query<ResultSetHeader>(`DELETE FROM watch_history WHERE animeId IN (${placeholders})`, ids);
-    const result = await query<ResultSetHeader>(`DELETE FROM anime WHERE id IN (${placeholders})`, ids);
+    await query<DbResult>(`DELETE FROM watch_history WHERE animeId IN (${placeholders})`, ids);
+    const result = await query<DbResult>(`DELETE FROM anime WHERE id IN (${placeholders})`, ids);
+    // 清理已删除番剧的本地封面文件
+    for (const id of ids) {
+      await deleteCoverImage(id);
+    }
     return apiSuccess({ deleted: result.affectedRows });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '删除失败';

@@ -11,7 +11,8 @@ export function useAnimeData(parsedHistory: ParsedWatchHistory[] = []) {
     errorMessage: '加载番剧数据失败',
   });
 
-  const animeStats = useMemo(() => {
+  // 合并 animeStats + animeTagStats 为单次遍历
+  const { animeStats, animeTagStats } = useMemo(() => {
     let episodes = 0;
     let minutes = 0;
     const byStatus: Record<AnimeStatus, number> = {
@@ -20,40 +21,38 @@ export function useAnimeData(parsedHistory: ParsedWatchHistory[] = []) {
       dropped: 0,
       plan_to_watch: 0,
     };
+    const tagCounts: Record<string, number> = {};
 
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
     const recentEpisodes = parsedHistory.filter(h => h.dateObj >= oneWeekAgo).length;
 
-    animeList.forEach((anime) => {
+    for (const anime of animeList) {
       episodes += anime.progress;
       minutes += anime.progress * (anime.durationMinutes || 24);
       byStatus[anime.status] += 1;
-    });
 
-    return {
-      count: animeList.length,
-      episodesWatched: episodes,
-      minutesWatched: minutes,
-      byStatus,
-      weeklyVelocity: recentEpisodes
-    };
-  }, [animeList, parsedHistory]);
-
-  const animeTagStats = useMemo(() => {
-    const tagCounts: Record<string, number> = {};
-    animeList.forEach(anime => {
       if (anime.tags && Array.isArray(anime.tags)) {
-        anime.tags.forEach(tag => {
+        for (const tag of anime.tags) {
           const t = tag.trim();
           if (t) tagCounts[t] = (tagCounts[t] || 0) + 1;
-        });
+        }
       }
-    });
-    return Object.entries(tagCounts)
-      .sort((a, b) => b[1] - a[1])
-      .map(([tag, count]) => ({ tag, count }));
-  }, [animeList]);
+    }
+
+    return {
+      animeStats: {
+        count: animeList.length,
+        episodesWatched: episodes,
+        minutesWatched: minutes,
+        byStatus,
+        weeklyVelocity: recentEpisodes,
+      },
+      animeTagStats: Object.entries(tagCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([tag, count]) => ({ tag, count })),
+    };
+  }, [animeList, parsedHistory]);
 
   const recentTagStats = useMemo(() => {
     const cutoff = new Date();

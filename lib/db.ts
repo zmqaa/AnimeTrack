@@ -1,31 +1,103 @@
 import 'server-only';
-import mysql from 'mysql2/promise';
-import { env } from './env';
+import path from 'path';
+import fs from 'fs';
 
-// Prevent multiple pools in development
-declare global {
-  // eslint-disable-next-line no-var
-  var mysqlPool: mysql.Pool | undefined;
+// Use runtime require to avoid bundling issues; type via any for simplicity
+// eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-explicit-any
+const BetterSqlite3: any = require('better-sqlite3');
+
+const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'animetrack.db');
+const SCHEMA_PATH = path.join(process.cwd(), 'database', 'schema.sql');
+
+let _db: InstanceType<typeof BetterSqlite3> | null = null;
+
+function getDb(): InstanceType<typeof BetterSqlite3> {
+  if (_db) return _db;
+
+  const dir = path.dirname(DB_PATH);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  const db = new BetterSqlite3(DB_PATH);
+
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+  db.pragma('busy_timeout = 5000');
+  // 增大缓存，减少磁盘IO
+  db.pragma('cache_size = -64000');  // 64MB
+  db.pragma('mmap_size = 268435456'); // 256MB memory-mapped I/O
+
+  if (fs.existsSync(SCHEMA_PATH)) {
+    const schema = fs.readFileSync(SCHEMA_PATH, 'utf-8');
+    db.exec(schema);
+  }
+
+  // 启动时清理孤儿观看历史（anime 已删除但 history 未清理的记录）
+  try {
+    const orphanResult = db.prepare('DELETE FROM watch_history WHERE animeId NOT IN (SELECT id FROM anime)').run();
+    if (orphanResult.changes > 0) {
+      console.log(`[db] 清理了 ${orphanResult.changes} 条孤儿观看历史`);
+    }
+  } catch (err) {
+    console.warn('[db] 孤儿记录清理失败:', (err as Error).message);
+  }
+
+  _db = db;
+  return db;
 }
 
-export const pool =
-  global.mysqlPool ||
-  mysql.createPool({
-    host: env.mysqlHost,
-    port: env.mysqlPort,
-    user: env.mysqlUser,
-    password: env.mysqlPassword,
-    database: env.mysqlDatabase,
-    connectionLimit: 5, // 降低连接数，避免超出数据库限制
-    waitForConnections: true,
-    queueLimit: 0,
-    enableKeepAlive: true,
-    keepAliveInitialDelay: 0,
-  });
+export interface DbResult {
+  insertId: number;
+  affectedRows: number;
+}
 
-if (process.env.NODE_ENV !== 'production') global.mysqlPool = pool;
+/** 预编译语句缓存 —— 避免每次 query() 都重新解析 SQL */
+const stmtCache = new Map<string, InstanceType<typeof BetterSqlite3>['_statements'][number]>();
 
-export async function query<T = unknown>(sql: string, params?: unknown[]) {
-  const [rows] = await pool.query(sql, params);
-  return rows as T;
+function getCachedStmt(db: InstanceType<typeof BetterSqlite3>, sql: string) {
+  let stmt = stmtCache.get(sql);
+  if (!stmt) {
+    stmt = db.prepare(sql);
+    stmtCache.set(sql, stmt);
+  }
+  return stmt;
+}
+
+export async function query<T = unknown>(sql: string, params?: unknown[]): Promise<T> {
+  const db = getDb();
+  const stmt = getCachedStmt(db, sql);
+  const bound = params && params.length > 0 ? params : [];
+
+  const trimmed = sql.trim().toUpperCase();
+
+  if (trimmed.startsWith('SELECT') || trimmed.startsWith('PRAGMA') || trimmed.startsWith('WITH') || trimmed.includes('RETURNING')) {
+    // eslint-disable-next-line prefer-spread
+    return (stmt.all as Function).apply(stmt, bound) as T;
+  }
+
+  // eslint-disable-next-line prefer-spread
+  const info = (stmt.run as Function).apply(stmt, bound) as { lastInsertRowid: number | bigint; changes: number };
+
+  return {
+    insertId: Number(info.lastInsertRowid),
+    affectedRows: info.changes,
+  } as T;
+}
+
+/** 清除语句缓存（数据库关闭时调用） */
+export function clearStmtCache(): void {
+  stmtCache.clear();
+}
+
+export function getRawDb() {
+  return getDb();
+}
+
+export function closeDb(): void {
+  clearStmtCache();
+  if (_db) {
+    _db.close();
+    _db = null;
+  }
 }

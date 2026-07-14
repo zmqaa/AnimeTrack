@@ -8,8 +8,8 @@ export const statusMap = ANIME_STATUS_LABELS;
 export const statusBadgeStyles: Record<AnimeStatus, string> = {
   watching: 'theme-status-watching',
   completed: 'theme-status-completed',
-  dropped: 'border-rose-400/30 bg-rose-400/10 text-rose-200',
-  plan_to_watch: 'border-violet-400/30 bg-violet-400/10 text-violet-200',
+  dropped: 'status-dropped-soft',
+  plan_to_watch: 'status-plan-soft',
 };
 
 export function formatDateLabel(value?: string) {

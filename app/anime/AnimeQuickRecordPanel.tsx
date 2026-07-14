@@ -49,7 +49,7 @@ export default function AnimeQuickRecordPanel({
 
       <p className="text-xs text-zinc-500 mt-2">支持自然语言拆成多条记录；AI 会补齐缺失的作品资料，但不会改开始观看和看完日期。</p>
       {quickMessage && (
-        <p className={`text-xs mt-2 ${quickMessage.includes('失败') || quickMessage.includes('请输入') ? 'text-red-400' : 'theme-accent-text'}`}>
+        <p className={`text-xs mt-2 ${quickMessage.includes('失败') || quickMessage.includes('请输入') ? 'text-danger' : 'theme-accent-text'}`}>
           {quickMessage}
         </p>
       )}

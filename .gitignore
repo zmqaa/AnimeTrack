@@ -18,10 +18,6 @@
 /build
 /dist
 
-# Tauri (desktop app)
-/src-tauri/target/
-/src-tauri/icons/extracted-*.png
-
 # IDE / Editor
 .vscode/
 
@@ -33,6 +29,9 @@
 database/*.db
 database/*.sqlite
 anime-track-export.json
+
+# 封面图片缓存（运行时从 Bangumi 下载，不上传）
+/public/covers/
 
 # Misc
 .DS_Store

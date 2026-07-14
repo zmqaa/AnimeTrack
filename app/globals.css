@@ -34,8 +34,115 @@
 
   --divider: #17312a;
 
+  --scrollbar-thumb: #3a5a4a;
+
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+
+  /* Chart colors — line chart (AdvancedActivityStats) */
+  --chart-line-start: #56d39c;
+  --chart-line-end: #5dd6f2;
+  --chart-area-top: rgba(86, 211, 156, 0.22);
+  --chart-area-mid: rgba(93, 214, 242, 0.06);
+  --chart-area-bottom: rgba(86, 211, 156, 0);
+  --chart-dot: #56d39c;
+  --chart-dot-stroke: #0f1a18;
+  --chart-dot-hover: #a8f0ce;
+  --chart-dot-hover-stroke: #ffffff;
+  --chart-grid: rgba(255, 255, 255, 0.07);
+  --chart-axis-y: #6b7b76;
+  --chart-axis-x: #7c8a86;
+  --chart-tooltip-bg: rgba(8, 14, 13, 0.96);
+  --chart-tooltip-border: rgba(125, 211, 252, 0.28);
+  --chart-tooltip-text: #f8fafc;
+  --chart-tooltip-sub: #cbd5e1;
+  --chart-baseline: rgba(255, 255, 255, 0.1);
+
+  /* Chart colors — bar chart (YearBarChart) */
+  --barchart-grid: rgba(255, 255, 255, 0.05);
+  --barchart-axis-y: #64748b;
+  --barchart-baseline: rgba(255, 255, 255, 0.1);
+  --barchart-axis-x: #94a3b8;
+  --barchart-tooltip-bg: rgba(8, 14, 13, 0.95);
+  --barchart-tooltip-border: rgba(255, 255, 255, 0.1);
+  --barchart-tooltip-text: #f1f5f9;
+  --barchart-tooltip-sub: #94a3b8;
+  --barchart-bar-default: #5dd6f2;
+
+  /* Chart colors — heatmap (TimelineHeatmap) */
+  --heatmap-0: rgba(255, 255, 255, 0.03);
+  --heatmap-1: rgba(86, 211, 156, 0.18);
+  --heatmap-2: rgba(86, 211, 156, 0.42);
+  --heatmap-3: rgba(86, 211, 156, 0.68);
+  --heatmap-4: #56d39c;
+
+  /* ── Semantic status colors ── */
+  --color-watching: #5dd6f2;
+  --color-watching-bg: rgba(93, 214, 242, 0.1);
+  --color-watching-border: rgba(93, 214, 242, 0.2);
+  --color-watching-glow: rgba(93, 214, 242, 0.45);
+
+  --color-completed: #56d39c;
+  --color-completed-bg: rgba(86, 211, 156, 0.1);
+  --color-completed-border: rgba(86, 211, 156, 0.2);
+  --color-completed-glow: rgba(86, 211, 156, 0.25);
+
+  --color-dropped: #e08080;
+  --color-dropped-bg: rgba(224, 128, 128, 0.1);
+  --color-dropped-border: rgba(224, 128, 128, 0.2);
+
+  --color-plan: #b8a8e0;
+  --color-plan-bg: rgba(184, 168, 224, 0.1);
+  --color-plan-border: rgba(184, 168, 224, 0.2);
+  --color-plan-glow: rgba(184, 168, 224, 0.4);
+
+  /* ── Semantic accent colors ── */
+  --color-score: #8da6ff;
+  --color-score-bg: rgba(141, 166, 255, 0.1);
+  --color-score-border: rgba(141, 166, 255, 0.2);
+
+  --color-airing: #7dd3f8;
+  --color-airing-bg: rgba(125, 211, 248, 0.1);
+  --color-airing-border: rgba(125, 211, 248, 0.2);
+
+  --color-finished: #56d39c;
+  --color-finished-bg: rgba(86, 211, 156, 0.1);
+  --color-finished-border: rgba(86, 211, 156, 0.2);
+
+  --color-rewatch: #f4bf62;
+  --color-rewatch-bg: rgba(244, 191, 98, 0.12);
+  --color-rewatch-border: rgba(244, 191, 98, 0.25);
+
+  --color-danger: #f87171;
+  --color-danger-bg: rgba(248, 113, 113, 0.1);
+  --color-danger-border: rgba(248, 113, 113, 0.2);
+
+  --color-info: #90b8d8;
+  --color-info-bg: rgba(144, 184, 216, 0.1);
+  --color-info-border: rgba(144, 184, 216, 0.2);
+
+  /* ── Progress bar gradient ── */
+  --color-progress-from: #5dd6f2;
+  --color-progress-to: #7c8ce0;
+
+  /* ── Focus ring ── */
+  --color-focus-ring: rgba(86, 211, 156, 0.3);
+
+  /* ── Surface overlays ── */
+  --color-surface-hover: rgba(255, 255, 255, 0.04);
+  --color-surface-raised: rgba(255, 255, 255, 0.06);
+
+  /* ── Cover gradient (hero card image overlay) ── */
+  --color-cover-gradient-start: rgba(7, 17, 15, 0.1);
+  --color-cover-gradient-end: rgba(7, 17, 15, 0.9);
+
+  /* ── Toast ── */
+  --color-toast-bg: rgba(14, 21, 19, 0.95);
+  --color-toast-border: rgba(255, 255, 255, 0.08);
+  --color-toast-text: #f5f7f4;
+  --color-toast-success-icon: #56d39c;
+  --color-toast-error-icon: #f87171;
+  --color-toast-icon-bg: #07110f;
 }
 
 /* ========================================================
@@ -69,8 +176,506 @@
 
   --divider: #3a211d;
 
+  --scrollbar-thumb: #5a3a33;
+
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+
+  /* Chart colors — line chart (AdvancedActivityStats) */
+  --chart-line-start: #f2a65a;
+  --chart-line-end: #ef7d57;
+  --chart-area-top: rgba(242, 166, 90, 0.22);
+  --chart-area-mid: rgba(239, 125, 87, 0.06);
+  --chart-area-bottom: rgba(242, 166, 90, 0);
+  --chart-dot: #f2a65a;
+  --chart-dot-stroke: #1d0f0c;
+  --chart-dot-hover: #ffd7a8;
+  --chart-dot-hover-stroke: #ffffff;
+  --chart-grid: rgba(255, 255, 255, 0.06);
+  --chart-axis-y: #8a7060;
+  --chart-axis-x: #9b8070;
+  --chart-tooltip-bg: rgba(19, 9, 7, 0.96);
+  --chart-tooltip-border: rgba(242, 166, 90, 0.25);
+  --chart-tooltip-text: #f9f3ef;
+  --chart-tooltip-sub: #dcc5b6;
+  --chart-baseline: rgba(255, 255, 255, 0.08);
+
+  /* Chart colors — bar chart (YearBarChart) */
+  --barchart-grid: rgba(255, 255, 255, 0.04);
+  --barchart-axis-y: #8a7060;
+  --barchart-baseline: rgba(255, 255, 255, 0.08);
+  --barchart-axis-x: #9b8070;
+  --barchart-tooltip-bg: rgba(19, 9, 7, 0.95);
+  --barchart-tooltip-border: rgba(255, 255, 255, 0.08);
+  --barchart-tooltip-text: #f9f3ef;
+  --barchart-tooltip-sub: #b89484;
+  --barchart-bar-default: #f2a65a;
+
+  /* Chart colors — heatmap (TimelineHeatmap) */
+  --heatmap-0: rgba(255, 255, 255, 0.03);
+  --heatmap-1: rgba(242, 166, 90, 0.18);
+  --heatmap-2: rgba(242, 166, 90, 0.42);
+  --heatmap-3: rgba(242, 166, 90, 0.68);
+  --heatmap-4: #f2a65a;
+
+  /* ── Semantic status colors ── */
+  --color-watching: #ef7d57;
+  --color-watching-bg: rgba(239, 125, 87, 0.1);
+  --color-watching-border: rgba(239, 125, 87, 0.2);
+  --color-watching-glow: rgba(239, 125, 87, 0.4);
+
+  --color-completed: #5eb89c;
+  --color-completed-bg: rgba(94, 184, 156, 0.1);
+  --color-completed-border: rgba(94, 184, 156, 0.2);
+  --color-completed-glow: rgba(94, 184, 156, 0.22);
+
+  --color-dropped: #c09080;
+  --color-dropped-bg: rgba(192, 144, 128, 0.1);
+  --color-dropped-border: rgba(192, 144, 128, 0.2);
+
+  --color-plan: #c9a0c0;
+  --color-plan-bg: rgba(201, 160, 192, 0.1);
+  --color-plan-border: rgba(201, 160, 192, 0.2);
+  --color-plan-glow: rgba(201, 160, 192, 0.35);
+
+  /* ── Semantic accent colors ── */
+  --color-score: #ffd166;
+  --color-score-bg: rgba(255, 209, 102, 0.1);
+  --color-score-border: rgba(255, 209, 102, 0.2);
+
+  --color-airing: #f7b979;
+  --color-airing-bg: rgba(247, 185, 121, 0.1);
+  --color-airing-border: rgba(247, 185, 121, 0.2);
+
+  --color-finished: #5eb89c;
+  --color-finished-bg: rgba(94, 184, 156, 0.1);
+  --color-finished-border: rgba(94, 184, 156, 0.2);
+
+  --color-rewatch: #ffd166;
+  --color-rewatch-bg: rgba(255, 209, 102, 0.12);
+  --color-rewatch-border: rgba(255, 209, 102, 0.25);
+
+  --color-danger: #f08060;
+  --color-danger-bg: rgba(240, 128, 96, 0.1);
+  --color-danger-border: rgba(240, 128, 96, 0.2);
+
+  --color-info: #c0a898;
+  --color-info-bg: rgba(192, 168, 152, 0.1);
+  --color-info-border: rgba(192, 168, 152, 0.2);
+
+  /* ── Progress bar gradient ── */
+  --color-progress-from: #ef7d57;
+  --color-progress-to: #f2a65a;
+
+  /* ── Focus ring ── */
+  --color-focus-ring: rgba(242, 166, 90, 0.3);
+
+  /* ── Surface overlays ── */
+  --color-surface-hover: rgba(255, 255, 255, 0.04);
+  --color-surface-raised: rgba(255, 255, 255, 0.06);
+
+  /* ── Cover gradient (hero card image overlay) ── */
+  --color-cover-gradient-start: rgba(19, 9, 7, 0.1);
+  --color-cover-gradient-end: rgba(19, 9, 7, 0.9);
+
+  /* ── Toast ── */
+  --color-toast-bg: rgba(25, 12, 10, 0.95);
+  --color-toast-border: rgba(255, 255, 255, 0.08);
+  --color-toast-text: #f9f3ef;
+  --color-toast-success-icon: #5eb89c;
+  --color-toast-error-icon: #f08060;
+  --color-toast-icon-bg: #130907;
+}
+
+/* ========================================================
+   Noir（深黑）
+   ======================================================== */
+
+[data-theme='noir'] {
+  --bg-page: #000000;
+  --bg-card: #0a0a0a;
+  --border: #1f1f1f;
+  --border-light: #2a2a2a;
+
+  --text-primary: #f0f0f0;
+  --text-secondary: #c0c0c0;
+  --text-muted: #707070;
+
+  --accent: #a0aec0;
+  --accent-light: rgba(160, 174, 192, 0.1);
+  --accent-hover: #cbd5e0;
+
+  --secondary-accent: #90cdf4;
+  --secondary-light: rgba(144, 205, 244, 0.08);
+  --secondary-hover: #b9dffb;
+
+  --warm-accent: #fbd38d;
+  --warm-light: rgba(251, 211, 141, 0.1);
+  --warm-hover: #fde5b8;
+
+  --tag-bg: #141414;
+  --tag-text: #888888;
+
+  --divider: #1f1f1f;
+
+  --scrollbar-thumb: #444444;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.6);
+
+  /* Chart colors — line chart (AdvancedActivityStats) */
+  --chart-line-start: #a0aec0;
+  --chart-line-end: #90cdf4;
+  --chart-area-top: rgba(160, 174, 192, 0.18);
+  --chart-area-mid: rgba(144, 205, 244, 0.05);
+  --chart-area-bottom: rgba(160, 174, 192, 0);
+  --chart-dot: #a0aec0;
+  --chart-dot-stroke: #0a0a0a;
+  --chart-dot-hover: #e2e8f0;
+  --chart-dot-hover-stroke: #ffffff;
+  --chart-grid: rgba(255, 255, 255, 0.06);
+  --chart-axis-y: #707070;
+  --chart-axis-x: #808080;
+  --chart-tooltip-bg: rgba(0, 0, 0, 0.96);
+  --chart-tooltip-border: rgba(144, 205, 244, 0.2);
+  --chart-tooltip-text: #f0f0f0;
+  --chart-tooltip-sub: #c0c0c0;
+  --chart-baseline: rgba(255, 255, 255, 0.08);
+
+  /* Chart colors — bar chart (YearBarChart) */
+  --barchart-grid: rgba(255, 255, 255, 0.04);
+  --barchart-axis-y: #707070;
+  --barchart-baseline: rgba(255, 255, 255, 0.08);
+  --barchart-axis-x: #808080;
+  --barchart-tooltip-bg: rgba(0, 0, 0, 0.95);
+  --barchart-tooltip-border: rgba(255, 255, 255, 0.08);
+  --barchart-tooltip-text: #f0f0f0;
+  --barchart-tooltip-sub: #707070;
+  --barchart-bar-default: #90cdf4;
+
+  /* Chart colors — heatmap (TimelineHeatmap) */
+  --heatmap-0: rgba(255, 255, 255, 0.03);
+  --heatmap-1: rgba(144, 205, 244, 0.18);
+  --heatmap-2: rgba(144, 205, 244, 0.42);
+  --heatmap-3: rgba(144, 205, 244, 0.68);
+  --heatmap-4: #90cdf4;
+
+  /* ── Semantic status colors ── */
+  --color-watching: #90cdf4;
+  --color-watching-bg: rgba(144, 205, 244, 0.08);
+  --color-watching-border: rgba(144, 205, 244, 0.18);
+  --color-watching-glow: rgba(144, 205, 244, 0.35);
+
+  --color-completed: #81c7a8;
+  --color-completed-bg: rgba(129, 199, 168, 0.08);
+  --color-completed-border: rgba(129, 199, 168, 0.18);
+  --color-completed-glow: rgba(129, 199, 168, 0.2);
+
+  --color-dropped: #999999;
+  --color-dropped-bg: rgba(153, 153, 153, 0.08);
+  --color-dropped-border: rgba(153, 153, 153, 0.18);
+
+  --color-plan: #b8b0d8;
+  --color-plan-bg: rgba(184, 176, 216, 0.08);
+  --color-plan-border: rgba(184, 176, 216, 0.18);
+  --color-plan-glow: rgba(184, 176, 216, 0.3);
+
+  /* ── Semantic accent colors ── */
+  --color-score: #e2e8f0;
+  --color-score-bg: rgba(226, 232, 240, 0.08);
+  --color-score-border: rgba(226, 232, 240, 0.18);
+
+  --color-airing: #b9dffb;
+  --color-airing-bg: rgba(185, 223, 251, 0.08);
+  --color-airing-border: rgba(185, 223, 251, 0.18);
+
+  --color-finished: #81c7a8;
+  --color-finished-bg: rgba(129, 199, 168, 0.08);
+  --color-finished-border: rgba(129, 199, 168, 0.18);
+
+  --color-rewatch: #fbd38d;
+  --color-rewatch-bg: rgba(251, 211, 141, 0.1);
+  --color-rewatch-border: rgba(251, 211, 141, 0.22);
+
+  --color-danger: #e09090;
+  --color-danger-bg: rgba(224, 144, 144, 0.08);
+  --color-danger-border: rgba(224, 144, 144, 0.18);
+
+  --color-info: #98a8b8;
+  --color-info-bg: rgba(152, 168, 184, 0.08);
+  --color-info-border: rgba(152, 168, 184, 0.18);
+
+  /* ── Progress bar gradient ── */
+  --color-progress-from: #90cdf4;
+  --color-progress-to: #a0aec0;
+
+  /* ── Focus ring ── */
+  --color-focus-ring: rgba(160, 174, 192, 0.3);
+
+  /* ── Surface overlays ── */
+  --color-surface-hover: rgba(255, 255, 255, 0.04);
+  --color-surface-raised: rgba(255, 255, 255, 0.06);
+
+  /* ── Cover gradient (hero card image overlay) ── */
+  --color-cover-gradient-start: rgba(0, 0, 0, 0.1);
+  --color-cover-gradient-end: rgba(0, 0, 0, 0.9);
+
+  /* ── Toast ── */
+  --color-toast-bg: rgba(10, 10, 10, 0.95);
+  --color-toast-border: rgba(255, 255, 255, 0.08);
+  --color-toast-text: #f0f0f0;
+  --color-toast-success-icon: #81c7a8;
+  --color-toast-error-icon: #e09090;
+  --color-toast-icon-bg: #000000;
+}
+
+/* ========================================================
+   Lumen（暖纸）— 书页暖米色调
+   ======================================================== */
+
+[data-theme='lumen'] {
+  --bg-page: #efe2cd;       /* warm parchment — distinctly warm, not white */
+  --bg-card: #f9f1e4;       /* warm cream — visible lift from page */
+  --border: #dbccb4;
+  --border-light: #e8dcc8;
+
+  --text-primary: #2a1808;
+  --text-secondary: #4a3422;
+  --text-muted: #68543c;
+
+  --accent: #c9782c;
+  --accent-light: rgba(201, 120, 44, 0.12);
+  --accent-hover: #a8621e;
+
+  --secondary-accent: #5a8a6f;
+  --secondary-light: rgba(90, 138, 111, 0.1);
+  --secondary-hover: #4a7a5f;
+
+  --warm-accent: #c9782c;
+  --warm-light: rgba(201, 120, 44, 0.1);
+  --warm-hover: #b0681e;
+
+  --tag-bg: #e6d7c0;
+  --tag-text: #4a3422;
+
+  --divider: #dbccb4;
+
+  --scrollbar-thumb: #bfae96;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.10);
+
+  /* Chart colors — line chart (AdvancedActivityStats) */
+  --chart-line-start: #c9782c;
+  --chart-line-end: #5a8a6f;
+  --chart-area-top: rgba(201, 120, 44, 0.16);
+  --chart-area-mid: rgba(90, 138, 111, 0.05);
+  --chart-area-bottom: rgba(201, 120, 44, 0);
+  --chart-dot: #c9782c;
+  --chart-dot-stroke: #f9f1e4;
+  --chart-dot-hover: #e0a858;
+  --chart-dot-hover-stroke: #3d2c1c;
+  --chart-grid: rgba(0, 0, 0, 0.07);
+  --chart-axis-y: #68543c;
+  --chart-axis-x: #786048;
+  --chart-tooltip-bg: rgba(249, 241, 228, 0.97);
+  --chart-tooltip-border: rgba(201, 120, 44, 0.22);
+  --chart-tooltip-text: #2a1808;
+  --chart-tooltip-sub: #4a3422;
+  --chart-baseline: rgba(0, 0, 0, 0.1);
+
+  /* Chart colors — bar chart (YearBarChart) */
+  --barchart-grid: rgba(0, 0, 0, 0.06);
+  --barchart-axis-y: #68543c;
+  --barchart-baseline: rgba(0, 0, 0, 0.1);
+  --barchart-axis-x: #68543c;
+  --barchart-tooltip-bg: rgba(249, 241, 228, 0.97);
+  --barchart-tooltip-border: rgba(201, 120, 44, 0.2);
+  --barchart-tooltip-text: #2a1808;
+  --barchart-tooltip-sub: #4a3422;
+  --barchart-bar-default: #c9782c;
+
+  /* Chart colors — heatmap (TimelineHeatmap) */
+  --heatmap-0: rgba(0, 0, 0, 0.03);
+  --heatmap-1: rgba(201, 120, 44, 0.18);
+  --heatmap-2: rgba(201, 120, 44, 0.42);
+  --heatmap-3: rgba(201, 120, 44, 0.68);
+  --heatmap-4: #c9782c;
+
+  /* ── Semantic status colors (light theme – darker, readable on cream) ── */
+  --color-watching: #3a7a6a;
+  --color-watching-bg: rgba(58, 122, 106, 0.08);
+  --color-watching-border: rgba(58, 122, 106, 0.18);
+  --color-watching-glow: rgba(58, 122, 106, 0.25);
+
+  --color-completed: #5a8a50;
+  --color-completed-bg: rgba(90, 138, 80, 0.08);
+  --color-completed-border: rgba(90, 138, 80, 0.18);
+  --color-completed-glow: rgba(90, 138, 80, 0.2);
+
+  --color-dropped: #b07868;
+  --color-dropped-bg: rgba(176, 120, 104, 0.08);
+  --color-dropped-border: rgba(176, 120, 104, 0.18);
+
+  --color-plan: #7a6a90;
+  --color-plan-bg: rgba(122, 106, 144, 0.08);
+  --color-plan-border: rgba(122, 106, 144, 0.18);
+  --color-plan-glow: rgba(122, 106, 144, 0.25);
+
+  /* ── Semantic accent colors ── */
+  --color-score: #b87828;
+  --color-score-bg: rgba(184, 120, 40, 0.08);
+  --color-score-border: rgba(184, 120, 40, 0.18);
+
+  --color-airing: #5a7890;
+  --color-airing-bg: rgba(90, 120, 144, 0.08);
+  --color-airing-border: rgba(90, 120, 144, 0.18);
+
+  --color-finished: #5a8a50;
+  --color-finished-bg: rgba(90, 138, 80, 0.08);
+  --color-finished-border: rgba(90, 138, 80, 0.18);
+
+  --color-rewatch: #b87828;
+  --color-rewatch-bg: rgba(184, 120, 40, 0.1);
+  --color-rewatch-border: rgba(184, 120, 40, 0.22);
+
+  --color-danger: #c05050;
+  --color-danger-bg: rgba(192, 80, 80, 0.08);
+  --color-danger-border: rgba(192, 80, 80, 0.18);
+
+  --color-info: #6a8090;
+  --color-info-bg: rgba(106, 128, 144, 0.08);
+  --color-info-border: rgba(106, 128, 144, 0.18);
+
+  /* ── Progress bar gradient ── */
+  --color-progress-from: #3a7a6a;
+  --color-progress-to: #6a9050;
+
+  /* ── Focus ring ── */
+  --color-focus-ring: rgba(201, 120, 44, 0.3);
+
+  /* ── Surface overlays (light theme – use dark transparency) ── */
+  --color-surface-hover: rgba(0, 0, 0, 0.03);
+  --color-surface-raised: rgba(0, 0, 0, 0.04);
+
+  /* ── Cover gradient (light theme – use bg-page color) ── */
+  --color-cover-gradient-start: rgba(239, 226, 205, 0.1);
+  --color-cover-gradient-end: rgba(239, 226, 205, 0.9);
+
+  /* ── Toast ── */
+  --color-toast-bg: rgba(255, 247, 235, 0.97);
+  --color-toast-border: rgba(0, 0, 0, 0.1);
+  --color-toast-text: #2a1808;
+  --color-toast-success-icon: #5a8a50;
+  --color-toast-error-icon: #c05050;
+  --color-toast-icon-bg: #efe2cd;
+}
+
+/* ========================================================
+   Lumen overrides — remap hardcoded Tailwind dark classes
+   to semantic CSS variables so the light theme is readable
+   without touching component files.
+   ======================================================== */
+
+/* ── Text: light-on-dark classes → dark-on-light ── */
+[data-theme='lumen'] .text-white,
+[data-theme='lumen'] .text-zinc-100,
+[data-theme='lumen'] .text-zinc-200 { color: var(--text-primary); }
+
+[data-theme='lumen'] .text-white\/70 { color: var(--text-secondary); }
+
+[data-theme='lumen'] .text-white\/50 { color: var(--text-muted); }
+
+[data-theme='lumen'] .text-zinc-300,
+[data-theme='lumen'] .text-zinc-400 { color: var(--text-secondary); }
+
+[data-theme='lumen'] .text-zinc-500,
+[data-theme='lumen'] .text-zinc-600 { color: var(--text-muted); }
+
+[data-theme='lumen'] .hover\:text-white:hover,
+[data-theme='lumen'] .hover\:text-zinc-200:hover,
+[data-theme='lumen'] .hover\:text-zinc-300:hover { color: var(--text-primary); }
+
+/* ── Placeholder ── */
+[data-theme='lumen'] .placeholder-zinc-500::placeholder { color: var(--text-muted); }
+
+/* ── Background: dark surfaces → light surfaces ── */
+[data-theme='lumen'] .bg-zinc-800,
+[data-theme='lumen'] .bg-zinc-800\/50 { background-color: var(--tag-bg); }
+
+[data-theme='lumen'] .bg-zinc-900,
+[data-theme='lumen'] .bg-zinc-900\/70,
+[data-theme='lumen'] .bg-zinc-900\/95 { background-color: var(--bg-card); }
+
+[data-theme='lumen'] .bg-\[\#080e0d\],
+[data-theme='lumen'] .bg-\[\#080e0d\]\/95,
+[data-theme='lumen'] .bg-\[\#07110f\] { background-color: var(--bg-card); }
+
+[data-theme='lumen'] .bg-\[\#09090b\] { background-color: var(--bg-page); }
+
+[data-theme='lumen'] .bg-black\/30,
+[data-theme='lumen'] .bg-black\/40 { background-color: rgb(0 0 0 / 0.06); }
+
+[data-theme='lumen'] .hover\:bg-zinc-800:hover,
+[data-theme='lumen'] .hover\:bg-zinc-800\/50:hover { background-color: var(--tag-bg); }
+
+[data-theme='lumen'] .hover\:bg-white\/\[0\.02\]:hover { background-color: var(--accent-light); }
+
+/* ── Borders: white-translucent → theme borders ── */
+[data-theme='lumen'] .border-white\/5,
+[data-theme='lumen'] .border-white\/6,
+[data-theme='lumen'] .border-white\/8,
+[data-theme='lumen'] .border-white\/10,
+[data-theme='lumen'] .border-white\/15,
+[data-theme='lumen'] .border-white\/\[0\.03\],
+[data-theme='lumen'] .border-white\/\[0\.06\] { border-color: var(--border); }
+
+[data-theme='lumen'] .border-white\/20 { border-color: var(--border-light); }
+
+[data-theme='lumen'] .hover\:border-white\/10:hover,
+[data-theme='lumen'] .hover\:border-white\/15:hover { border-color: var(--border-light); }
+
+[data-theme='lumen'] .border-zinc-800,
+[data-theme='lumen'] .border-zinc-900,
+[data-theme='lumen'] .border-zinc-950 { border-color: var(--border); }
+
+/* ── Shadows: heavy black → subtle gray ── */
+[data-theme='lumen'] .shadow-black\/40 { --tw-shadow-color: rgb(0 0 0 / 0.1); }
+
+[data-theme='lumen'] .hover\:shadow-black\/40:hover { --tw-shadow-color: rgb(0 0 0 / 0.1); }
+
+/* ── Group hover text (safety net for any remaining hardcoded classes) ── */
+[data-theme='lumen'] .group:hover .group-hover\:text-white { color: var(--text-primary); }
+
+/* ── Generic white-transparency & border safety net ── */
+
+/* ── bg-white/opacity → subtle dark overlay (light bg doesn't benefit from white transparency) ── */
+[data-theme='lumen'] .bg-white\/5,
+[data-theme='lumen'] .bg-white\/6,
+[data-theme='lumen'] .bg-white\/10 { background-color: rgb(0 0 0 / 0.05); }
+
+[data-theme='lumen'] .bg-white\/\[0\.02\] { background-color: rgb(0 0 0 / 0.02); }
+[data-theme='lumen'] .bg-white\/\[0\.04\] { background-color: rgb(0 0 0 / 0.04); }
+[data-theme='lumen'] .bg-white\/\[0\.06\] { background-color: rgb(0 0 0 / 0.06); }
+
+[data-theme='lumen'] .hover\:bg-white\/\[0\.02\]:hover { background-color: rgb(0 0 0 / 0.03); }
+[data-theme='lumen'] .hover\:bg-white\/\[0\.04\]:hover { background-color: rgb(0 0 0 / 0.05); }
+[data-theme='lumen'] .hover\:bg-white\/\[0\.07\]:hover { background-color: rgb(0 0 0 / 0.07); }
+[data-theme='lumen'] .hover\:bg-white\/\[0\.08\]:hover { background-color: rgb(0 0 0 / 0.07); }
+[data-theme='lumen'] .hover\:bg-white\/5:hover { background-color: rgb(0 0 0 / 0.05); }
+[data-theme='lumen'] .hover\:bg-white\/10:hover { background-color: rgb(0 0 0 / 0.08); }
+
+/* ── divide-x (divider lines in stat card grids) ── */
+[data-theme='lumen'] .divide-white\/\[0\.06\] > :not([hidden]) ~ :not([hidden]) { border-color: var(--border); }
+
+/* ── Chart dot hover glow (replaces Tailwind arbitrary values in SVG) ── */
+.chart-dot-base {
+  transition: all 0.2s;
+}
+.chart-dot-base:hover {
+  fill: var(--chart-dot-hover);
+  stroke: var(--chart-dot-hover-stroke);
+  r: 8;
 }
 
 /* ===== Base ===== */
@@ -316,7 +921,7 @@ body {
 ::-webkit-scrollbar       { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--text-muted);
+  background: var(--scrollbar-thumb);
   border-radius: 2px;
 }
 
@@ -346,3 +951,133 @@ body {
 @layer utilities {
   .text-balance { text-wrap: balance; }
 }
+
+/* ========================================================
+   Semantic color utility classes
+   Use these instead of hardcoded Tailwind colors
+   ======================================================== */
+
+/* ── Status badge soft blocks (text + bg + border + gradient) ── */
+.status-watching-soft {
+  color: var(--color-watching);
+  background: linear-gradient(to bottom right, var(--color-watching-bg), color-mix(in srgb, var(--color-watching) 5%, transparent));
+  border-color: var(--color-watching-border);
+}
+.status-completed-soft {
+  color: var(--color-completed);
+  background: linear-gradient(to bottom right, var(--color-completed-bg), color-mix(in srgb, var(--color-completed) 5%, transparent));
+  border-color: var(--color-completed-border);
+}
+.status-dropped-soft {
+  color: var(--color-dropped);
+  background: linear-gradient(to bottom right, var(--color-dropped-bg), color-mix(in srgb, var(--color-dropped) 5%, transparent));
+  border-color: var(--color-dropped-border);
+}
+.status-plan-soft {
+  color: var(--color-plan);
+  background: linear-gradient(to bottom right, var(--color-plan-bg), color-mix(in srgb, var(--color-plan) 5%, transparent));
+  border-color: var(--color-plan-border);
+}
+
+/* ── Status dot (small solid circle, e.g. in list views) ── */
+.status-watching-dot  { background-color: var(--color-watching); }
+.status-completed-dot  { background-color: var(--color-completed); }
+.status-dropped-dot    { background-color: var(--color-dropped); }
+.status-plan-dot       { background-color: var(--color-plan); }
+
+/* ── Airing / finished / rewatch badge soft blocks ── */
+.badge-airing-soft {
+  color: var(--color-airing);
+  background: var(--color-airing-bg);
+  border-color: var(--color-airing-border);
+}
+.badge-finished-soft {
+  color: var(--color-finished);
+  background: var(--color-finished-bg);
+  border-color: var(--color-finished-border);
+}
+.badge-rewatch-soft {
+  color: var(--color-rewatch);
+  background: var(--color-rewatch-bg);
+  border-color: var(--color-rewatch-border);
+}
+
+/* ── Score text ── */
+.score-text { color: var(--color-score); }
+.score-soft {
+  color: var(--color-score);
+  background: var(--color-score-bg);
+  border-color: var(--color-score-border);
+}
+
+/* ── Semantic soft blocks (text + bg + border) ── */
+.danger-soft {
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+}
+.info-soft {
+  color: var(--color-info);
+  background: var(--color-info-bg);
+  border-color: var(--color-info-border);
+}
+.success-soft {
+  color: var(--color-completed);
+  background: var(--color-completed-bg);
+  border-color: var(--color-completed-border);
+}
+
+/* ── Individual semantic text colors ── */
+.text-watching  { color: var(--color-watching); }
+.text-completed { color: var(--color-completed); }
+.text-dropped   { color: var(--color-dropped); }
+.text-plan      { color: var(--color-plan); }
+.text-score     { color: var(--color-score); }
+.text-airing    { color: var(--color-airing); }
+.text-finished  { color: var(--color-finished); }
+.text-rewatch   { color: var(--color-rewatch); }
+.text-danger    { color: var(--color-danger); }
+.text-info      { color: var(--color-info); }
+
+/* ── Progress bar gradient ── */
+.progress-gradient {
+  background: linear-gradient(to right, var(--color-progress-from), var(--color-progress-to));
+}
+.progress-completed {
+  background-color: var(--color-completed);
+}
+
+/* ── Focus ring ── */
+.focus-theme:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+
+/* ── Surface overlays (for hover states, raised surfaces) ── */
+.surface-hover:hover {
+  background-color: var(--color-surface-hover);
+}
+.bg-surface-raised {
+  background-color: var(--color-surface-raised);
+}
+
+/* ── Glow effects ── */
+.glow-watching {
+  background-color: var(--color-watching);
+  box-shadow: 0 0 10px var(--color-watching-glow);
+}
+.glow-completed {
+  box-shadow: 0 0 12px var(--color-completed-glow);
+}
+
+/* ── Cover gradient overlay ── */
+.cover-gradient-overlay {
+  background: linear-gradient(180deg, var(--color-cover-gradient-start), var(--color-cover-gradient-end));
+}
+
+/* ── Hover text transitions (per semantic category) ── */
+.group:hover .group-hover\:text-watching { color: var(--color-watching); }
+.group:hover .group-hover\:text-completed { color: var(--color-completed); }
+.group:hover .group-hover\:text-plan { color: var(--color-plan); }
+.group:hover .group-hover\:text-airing { color: var(--color-airing); }

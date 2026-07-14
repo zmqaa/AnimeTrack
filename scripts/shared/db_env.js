@@ -13,12 +13,8 @@ function resolveProjectRoot() {
     if (fs.existsSync(path.join(currentDir, 'package.json'))) {
       return currentDir;
     }
-
     const parentDir = path.dirname(currentDir);
-    if (parentDir === currentDir) {
-      break;
-    }
-
+    if (parentDir === currentDir) break;
     currentDir = parentDir;
   }
 
@@ -26,13 +22,12 @@ function resolveProjectRoot() {
 }
 
 const projectRoot = resolveProjectRoot();
+const DB_PATH = process.env.DB_PATH || path.join(projectRoot, 'data', 'animetrack.db');
 
 let loaded = false;
 
 function loadDatabaseEnv() {
-  if (loaded) {
-    return;
-  }
+  if (loaded) return;
 
   for (const fileName of ['.env.local', '.env']) {
     const filePath = path.join(projectRoot, fileName);
@@ -44,32 +39,37 @@ function loadDatabaseEnv() {
   loaded = true;
 }
 
-function requireEnv(name) {
+/**
+ * Get a better-sqlite3 database instance.
+ * Auto-creates the data directory and applies schema if tables don't exist.
+ */
+function getDb() {
   loadDatabaseEnv();
 
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+  const dbDir = path.dirname(DB_PATH);
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
   }
 
-  return value;
-}
+  const Database = require('better-sqlite3');
+  const db = new Database(DB_PATH);
 
-function createDbConfig(overrides = {}) {
-  return {
-    host: requireEnv('MYSQL_HOST'),
-    port: Number(requireEnv('MYSQL_PORT')),
-    user: requireEnv('MYSQL_USER'),
-    password: requireEnv('MYSQL_PASSWORD'),
-    database: requireEnv('MYSQL_DATABASE'),
-    charset: 'utf8mb4',
-    ...overrides,
-  };
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+  db.pragma('busy_timeout = 5000');
+
+  // Auto-create tables
+  const schemaPath = path.join(projectRoot, 'database', 'schema.sql');
+  if (fs.existsSync(schemaPath)) {
+    const schema = fs.readFileSync(schemaPath, 'utf-8');
+    db.exec(schema);
+  }
+
+  return db;
 }
 
 /**
- * 返回当前 CST (UTC+8) 时间的文件名安全时间戳，格式 "2026-03-31_14-05-00"。
- * 统一替代各脚本里重复的 new Date(Date.now() + 8*3600000).toISOString() 写法。
+ * Returns current CST (UTC+8) timestamp in filename-safe format: "2026-03-31_14-05-00"
  */
 function nowCSTTimestamp() {
   return new Intl.DateTimeFormat('sv-SE', {
@@ -81,7 +81,7 @@ function nowCSTTimestamp() {
 }
 
 /**
- * 返回当前 CST 时间可读字符串，格式 "2026-03-31 14:05:00"（用于注释/日志）。
+ * Returns current CST time readable string, format "2026-03-31 14:05:00"
  */
 function nowCSTReadable() {
   return new Intl.DateTimeFormat('sv-SE', {
@@ -92,11 +92,16 @@ function nowCSTReadable() {
   }).format(new Date());
 }
 
+/** Returns the path to the SQLite database file */
+function getDbPath() {
+  return DB_PATH;
+}
+
 module.exports = {
   projectRoot,
+  getDbPath,
   loadDatabaseEnv,
-  requireEnv,
-  createDbConfig,
+  getDb,
   nowCSTTimestamp,
   nowCSTReadable,
 };

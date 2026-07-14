@@ -67,8 +67,8 @@ export default function AnimeFilterBar({
                     <div className="surface-card-muted flex p-1 rounded-xl shadow-inner overflow-x-auto max-w-full no-scrollbar">
              {(['all', 'watching', 'completed', 'plan_to_watch', 'dropped'] as const).map((s) => {
                  const isActive = filterStatus === s;
-                 const activeStyles = "bg-zinc-800 text-white shadow-md";
-                 const inactiveStyles = "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50";
+                 const activeStyles = "bg-[var(--tag-bg)] text-[var(--text-primary)] shadow-md";
+                 const inactiveStyles = "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--tag-bg)]/50";
                  
                  return (
                      <button
@@ -84,14 +84,14 @@ export default function AnimeFilterBar({
 
                     <div className="flex items-center gap-3 w-full xl:w-auto">
                         <div className="relative flex-1 xl:flex-none xl:w-[220px]">
-                            <FunnelIcon className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <FunnelIcon className="w-4 h-4 text-[var(--text-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                             <input
                                 type="text"
                                 value={castQuery}
                                 onChange={(event) => setCastQuery(event.target.value)}
                                 placeholder="按声优筛选，支持中文别名"
                                 list="anime-cast-suggestions"
-                                className="surface-input w-full rounded-xl pl-9 pr-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500/40"
+                                className="surface-input w-full rounded-xl pl-9 pr-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus-theme"
                             />
                             <datalist id="anime-cast-suggestions">
                                 {voiceActorSuggestions.map((name) => (
@@ -104,7 +104,7 @@ export default function AnimeFilterBar({
               <button
                   onClick={() => setIsSortOpen(!isSortOpen)}
                   onBlur={() => setTimeout(() => setIsSortOpen(false), 200)}
-                    className="surface-pill flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-zinc-400 hover:text-zinc-200 hover:border-white/10 transition-all cursor-pointer shadow-sm w-[140px] justify-between"
+                    className="surface-pill flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border)] transition-all cursor-pointer shadow-sm w-[140px] justify-between"
               >
                   <div className="flex items-center gap-2">
                       <ArrowsUpDownIcon className="w-4 h-4" />
@@ -119,10 +119,10 @@ export default function AnimeFilterBar({
                          <button
                              key={opt.val}
                              onClick={() => { setSortBy(opt.val); setIsSortOpen(false); }}
-                             className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between ${sortBy === opt.val ? 'bg-zinc-800 text-white font-medium' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'}`}
+                             className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between ${sortBy === opt.val ? 'bg-[var(--tag-bg)] text-[var(--text-primary)] font-medium' : 'text-[var(--text-secondary)] hover:bg-[var(--tag-bg)]/50 hover:text-[var(--text-primary)]'}`}
                          >
                              {opt.label}
-                             {sortBy === opt.val && <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>}
+                             {sortBy === opt.val && <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-plan)]"></span>}
                          </button>
                      ))}
                  </div>
@@ -131,7 +131,7 @@ export default function AnimeFilterBar({
 
             <button 
               onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="surface-pill w-10 h-10 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:border-white/10 transition-all shadow-sm group"
+              className="surface-pill w-10 h-10 flex items-center justify-center rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border)] transition-all shadow-sm group"
               title={sortOrder === 'asc' ? '升序 (A-Z)' : '降序 (Z-A)'}
             >
               <div className={`transition-transform duration-300 ${sortOrder === 'desc' ? 'rotate-180' : ''}`}>
@@ -144,7 +144,7 @@ export default function AnimeFilterBar({
           </div>
         </div>
       </div>
-      <div className="flex justify-end text-[10px] text-zinc-600 font-mono mb-4 px-1">
+      <div className="flex justify-end text-[10px] text-[var(--text-muted)] font-mono mb-4 px-1">
           SHOWING {itemsCount} TITLES
       </div>
     </>

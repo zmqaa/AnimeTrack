@@ -168,28 +168,28 @@ export default function BackupPageClient() {
   };
 
   if (status === 'loading' || (status === 'authenticated' && role !== 'admin')) {
-    return <main className="p-6 text-zinc-400">验证权限中...</main>;
+    return <main className="p-6 text-[var(--text-secondary)]">验证权限中...</main>;
   }
 
   return (
     <main className="p-4 md:p-8 space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl md:text-3xl font-display tracking-tight text-zinc-100">备份与导出</h1>
-        <p className="text-base text-zinc-500 mt-2">导出数据、创建和管理 SQL 备份文件</p>
+        <h1 className="text-2xl md:text-3xl font-display tracking-tight text-[var(--text-primary)]">备份与导出</h1>
+        <p className="text-base text-[var(--text-muted)] mt-2">导出数据、创建和管理 SQL 备份文件</p>
       </div>
 
       {/* Export Section */}
-      <section className="glass-panel rounded-3xl border border-white/5 p-6 md:p-8">
-        <h2 className="text-lg font-medium text-zinc-200 mb-2">导出数据</h2>
-        <p className="text-sm text-zinc-500 mb-5">
+      <section className="glass-panel rounded-3xl border border-[var(--border)] p-6 md:p-8">
+        <h2 className="text-lg font-medium text-[var(--text-primary)] mb-2">导出数据</h2>
+        <p className="text-sm text-[var(--text-muted)] mb-5">
           导出全部番剧列表和观看记录。CSV 格式可以直接用 Excel 打开，JSON 适合程序处理、备份后回导或迁移。
         </p>
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => handleExport('csv')}
             disabled={exporting !== null}
-            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm font-medium hover:bg-emerald-500/20 transition-all disabled:opacity-50"
+            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl success-soft text-sm font-medium hover:bg-[var(--color-completed)]/20 transition-all disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -199,7 +199,7 @@ export default function BackupPageClient() {
           <button
             onClick={() => handleExport('json')}
             disabled={exporting !== null}
-            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-sm font-medium hover:bg-blue-500/20 transition-all disabled:opacity-50"
+            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl badge-airing-soft text-sm font-medium hover:bg-[var(--color-airing)]/20 transition-all disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -209,7 +209,7 @@ export default function BackupPageClient() {
           <button
             onClick={handleImportClick}
             disabled={importing}
-            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm font-medium hover:bg-amber-500/20 transition-all disabled:opacity-50"
+            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-[var(--color-score)]/10 border border-[var(--color-score)]/20 text-[var(--color-score)] text-sm font-medium hover:bg-[var(--color-score)]/20 transition-all disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20V10m0 0l-4 4m4-4l4 4M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1" />
@@ -224,19 +224,19 @@ export default function BackupPageClient() {
           className="hidden"
           onChange={handleImportFile}
         />
-        <p className="text-xs text-zinc-500 mt-4">
+        <p className="text-xs text-[var(--text-muted)] mt-4">
           支持导入当前系统导出的 JSON 文件。导入时会按标题合并番剧，观看历史按番剧、集数、时间去重，避免重复导入后无限叠加。
         </p>
       </section>
 
       {/* Backup Section */}
-      <section className="glass-panel rounded-3xl border border-white/5 p-6 md:p-8">
+      <section className="glass-panel rounded-3xl border border-[var(--border)] p-6 md:p-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
-          <h2 className="text-lg font-medium text-zinc-200">SQL 备份</h2>
+          <h2 className="text-lg font-medium text-[var(--text-primary)]">SQL 备份</h2>
           <button
             onClick={handleCreateBackup}
             disabled={creating}
-            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-violet-500/10 border border-violet-500/20 text-violet-300 text-sm font-medium hover:bg-violet-500/20 transition-all disabled:opacity-50 w-fit"
+            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl status-plan-soft text-sm font-medium hover:bg-[var(--color-plan)]/20 transition-all disabled:opacity-50 w-fit"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -244,18 +244,18 @@ export default function BackupPageClient() {
             {creating ? '备份中...' : '立即备份'}
           </button>
         </div>
-        <p className="text-sm text-zinc-500 mb-6">
-          备份 anime 和 watch_history 表为 SQL 文件。可用于恢复数据、迁移到其他服务器，或配合 <code className="text-zinc-400">/setup</code> 页面初始化新环境。
+        <p className="text-sm text-[var(--text-muted)] mb-6">
+          备份 anime 和 watch_history 表为 SQL 文件。可用于恢复数据、迁移到其他服务器，或配合 <code className="text-[var(--text-secondary)]">/setup</code> 页面初始化新环境。
         </p>
 
         {loading ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-16 bg-white/5 rounded-2xl animate-pulse" />
+              <div key={i} className="h-16 bg-[var(--border)] rounded-2xl animate-pulse" />
             ))}
           </div>
         ) : backups.length === 0 ? (
-          <div className="text-center py-12 text-zinc-500">
+          <div className="text-center py-12 text-[var(--text-muted)]">
             暂无备份文件，点击「立即备份」创建第一个
           </div>
         ) : (
@@ -263,18 +263,18 @@ export default function BackupPageClient() {
             {backups.map((backup) => (
               <div
                 key={backup.name}
-                className="surface-card-muted flex items-center justify-between px-5 py-4 rounded-2xl hover:bg-white/[0.04] transition-all group"
+                className="surface-card-muted flex items-center justify-between px-5 py-4 rounded-2xl hover:bg-[var(--color-surface-hover)] transition-all group"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm md:text-base text-zinc-300 truncate font-medium">{backup.name}</p>
-                  <p className="text-xs md:text-sm text-zinc-500 mt-1">
+                  <p className="text-sm md:text-base text-[var(--text-secondary)] truncate font-medium">{backup.name}</p>
+                  <p className="text-xs md:text-sm text-[var(--text-muted)] mt-1">
                     {formatDate(backup.createdAt)} · {formatSize(backup.size)}
                   </p>
                 </div>
                 <div className="flex items-center gap-1 ml-4 shrink-0">
                   <button
                     onClick={() => handleDownload(backup.name)}
-                    className="p-2.5 rounded-xl text-zinc-400 hover:text-blue-300 hover:bg-blue-500/10 transition-all"
+                    className="p-2.5 rounded-xl text-[var(--text-secondary)] hover:text-[var(--color-watching)] hover:bg-[var(--color-watching)]/10 transition-all"
                     title="下载"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -283,7 +283,7 @@ export default function BackupPageClient() {
                   </button>
                   <button
                     onClick={() => setDeleteConfirm(backup.name)}
-                    className="p-2.5 rounded-xl text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                    className="p-2.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 transition-all"
                     title="删除"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -2,10 +2,10 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
+    // 封面图已本地化到 public/covers/
     remotePatterns: [
-      { protocol: 'https', hostname: 'lain.bgm.tv' },
-      { protocol: 'http', hostname: 'lain.bgm.tv' },
       { protocol: 'https', hostname: 'cdn.myanimelist.net' },
+      { protocol: 'https', hostname: 'lain.bgm.tv' },
     ],
   },
 };

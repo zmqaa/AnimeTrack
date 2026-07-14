@@ -20,42 +20,31 @@
     "anime:enrich-titles": "node scripts/enrich/enrich_titles.js",
     "anime:enrich-titles:write": "node scripts/enrich/enrich_titles.js --write",
     "anime:enrich-bangumi": "node scripts/enrich/enrich_bangumi.js",
-    "anime:enrich-bangumi:write": "node scripts/enrich/enrich_bangumi.js --write",
-    "dev:desktop": "vite",
-    "build:desktop:vite": "vite build",
-    "tauri": "tauri",
-    "build:desktop": "tauri build",
-    "preview:desktop": "vite preview"
+    "anime:enrich-bangumi:write": "node scripts/enrich/enrich_bangumi.js --write"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.11.1",
     "dotenv": "^17.2.4",
-    "mysql2": "^3.16.3",
     "next": "^14.1.0",
     "next-auth": "^4.24.13",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@tauri-apps/api": "2.10.1",
-    "echarts": "^6.0.0",
-    "echarts-for-react": "^3.0.2",
     "react-hot-toast": "^2.6.0",
-    "react-router-dom": "^6.30.1",
     "typescript": "^5.3.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.11.5",
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
-    "@tauri-apps/cli": "^2.0.0",
-    "@vitejs/plugin-react-swc": "^3.7.0",
     "autoprefixer": "^10.4.17",
     "eslint": "^8.56.0",
     "eslint-config-next": "^14.1.0",
     "postcss": "^8.4.33",
-    "tailwindcss": "^3.4.1",
-    "vite": "^5.4.10"
+    "tailwindcss": "^3.4.1"
   }
 }

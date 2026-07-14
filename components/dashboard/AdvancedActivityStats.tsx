@@ -1,22 +1,37 @@
 "use client";
 
-import { memo, useMemo, useState } from 'react';
+import { memo, useMemo, useState, useRef, useEffect } from 'react';
 import { AnimeRecord, ParsedWatchHistory } from '@/lib/dashboard-types';
 
 /** Inline SVG line chart — replacing echarts for ~800KB bundle savings */
 function ActivityLineChart({ data, maxValue, scale }: { data: { label: string; value: number }[]; maxValue: number; scale: 'week' | 'month' | 'year' }) {
-  const W = 600;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [svgWidth, setSvgWidth] = useState(600);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setSvgWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(el);
+    setSvgWidth(el.getBoundingClientRect().width);
+    return () => observer.disconnect();
+  }, []);
+
   const H = 250;
-  const padLeft = 34;
-  const padRight = 12;
+  const padLeft = 40;
+  const padRight = 16;
   const padTop = 16;
   const padBottom = scale === 'month' ? 30 : 18;
-  const chartW = W - padLeft - padRight;
+  const chartW = Math.max(svgWidth - padLeft - padRight, 200);
   const chartH = H - padTop - padBottom;
   const yMax = maxValue < 4 ? 4 : maxValue;
 
   if (data.length === 0) {
-    return <div className="flex h-[250px] items-center justify-center text-sm text-zinc-500">暂无数据</div>;
+    return <div className="flex h-[250px] items-center justify-center text-sm text-[var(--text-muted)]">暂无数据</div>;
   }
 
   // Build path and points
@@ -33,65 +48,67 @@ function ActivityLineChart({ data, maxValue, scale }: { data: { label: string; v
   const xLabelInterval = scale === 'month' ? 4 : 1;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-[250px] w-full select-none" preserveAspectRatio="xMidYMid meet">
-      <defs>
-        <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="rgba(192,132,252,0.28)" />
-          <stop offset="55%" stopColor="rgba(129,140,248,0.08)" />
-          <stop offset="100%" stopColor="rgba(109,40,217,0)" />
-        </linearGradient>
-        <filter id="glow">
-          <feGaussianBlur stdDeviation="2" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-      </defs>
+    <div ref={containerRef} style={{ width: '100%' }}>
+      <svg width="100%" height={H} className="select-none block">
+        <defs>
+          <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--chart-area-top)" />
+            <stop offset="55%" stopColor="var(--chart-area-mid)" />
+            <stop offset="100%" stopColor="var(--chart-area-bottom)" />
+          </linearGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="2" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
 
-      {/* Grid lines */}
-      {Array.from({ length: yTicks }, (_, i) => {
-        const y = padTop + (chartH / (yTicks - 1)) * i;
-        const val = Math.round(yMax - (yMax / (yTicks - 1)) * i);
-        return (
-          <g key={i}>
-            <line x1={padLeft} x2={W - padRight} y1={y} y2={y} stroke="rgba(255,255,255,0.07)" strokeDasharray="4,4" />
-            <text x={padLeft - 6} y={y + 3} textAnchor="end" fill="#6b7b76" fontSize={10}>{val}</text>
+        {/* Grid lines — span full chart width */}
+        {Array.from({ length: yTicks }, (_, i) => {
+          const y = padTop + (chartH / (yTicks - 1)) * i;
+          const val = Math.round(yMax - (yMax / (yTicks - 1)) * i);
+          return (
+            <g key={i}>
+              <line x1={padLeft} x2={svgWidth - padRight} y1={y} y2={y} stroke="var(--chart-grid)" strokeDasharray="4,4" />
+              <text x={padLeft - 6} y={y + 3} textAnchor="end" fill="var(--chart-axis-y)" fontSize={10}>{val}</text>
+            </g>
+          );
+        })}
+
+        {/* Area fill */}
+        <path d={areaPath} fill="url(#lineGrad)" />
+
+        {/* Line */}
+        <path d={linePath} fill="none" stroke="url(#lineStrokeGrad)" strokeWidth={2.5} filter="url(#glow)" />
+
+        {/* Line gradient stroke (defined inline because it needs x coordinates) */}
+        <defs>
+          <linearGradient id="lineStrokeGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="var(--chart-line-start)" />
+            <stop offset="100%" stopColor="var(--chart-line-end)" />
+          </linearGradient>
+        </defs>
+
+        {/* Dots */}
+        {points.map((p, i) => (
+          <g key={i} className="group">
+            <circle cx={p.x} cy={p.y} r={6} fill="var(--chart-dot)" stroke="var(--chart-dot-stroke)" strokeWidth={2}
+              className="chart-dot-base" />
+            {/* Tooltip on hover */}
+            <g className="pointer-events-none opacity-0 transition-opacity group-hover:opacity-100">
+              <rect x={p.x - 36} y={p.y - 40} width={72} height={36} rx={10}
+                fill="var(--chart-tooltip-bg)" stroke="var(--chart-tooltip-border)" strokeWidth={1} />
+              <text x={p.x} y={p.y - 22} textAnchor="middle" fill="var(--chart-tooltip-text)" fontSize={16} fontWeight={600}>{p.value} EP</text>
+              <text x={p.x} y={p.y - 10} textAnchor="middle" fill="var(--chart-tooltip-sub)" fontSize={10}>{p.label}</text>
+            </g>
           </g>
-        );
-      })}
+        ))}
 
-      {/* Area fill */}
-      <path d={areaPath} fill="url(#lineGrad)" />
-
-      {/* Line */}
-      <path d={linePath} fill="none" stroke="url(#lineStrokeGrad)" strokeWidth={2.5} filter="url(#glow)" />
-
-      {/* Line gradient stroke (defined inline because it needs x coordinates) */}
-      <defs>
-        <linearGradient id="lineStrokeGrad" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#c084fc" />
-          <stop offset="100%" stopColor="#818cf8" />
-        </linearGradient>
-      </defs>
-
-      {/* Dots */}
-      {points.map((p, i) => (
-        <g key={i} className="group">
-          <circle cx={p.x} cy={p.y} r={6} fill="#c084fc" stroke="#0d1117" strokeWidth={2}
-            className="transition-all hover:r-8 hover:fill-[#e9d5ff] hover:stroke-white" />
-          {/* Tooltip on hover */}
-          <g className="pointer-events-none opacity-0 transition-opacity group-hover:opacity-100">
-            <rect x={p.x - 36} y={p.y - 40} width={72} height={36} rx={10}
-              fill="rgba(8,14,13,0.96)" stroke="rgba(125,211,252,0.28)" strokeWidth={1} />
-            <text x={p.x} y={p.y - 22} textAnchor="middle" fill="#f8fafc" fontSize={16} fontWeight={600}>{p.value} EP</text>
-            <text x={p.x} y={p.y - 10} textAnchor="middle" fill="#cbd5e1" fontSize={10}>{p.label}</text>
-          </g>
-        </g>
-      ))}
-
-      {/* X-axis labels */}
-      {points.filter((_, i) => i % xLabelInterval === 0).map((p) => (
-        <text key={p.label} x={p.x} y={H - 4} textAnchor="middle" fill="#7c8a86" fontSize={10}>{p.label}</text>
-      ))}
-    </svg>
+        {/* X-axis labels */}
+        {points.filter((_, i) => i % xLabelInterval === 0).map((p) => (
+          <text key={p.label} x={p.x} y={H - 4} textAnchor="middle" fill="var(--chart-axis-x)" fontSize={10}>{p.label}</text>
+        ))}
+      </svg>
+    </div>
   );
 }
 
@@ -174,11 +191,11 @@ export default memo(function AdvancedActivityStats({ history, animeList }: { his
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-display font-semibold flex items-center gap-3 text-zinc-100">
-            <span className="w-1.5 h-8 bg-gradient-to-b from-cyan-300 to-blue-500 rounded-full shadow-[0_0_12px_rgba(59,130,246,0.5)]"></span>
+          <h2 className="text-2xl font-display font-semibold flex items-center gap-3 text-[var(--text-primary)]">
+            <span className="w-1.5 h-8 rounded-full shadow-[0_0_12px_var(--color-watching)]" style={{ background: 'linear-gradient(to bottom, var(--chart-line-start), var(--chart-line-end))' }}></span>
             观影趋势分析
           </h2>
-          <p className="text-sm text-zinc-400 mt-2 leading-6">{statsData.title}，现在会额外给出高频观看时段和这一段时间对整库的推进占比。</p>
+          <p className="text-sm text-[var(--text-secondary)] mt-2 leading-6">{statsData.title}，现在会额外给出高频观看时段和这一段时间对整库的推进占比。</p>
         </div>
 
         <div className="surface-card-muted flex p-1.5 rounded-2xl shadow-xl self-start lg:self-auto">
@@ -186,7 +203,7 @@ export default memo(function AdvancedActivityStats({ history, animeList }: { his
             <button
               key={s}
               onClick={() => setScale(s)}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold uppercase transition-all ${scale === s ? 'bg-zinc-800 text-primary shadow-lg ring-1 ring-white/10' : 'text-zinc-500 hover:text-zinc-300'}`}
+              className={`px-4 py-1.5 rounded-xl text-xs font-bold uppercase transition-all ${scale === s ? 'bg-[var(--tag-bg)] text-[var(--accent)] shadow-lg ring-1 ring-[var(--border)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
             >
               {s === 'week' ? '周' : s === 'month' ? '月' : '年'}
             </button>
@@ -195,18 +212,18 @@ export default memo(function AdvancedActivityStats({ history, animeList }: { his
       </div>
 
       {/* Stat cards */}
-      <div className="surface-card-muted grid grid-cols-2 xl:grid-cols-4 divide-x divide-white/[0.06] rounded-2xl px-1 py-3">
+      <div className="surface-card-muted grid grid-cols-2 xl:grid-cols-4 divide-x divide-[var(--border)] rounded-2xl px-1 py-3">
         {[
-          ['总看番集数', statsData.totalEpisodes, 'EP', 'text-zinc-100'],
-          ['预估时长', Math.round(statsData.totalMinutes / 60), 'HRS', 'text-blue-400'],
-          ['活跃效率', (statsData.totalEpisodes / averagePerUnit).toFixed(1), 'EP/D', 'text-green-400'],
-          ['高频时段', statsData.mostActiveWindow[0], `× ${statsData.mostActiveWindow[1]}`, 'text-amber-300'],
+          ['总看番集数', statsData.totalEpisodes, 'EP', 'text-[var(--text-primary)]'],
+          ['预估时长', Math.round(statsData.totalMinutes / 60), 'HRS', 'text-[var(--color-watching)]'],
+          ['活跃效率', (statsData.totalEpisodes / averagePerUnit).toFixed(1), 'EP/D', 'text-[var(--color-completed)]'],
+          ['高频时段', statsData.mostActiveWindow[0], `× ${statsData.mostActiveWindow[1]}`, 'score-text'],
         ].map(([label, val, unit, colorClass]) => (
-          <div key={label as string} className="flex flex-col gap-1 px-5 first:pl-0">
-            <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">{label}</span>
-            <div className="flex items-baseline gap-1.5">
-              <span className={`text-3xl font-bold font-mono tracking-tighter ${colorClass}`}>{val}</span>
-              <span className="text-xs text-zinc-500 font-bold">{unit}</span>
+          <div key={label as string} className="flex items-center justify-between gap-3 px-5 first:pl-0">
+            <span className="text-sm font-bold text-[var(--text-secondary)] tracking-wide">{label}</span>
+            <div className="flex items-baseline gap-1.5 shrink-0">
+              <span className={`text-2xl font-bold font-mono tracking-tighter ${colorClass}`}>{val}</span>
+              <span className="text-xs text-[var(--text-muted)] font-bold">{unit}</span>
             </div>
           </div>
         ))}
@@ -214,10 +231,10 @@ export default memo(function AdvancedActivityStats({ history, animeList }: { his
 
       {/* Chart + side panels */}
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_260px] gap-5">
-        <div className="surface-card h-[320px] rounded-[28px] bg-[linear-gradient(180deg,rgba(8,14,13,0.66),rgba(7,11,11,0.3))] p-4 md:p-5">
+        <div className="surface-card h-[320px] rounded-[28px] bg-[linear-gradient(180deg,var(--bg-card),transparent)] p-4 md:p-5">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Viewer Activity</div>
-            <div className="hidden md:flex rounded-full border border-violet-400/20 bg-violet-400/10 px-3 py-1 text-[10px] uppercase tracking-[0.28em] text-violet-200/75">
+            <div className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)]">Viewer Activity</div>
+            <div className="status-plan-soft hidden md:flex rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.28em]">
               {scale === 'week' ? '7 Day Window' : scale === 'month' ? 'Monthly Timeline' : 'Yearly Timeline'}
             </div>
           </div>
@@ -226,15 +243,15 @@ export default memo(function AdvancedActivityStats({ history, animeList }: { his
 
         <div className="grid grid-cols-1 sm:grid-cols-3 xl:flex xl:flex-col gap-2 xl:h-64">
           {[
-            ['Peak Point', statsData.peakPoint.label, `max ${statsData.peakPoint.value} EP`, 'text-zinc-100'],
-            ['Active Days', statsData.activeDays, '有记录天', 'text-emerald-300'],
-            ['Library Cov.', `${statsData.libraryCoverage}%`, '整库占比', 'text-cyan-300'],
+            ['Peak Point', statsData.peakPoint.label, `max ${statsData.peakPoint.value} EP`, 'text-[var(--text-primary)]'],
+            ['Active Days', statsData.activeDays, '有记录天', 'text-[var(--color-completed)]'],
+            ['Library Cov.', `${statsData.libraryCoverage}%`, '整库占比', 'text-[var(--color-info)]'],
           ].map(([label, val, sub, colorClass]) => (
-            <div key={label as string} className="surface-card-muted flex-1 px-4 py-3 flex flex-col justify-between border-l border-white/[0.06] rounded-xl">
-              <div className="text-[9px] uppercase tracking-[0.3em] text-zinc-600">{label}</div>
+            <div key={label as string} className="surface-card-muted flex-1 px-4 py-3 flex flex-col justify-between border-l border-[var(--border)] rounded-xl">
+              <div className="text-[9px] uppercase tracking-[0.3em] text-[var(--text-muted)]">{label}</div>
               <div className="flex items-end justify-between gap-2">
                 <span className={`text-xl font-mono leading-tight ${colorClass}`}>{val}</span>
-                <span className="text-[10px] text-zinc-500 font-mono pb-0.5">{sub}</span>
+                <span className="text-[10px] text-[var(--text-muted)] font-mono pb-0.5">{sub}</span>
               </div>
             </div>
           ))}

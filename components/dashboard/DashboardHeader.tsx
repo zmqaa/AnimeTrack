@@ -18,7 +18,7 @@ const TimeDisplay = memo(function TimeDisplay() {
     }, []);
 
     return (
-        <p className="text-muted-foreground font-mono text-sm opacity-60 min-h-[1.25rem]">
+        <p className="text-[var(--text-muted)] font-mono text-sm min-h-[1.25rem]">
             {nowText ? `${nowText.date} · ${nowText.time}` : ''}
         </p>
     );
@@ -33,18 +33,18 @@ export default function DashboardHeader({ isLoading, isRefreshing }: DashboardHe
     return (
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 mb-10 relative z-10">
             <div className="space-y-3 max-w-3xl">
-                <h1 className="text-3xl md:text-4xl font-display font-semibold tracking-tight text-foreground/95 flex items-center gap-4">
+                <h1 className="text-3xl md:text-4xl font-display font-semibold tracking-tight text-[var(--text-primary)] flex items-center gap-4">
                     动漫记录总览
                 </h1>
-                <p className="text-sm md:text-base text-zinc-400 leading-6 max-w-2xl">
+                <p className="text-sm md:text-base text-[var(--text-secondary)] leading-6 max-w-2xl">
                     观看记录、评分和元数据，一览无余。
                 </p>
                 <TimeDisplay />
             </div>
             <div className="flex items-center gap-3 self-stretch xl:self-auto">
                 {(isLoading || isRefreshing) && (
-                    <div className="flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-400/10 px-3 py-2 text-[10px] font-mono text-blue-200">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-300 animate-pulse" />
+                    <div className="badge-airing-soft flex items-center gap-2 rounded-full px-3 py-2 text-[10px] font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-watching)] animate-pulse" />
                         {isLoading ? '初始化数据中...' : '数据同步中...'}
                     </div>
                 )}
