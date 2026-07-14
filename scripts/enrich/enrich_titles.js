@@ -17,8 +17,7 @@
  *   --help              显示帮助
  */
 
-const mysql = require('mysql2/promise');
-const { createDbConfig, loadDatabaseEnv } = require('../shared/db_env');
+const { getDb, loadDatabaseEnv } = require('../shared/db_env');
 
 loadDatabaseEnv();
 
@@ -319,7 +318,7 @@ async function main() {
     throw new Error('需要 AI_API_KEY 或 DEEPSEEK_API_KEY');
   }
 
-  const connection = await mysql.createConnection(createDbConfig());
+  const db = getDb();
 
   console.log('\n🎬 动画标题标准化');
   console.log(`AI: ${aiConfig.apiUrl} | model: ${aiConfig.model}`);
@@ -328,7 +327,7 @@ async function main() {
   const stats = { updatedTitle: 0, updatedOriginal: 0, updatedBoth: 0, skipped: 0, rejected: 0, errors: 0 };
 
   try {
-    const [rows] = await connection.execute('SELECT id, title, original_title AS originalTitle FROM anime ORDER BY id ASC');
+    const rows = db.prepare('SELECT id, title, original_title AS originalTitle FROM anime ORDER BY id ASC').all();
     const allRows = Array.isArray(rows) ? rows : [];
 
     let candidates = options.ids ? allRows.filter((row) => options.ids.includes(row.id)) : allRows;
@@ -382,9 +381,15 @@ async function main() {
         console.log(`  ${label} "${currentTitle}" ✓ ${options.dryRun ? '[dry-run]' : '[写入]'} [confidence=${result.confidence}] ${parts.join(' | ')}`);
 
         if (!options.dryRun) {
+          const now = new Intl.DateTimeFormat('sv-SE', {
+            timeZone: 'Asia/Shanghai',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false,
+          }).format(new Date()).replace(' ', 'T');
           const columns = Object.keys(updates).map((key) => `${key} = ?`);
-          columns.push('updatedAt = NOW()');
-          await connection.execute(`UPDATE anime SET ${columns.join(', ')} WHERE id = ?`, [...Object.values(updates), row.id]);
+          columns.push('updatedAt = ?');
+          await db.prepare(`UPDATE anime SET ${columns.join(', ')} WHERE id = ?`).run(...[...Object.values(updates), now, row.id]);
         }
 
         if (titleChanged && originalChanged) stats.updatedBoth++;
@@ -403,7 +408,7 @@ async function main() {
     console.log(`完成: 变更=${totalChanged} (仅中文名=${stats.updatedTitle}, 仅原名=${stats.updatedOriginal}, 两者=${stats.updatedBoth})`);
     console.log(`      无变化=${stats.skipped}, 拒绝写入=${stats.rejected}, 错误=${stats.errors}`);
   } finally {
-    await connection.end();
+    db.close();
   }
 }
 

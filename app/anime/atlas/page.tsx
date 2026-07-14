@@ -4,23 +4,14 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import {
   ArrowUpRightIcon,
-  CalendarDaysIcon,
   ChevronLeftIcon,
-  SparklesIcon,
-  StarIcon,
-  TagIcon,
 } from '@heroicons/react/24/outline';
 import { useAnimeData } from '@/hooks/useAnimeData';
-
-const distributionColors = ['#7be7ff', '#62f0c2', '#9ae66e', '#f4bf62', '#f08ac2', '#74858a'];
-const episodeBucketOrder: Record<string, number> = {
-  '1-3 集': 0,
-  '4-11 集': 1,
-  '12-13 集': 2,
-  '14-26 集': 3,
-  '27+ 集': 4,
-};
-
+import { useTheme } from '@/components/theme/ThemeProvider';
+import { getAppThemeDefinition } from '@/lib/theme';
+import { YearBarChart } from '@/components/dashboard/YearBarChart';
+import { ChordDiagram } from '@/components/dashboard/ChordDiagram';
+import { CastNetwork } from '@/components/dashboard/CastNetwork';
 function formatPremiere(value?: string) {
   if (!value) return '未补充';
   const date = new Date(value);
@@ -28,154 +19,15 @@ function formatPremiere(value?: string) {
   return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'short' }).format(date);
 }
 
-function getEpisodeBucketLabel(totalEpisodes?: number) {
-  if (!totalEpisodes || totalEpisodes <= 0) {
-    return undefined;
-  }
-
-  if (totalEpisodes <= 3) return '1-3 集';
-  if (totalEpisodes <= 11) return '4-11 集';
-  if (totalEpisodes <= 13) return '12-13 集';
-  if (totalEpisodes <= 26) return '14-26 集';
-  return '27+ 集';
-}
-
-type DistributionItem = {
-  label: string;
-  value: number;
-  color: string;
-  percentage: number;
-};
-
-type TagRow = {
-  tag: string;
-  count: number;
-  percentage: number;
-};
-
-function getRelativeBarWidth(value: number, maxValue: number) {
-  if (value <= 0 || maxValue <= 0) {
-    return '0%';
-  }
-
-  return `${(value / maxValue) * 100}%`;
-}
-
-function AtlasEpisodeBarList({ data }: { data: DistributionItem[] }) {
-  const maxValue = useMemo(() => data.reduce((max, item) => Math.max(max, item.value), 0), [data]);
-
-  if (!data.length) {
-    return (
-      <div className="surface-card-muted flex h-[220px] items-center justify-center rounded-[24px] text-sm text-zinc-500">
-        暂无总集数分布数据
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {data.map((item, index) => (
-        <div key={item.label} className="surface-card-muted rounded-[24px] px-4 py-4 lg:px-5">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-5">
-            <div className="flex min-w-0 items-center gap-3 lg:w-[250px] lg:shrink-0">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-xs font-mono text-zinc-400">
-                {index + 1}
-              </span>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="truncate text-sm text-zinc-100">{item.label}</span>
-                </div>
-                <div className="mt-1 text-xs text-zinc-500">{item.percentage}% · 共 {item.value} 部作品</div>
-              </div>
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="h-3 overflow-hidden rounded-full bg-white/[0.05]">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: getRelativeBarWidth(item.value, maxValue),
-                    backgroundColor: item.color,
-                    boxShadow: `0 0 18px ${item.color}33`,
-                  }}
-                />
-              </div>
-            </div>
-            <div className="flex items-end gap-2 lg:w-[92px] lg:shrink-0 lg:justify-end">
-              <span className="text-2xl font-mono text-zinc-100">{item.value}</span>
-              <span className="pb-1 text-xs text-zinc-500">部</span>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function AtlasTagBarList({ data }: { data: TagRow[] }) {
-  const maxValue = useMemo(() => data.reduce((max, item) => Math.max(max, item.count), 0), [data]);
-
-  if (!data.length) {
-    return (
-      <div className="surface-card-muted flex h-[280px] items-center justify-center rounded-[24px] text-sm text-zinc-500">
-        暂无标签排行数据
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {data.map((item, index) => (
-        <Link
-          key={item.tag}
-          href={`/anime?tag=${encodeURIComponent(item.tag)}`}
-          className="theme-secondary-hover-card group block surface-card-muted rounded-[24px] px-4 py-4 transition-all duration-300 hover:bg-white/[0.05] lg:px-5"
-        >
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-5">
-            <div className="flex min-w-0 items-center gap-3 lg:w-[250px] lg:shrink-0">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-xs font-mono text-zinc-400">
-                {index + 1}
-              </span>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-sm text-zinc-100">{item.tag}</span>
-                  <ArrowUpRightIcon className="theme-secondary-hover-text h-3.5 w-3.5 shrink-0 text-zinc-600 transition-colors" />
-                </div>
-                <div className="mt-1 text-xs text-zinc-500">覆盖 {item.percentage}% · 点击筛选该标签</div>
-              </div>
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="h-3 overflow-hidden rounded-full bg-white/[0.05]">
-                <div
-                  className="theme-spectrum-gradient h-full rounded-full transition-all duration-500"
-                  style={{ width: getRelativeBarWidth(item.count, maxValue) }}
-                />
-              </div>
-            </div>
-            <div className="flex items-end gap-2 lg:w-[92px] lg:shrink-0 lg:justify-end">
-              <span className="text-2xl font-mono text-zinc-100">{item.count}</span>
-              <span className="pb-1 text-xs text-zinc-500">部</span>
-            </div>
-          </div>
-        </Link>
-      ))}
-    </div>
-  );
-}
-
 export default function AnimeAtlasPage() {
-  const { animeList, animeTagStats, isLoading: animeLoading } = useAnimeData();
+  const { animeList, isLoading: animeLoading } = useAnimeData();
+  const { theme } = useTheme();
+  const themeDef = getAppThemeDefinition(theme);
 
   const data = useMemo(() => {
-    const episodeBucketCounts: Record<string, number> = {};
     const castCounts: Record<string, number> = {};
 
     animeList.forEach((anime) => {
-      const episodeBucket = getEpisodeBucketLabel(anime.totalEpisodes ?? undefined);
-      if (episodeBucket) {
-        episodeBucketCounts[episodeBucket] = (episodeBucketCounts[episodeBucket] || 0) + 1;
-      }
-
       if (Array.isArray(anime.cast)) {
         anime.cast.forEach((name) => {
           const normalized = String(name || '').trim();
@@ -199,6 +51,21 @@ export default function AnimeAtlasPage() {
       .sort((left, right) => new Date(right.premiereDate ?? 0).getTime() - new Date(left.premiereDate ?? 0).getTime())
       .slice(0, 6);
 
+    // 标签出现次数排行
+    const tagCountMap: Record<string, number> = {};
+    animeList.forEach((anime) => {
+      if (!Array.isArray(anime.tags)) return;
+      anime.tags.forEach((tag) => {
+        const t = String(tag || '').trim();
+        if (!t) return;
+        tagCountMap[t] = (tagCountMap[t] || 0) + 1;
+      });
+    });
+    const tagRanking = Object.entries(tagCountMap)
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
     const metadataRichness = animeList.length
       ? Math.round(
           (animeList.filter((anime) => [anime.originalTitle, anime.score, anime.totalEpisodes, Array.isArray(anime.cast) && anime.cast.length > 0 ? 'cast' : '', anime.premiereDate, anime.summary].filter(Boolean).length >= 4).length /
@@ -207,44 +74,102 @@ export default function AnimeAtlasPage() {
         )
       : 0;
 
-    const sortedEpisodeBuckets = Object.entries(episodeBucketCounts).sort((left, right) => {
-      const countDiff = right[1] - left[1];
-      if (countDiff !== 0) return countDiff;
-      return episodeBucketOrder[left[0]] - episodeBucketOrder[right[0]];
+    // ── 和弦图数据：声优 × 标签交叉统计 ──
+    const allCast = Object.entries(castCounts).sort((a, b) => b[1] - a[1]);
+    const allTags = Object.entries(tagCountMap).sort((a, b) => b[1] - a[1]);
+
+    function buildChordData(castList: [string, number][], tagList: [string, number][]) {
+      const matrix: Record<string, Record<string, number>> = {};
+      castList.forEach(([name]) => { matrix[name] = {}; });
+
+      const tagSet = new Set(tagList.map(([t]) => t));
+      animeList.forEach((anime) => {
+        if (!Array.isArray(anime.cast) || !Array.isArray(anime.tags)) return;
+        const animeTags = new Set(anime.tags.map((t: string) => String(t || '').trim()).filter(Boolean));
+        const castInAnime = anime.cast
+          .map((c: string) => String(c || '').trim())
+          .filter((c: string) => c && matrix[c]);
+        castInAnime.forEach((cast: string) => {
+          tagList.forEach(([tag]) => {
+            if (animeTags.has(tag)) matrix[cast][tag] = (matrix[cast][tag] || 0) + 1;
+          });
+        });
+      });
+
+      const nodes = [
+        ...castList.map(([name, count]) => ({ id: name, label: name, group: 'cast' as const, value: count })),
+        ...tagList.map(([tag, count]) => ({ id: tag, label: tag, group: 'tag' as const, value: count })),
+      ];
+      const links: { source: string; target: string; value: number }[] = [];
+      castList.forEach(([cast]) => {
+        tagList.forEach(([tag]) => {
+          const w = matrix[cast]?.[tag] ?? 0;
+          if (w > 0) links.push({ source: cast, target: tag, value: w });
+        });
+      });
+      return { nodes, links, hasData: links.length >= 3 };
+    }
+
+    const leftChord = buildChordData(allCast.slice(0, 12), allTags.slice(0, 8));
+    const rightChord = buildChordData(allCast.slice(12, 24), allTags.slice(0, 8));
+
+    // ── 声优共演网络数据 ──
+    const topNetworkCast = allCast.slice(0, 20);
+    const networkCastSet = new Set(topNetworkCast.map(([n]) => n));
+
+    // 构建共现矩阵：两两声优共同出演计数
+    const cooccurrence: Record<string, Record<string, number>> = {};
+    topNetworkCast.forEach(([name]) => { cooccurrence[name] = {}; });
+
+    animeList.forEach((anime) => {
+      if (!Array.isArray(anime.cast)) return;
+      const castInAnime = anime.cast
+        .map((c: string) => String(c || '').trim())
+        .filter((c: string) => networkCastSet.has(c));
+      for (let i = 0; i < castInAnime.length; i++) {
+        for (let j = i + 1; j < castInAnime.length; j++) {
+          const a = castInAnime[i];
+          const b = castInAnime[j];
+          if (!cooccurrence[a]) cooccurrence[a] = {};
+          cooccurrence[a][b] = (cooccurrence[a][b] || 0) + 1;
+        }
+      }
     });
 
-    const episodeTotal = sortedEpisodeBuckets.reduce((sum, [, value]) => sum + value, 0);
+    const networkNodes = topNetworkCast.map(([name, count]) => ({
+      id: name, label: name, value: count,
+    }));
+
+    const networkLinks: { source: string; target: string; value: number }[] = [];
+    topNetworkCast.forEach(([a]) => {
+      topNetworkCast.forEach(([b]) => {
+        if (a >= b) return; // upper triangle only
+        // 数据可能存 a→b 或 b→a，取决于每部番的 cast 顺序，两边都要查
+        const w = (cooccurrence[a]?.[b] ?? 0) + (cooccurrence[b]?.[a] ?? 0);
+        if (w >= 2) networkLinks.push({ source: a, target: b, value: w });
+      });
+    });
+
+    // filter orphan nodes
+    const linkedIds = new Set<string>();
+    networkLinks.forEach((l) => { linkedIds.add(l.source); linkedIds.add(l.target); });
+    const filteredNetworkNodes = networkNodes.filter((n) => linkedIds.has(n.id));
+    const hasNetworkData = filteredNetworkNodes.length >= 3 && networkLinks.length >= 2;
 
     return {
       scored,
       premiered,
-      topVoiceActors: Object.entries(castCounts)
-        .sort((left, right) => right[1] - left[1])
-        .slice(0, 8),
-      episodeDistribution: sortedEpisodeBuckets
-        .map(([label, value], index) => ({
-          label,
-          value,
-          color: distributionColors[index % distributionColors.length],
-          percentage: episodeTotal ? Math.round((value / episodeTotal) * 100) : 0,
-        })),
+      tagRanking,
       metadataRichness,
+      leftChord,
+      rightChord,
+      networkNodes: filteredNetworkNodes,
+      networkLinks,
+      hasNetworkData,
     };
   }, [animeList]);
 
   const loading = animeLoading;
-  const tagRows = useMemo<TagRow[]>(() => (
-    animeTagStats
-      .filter((item) => item.tag.trim().toLowerCase() !== 'tv')
-      .slice(0, 10)
-      .map((item) => ({
-        ...item,
-        percentage: animeList.length ? Math.round((item.count / animeList.length) * 100) : 0,
-      }))
-  ), [animeList.length, animeTagStats]);
-  const episodeTotal = data.episodeDistribution.reduce((sum, item) => sum + item.value, 0);
-  const dominantEpisodeBucket = data.episodeDistribution[0] ?? null;
-  const dominantTag = tagRows[0] ?? null;
 
   return (
     <main className="p-4 lg:p-8 pb-24 space-y-6 lg:space-y-8 animate-fade-in relative">
@@ -254,180 +179,137 @@ export default function AnimeAtlasPage() {
         <div className="theme-atlas-hero-aura absolute inset-0" />
         <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-4 max-w-3xl">
-            <Link href="/" className="inline-flex items-center gap-1 text-zinc-400 hover:text-white text-sm transition-colors">
+            <Link href="/" className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm transition-colors">
               <ChevronLeftIcon className="w-4 h-4" /> 返回总览
             </Link>
-            <h1 className="text-3xl md:text-4xl font-display font-semibold tracking-tight text-zinc-50">作品元数据图谱</h1>
-            <p className="text-sm md:text-base text-zinc-400 leading-7">
-              这里专门展示你的片库由哪些集数层级、声优排行、标签和作品评分构成。比起首页，它更偏向“片库剖面图”。
+            <h1 className="text-3xl md:text-4xl font-display font-semibold tracking-tight text-[var(--text-primary)]">作品元数据图谱</h1>
+            <p className="text-sm md:text-base text-[var(--text-secondary)] leading-7">
+              这里专门展示你的片库中标签分布、声优×标签关联图谱、作品评分和最近开播作品。
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 min-w-full lg:min-w-[320px] lg:max-w-[360px]">
             <div className="surface-card rounded-[24px] p-4">
-              <div className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Library</div>
-              <div className="mt-2 text-2xl font-mono text-zinc-100">{animeList.length}</div>
-              <div className="text-xs text-zinc-500 mt-1">当前入库作品</div>
+              <div className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)]">Library</div>
+              <div className="mt-2 text-2xl font-mono text-[var(--text-primary)]">{animeList.length}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-1">当前入库作品</div>
             </div>
             <div className="surface-card rounded-[24px] p-4">
-              <div className="text-[10px] uppercase tracking-[0.28em] text-zinc-500">Richness</div>
+              <div className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)]">Richness</div>
               <div className="theme-accent-text mt-2 text-2xl font-mono">{data.metadataRichness}%</div>
-              <div className="text-xs text-zinc-500 mt-1">档案完整度</div>
+              <div className="text-xs text-[var(--text-muted)] mt-1">档案完整度</div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="relative z-10 space-y-6">
-        <div className="glass-panel rounded-[32px] p-6 lg:p-7">
-          <div className="flex flex-col gap-4 border-b border-white/6 pb-5 md:flex-row md:items-end md:justify-between">
-            <div className="flex items-center gap-3">
-              <SparklesIcon className="theme-accent-text w-5 h-5" />
-              <div>
-                <h2 className="text-xl font-display font-semibold text-zinc-100">集数分布</h2>
-                <p className="mt-1 text-sm text-zinc-500">改为全宽横向条形图，直接比较各集数区间的体量差。</p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-zinc-300">
-              <div>
-                <span className="text-zinc-500">已统计</span>
-                <span className="ml-2 font-mono text-zinc-100">{episodeTotal}</span>
-              </div>
-              <div>
-                <span className="text-zinc-500">最高区间</span>
-                <span className="ml-2 text-zinc-100">{dominantEpisodeBucket?.label ?? '暂无'}</span>
-              </div>
-            </div>
+      {data.tagRanking.length > 0 && (
+        <section className="glass-panel rounded-[32px] p-6 lg:p-8 relative z-10">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom, var(--chart-line-start), var(--chart-line-end))' }} />
+            <h2 className="text-xl font-display font-semibold text-[var(--text-primary)]">标签排行 Top 10</h2>
           </div>
-          <div className="mt-5">
-            <AtlasEpisodeBarList data={data.episodeDistribution} />
-          </div>
-        </div>
+          <YearBarChart
+            data={data.tagRanking.map((item, i) => ({
+              label: item.tag,
+              value: item.count,
+              color: themeDef.premierePalette[i % themeDef.premierePalette.length],
+            }))}
+            height={240}
+            sortBy="value"
+            labelFontSize={12}
+          />
+        </section>
+      )}
 
-        <div className="glass-panel rounded-[32px] p-6 lg:p-7">
-          <div className="flex flex-col gap-4 border-b border-white/6 pb-5 md:flex-row md:items-end md:justify-between">
-            <div className="flex items-center gap-3">
-              <TagIcon className="theme-secondary-text w-5 h-5" />
-              <div>
-                <h2 className="text-xl font-display font-semibold text-zinc-100">标签排行</h2>
-                <p className="mt-1 text-sm text-zinc-500">横向拉满主容器，每个标签都可以直接跳到番剧列表筛选。</p>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-zinc-300">
-              <div>
-                <span className="text-zinc-500">展示范围</span>
-                <span className="ml-2 text-zinc-100">前 {tagRows.length} 标签</span>
-              </div>
-              <div>
-                <span className="text-zinc-500">已过滤</span>
-                <span className="ml-2 text-zinc-100">TV</span>
-              </div>
-              <div>
-                <span className="text-zinc-500">首位标签</span>
-                <span className="ml-2 text-zinc-100">{dominantTag?.tag ?? '暂无'}</span>
-              </div>
-              <Link
-                href={dominantTag ? `/anime?tag=${encodeURIComponent(dominantTag.tag)}` : '/anime'}
-                className="theme-secondary-text inline-flex items-center gap-1.5 transition-colors hover:text-white"
-              >
-                查看标签作品
-                <ArrowUpRightIcon className="h-4 w-4" />
-              </Link>
-            </div>
+      {/* ── 声优 × 标签 和弦图 双列 ── */}
+      {(data.leftChord.hasData || data.rightChord.hasData) && (
+        <section className="glass-panel rounded-[32px] p-6 lg:p-8 relative z-10">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom, var(--chart-line-start), var(--chart-line-end))' }} />
+            <h2 className="text-xl font-display font-semibold text-[var(--text-primary)]">声优 × 标签 关联图谱</h2>
+            <span className="text-[10px] text-[var(--text-muted)] ml-auto">悬停查看关联</span>
           </div>
-          <div className="mt-5">
-            <AtlasTagBarList data={tagRows} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {data.leftChord.hasData && (
+              <div>
+                <div className="text-xs text-[var(--text-muted)] text-center mb-1">声优视角 · Top 1–12 声优 × 8 标签</div>
+                <ChordDiagram nodes={data.leftChord.nodes} links={data.leftChord.links} />
+              </div>
+            )}
+            {data.rightChord.hasData && (
+              <div>
+                <div className="text-xs text-[var(--text-muted)] text-center mb-1">声优视角 · Top 13–24 声优 × 8 标签</div>
+                <ChordDiagram nodes={data.rightChord.nodes} links={data.rightChord.links} />
+              </div>
+            )}
           </div>
-          {tagRows.length > 0 && (
-            <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-              {tagRows.map((tag) => (
-                <Link
-                  key={tag.tag}
-                  href={`/anime?tag=${encodeURIComponent(tag.tag)}`}
-                  className="text-zinc-400 transition-colors theme-secondary-hover-text"
-                >
-                  #{tag.tag}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+        </section>
+      )}
+
+      {/* ── 声优共演网络 ── */}
+      {data.hasNetworkData && (
+        <section className="glass-panel rounded-[32px] p-6 lg:p-8 relative z-10">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom, var(--chart-line-start), var(--chart-line-end))' }} />
+            <h2 className="text-xl font-display font-semibold text-[var(--text-primary)]">声优共演网络</h2>
+            <span className="text-[10px] text-[var(--text-muted)] ml-auto">拖拽节点 · 悬停高亮</span>
+          </div>
+          <CastNetwork nodes={data.networkNodes} links={data.networkLinks} height={500} />
+        </section>
+      )}
 
       <section className="grid grid-cols-1 xl:grid-cols-12 gap-6 relative z-10">
         <div className="xl:col-span-7 glass-panel rounded-[32px] p-6 lg:p-8">
           <div className="flex items-center gap-3 mb-6">
-            <StarIcon className="w-5 h-5 text-amber-300" />
-            <h2 className="text-xl font-display font-semibold text-zinc-100">作品评分</h2>
+            <span className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom, var(--chart-line-start), var(--chart-line-end))' }} />
+            <h2 className="text-xl font-display font-semibold text-[var(--text-primary)]">作品评分</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {data.scored.map((anime, index) => (
-              <Link key={anime.id} href={`/anime/${anime.id}`} className="group surface-card-muted rounded-[28px] overflow-hidden hover:border-amber-300/20 transition-all duration-300">
-                <div className="h-40 bg-zinc-900/70 bg-cover bg-center" style={anime.coverUrl ? { backgroundImage: `linear-gradient(180deg, rgba(7,17,15,0.05), rgba(7,17,15,0.9)), url(${anime.coverUrl})` } : undefined} />
+              <Link key={anime.id} href={`/anime/${anime.id}`} className="group surface-card-muted rounded-[28px] overflow-hidden hover:border-[var(--color-score)]/20 transition-all duration-300">
+                <div className="h-40 bg-[var(--bg-card)] bg-cover bg-center" style={anime.coverUrl ? { backgroundImage: `linear-gradient(180deg, var(--color-cover-gradient-start), var(--color-cover-gradient-end)), url(${anime.coverUrl})` } : undefined} />
                 <div className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">Rank #{index + 1}</div>
-                      <div className="mt-1 text-lg text-zinc-100 truncate">{anime.title}</div>
-                      <div className="text-xs text-zinc-500 truncate">{anime.originalTitle ?? '未补充原名'}</div>
+                      <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--text-muted)]">Rank #{index + 1}</div>
+                      <div className="mt-1 text-lg text-[var(--text-primary)] truncate">{anime.title}</div>
+                      <div className="text-xs text-[var(--text-muted)] truncate">{anime.originalTitle ?? '未补充原名'}</div>
                     </div>
-                    <div className="shrink-0 rounded-full border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-sm text-amber-100">
+                    <div className="shrink-0 rounded-full border score-soft px-2.5 py-1 text-sm">
                       {anime.score?.toFixed(1)}
                     </div>
                   </div>
                 </div>
               </Link>
             ))}
-            {!data.scored.length && <div className="text-sm text-zinc-500">评分字段还不够丰富，之后可以继续补齐。</div>}
+            {!data.scored.length && <div className="text-sm text-[var(--text-muted)]">评分字段还不够丰富，之后可以继续补齐。</div>}
           </div>
         </div>
 
         <div className="xl:col-span-5 space-y-6">
           <div className="glass-panel rounded-[32px] p-6 lg:p-8">
             <div className="flex items-center gap-3 mb-6">
-              <TagIcon className="w-5 h-5 text-violet-300" />
-              <h2 className="text-xl font-display font-semibold text-zinc-100">声优排行</h2>
-            </div>
-            <div className="space-y-2.5">
-              {data.topVoiceActors.map(([name, count], index) => (
-                <div key={name} className="surface-card-muted rounded-[18px] px-4 py-3 text-sm text-zinc-300">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-[11px] font-mono text-zinc-400">
-                        {index + 1}
-                      </span>
-                      <span className="truncate">{name}</span>
-                    </div>
-                    <span className="text-zinc-500 shrink-0">{count} 部</span>
-                  </div>
-                </div>
-              ))}
-              {!data.topVoiceActors.length && <div className="text-sm text-zinc-500">声优信息还没有形成排行。</div>}
-            </div>
-          </div>
-
-          <div className="glass-panel rounded-[32px] p-6 lg:p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <CalendarDaysIcon className="w-5 h-5 text-sky-300" />
-              <h2 className="text-xl font-display font-semibold text-zinc-100">追番列表中最近开播作品</h2>
+              <span className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom, var(--chart-line-start), var(--chart-line-end))' }} />
+              <h2 className="text-xl font-display font-semibold text-[var(--text-primary)]">追番列表中最近开播作品</h2>
             </div>
             <div className="space-y-3">
               {data.premiered.map((anime) => (
-                <Link key={anime.id} href={`/anime/${anime.id}`} className="group surface-card-muted flex items-center justify-between gap-3 rounded-[20px] px-4 py-3 hover:border-sky-300/20 transition-all">
+                <Link key={anime.id} href={`/anime/${anime.id}`} className="group surface-card-muted flex items-center justify-between gap-3 rounded-[20px] px-4 py-3 hover:border-[var(--color-airing)]/20 transition-all">
                   <div className="min-w-0">
-                    <div className="text-sm text-zinc-200 truncate">{anime.title}</div>
-                    <div className="text-xs text-zinc-500 truncate">{formatPremiere(anime.premiereDate)} · {anime.totalEpisodes ? `${anime.totalEpisodes} 集` : '集数未补充'}</div>
+                    <div className="text-sm text-[var(--text-primary)] truncate">{anime.title}</div>
+                    <div className="text-xs text-[var(--text-muted)] truncate">{formatPremiere(anime.premiereDate)} · {anime.totalEpisodes ? `${anime.totalEpisodes} 集` : '集数未补充'}</div>
                   </div>
-                  <ArrowUpRightIcon className="w-4 h-4 text-zinc-600 group-hover:text-sky-300 transition-colors" />
+                  <ArrowUpRightIcon className="w-4 h-4 text-[var(--text-muted)] group-hover:text-airing transition-colors" />
                 </Link>
               ))}
-              {!data.premiered.length && <div className="text-sm text-zinc-500">首播日期字段暂时较少。</div>}
+              {!data.premiered.length && <div className="text-sm text-[var(--text-muted)]">首播日期字段暂时较少。</div>}
             </div>
           </div>
         </div>
       </section>
 
       {loading && (
-        <div className="text-sm text-zinc-500 font-mono px-2">ATLAS_LOADING...</div>
+        <div className="text-sm text-[var(--text-muted)] font-mono px-2">ATLAS_LOADING...</div>
       )}
     </main>
   );

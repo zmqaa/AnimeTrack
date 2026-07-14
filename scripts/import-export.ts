@@ -1,26 +1,12 @@
 /**
- * 一键导入 anime-track-export.json 到数据库
+ * 一键导入 anime-track-export.json 到 SQLite 数据库
  * 用法: npx tsx scripts/import-export.ts
  */
 import { readFileSync } from 'fs';
-import { resolve } from 'path';
-import mysql from 'mysql2/promise';
+import { resolve, join, dirname } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 
-// 直接读取 .env.local 中的数据库配置
-function loadEnv() {
-  const envPath = resolve(process.cwd(), '.env.local');
-  const content = readFileSync(envPath, 'utf-8');
-  const vars: Record<string, string> = {};
-  for (const line of content.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eq = trimmed.indexOf('=');
-    if (eq > 0) vars[trimmed.slice(0, eq)] = trimmed.slice(eq + 1);
-  }
-  return vars;
-}
-
-const env = loadEnv();
+const DB_PATH = process.env.DB_PATH || join(process.cwd(), 'data', 'animetrack.db');
 const EXPORT_FILE = resolve(process.cwd(), 'anime-track-export.json');
 
 interface AnimeRecord {
@@ -51,90 +37,98 @@ interface HistoryRecord {
   note?: string;
 }
 
+function nowISO(): string {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).format(new Date()).replace(' ', 'T');
+}
+
 async function main() {
-  const pool = mysql.createPool({
-    host: env.MYSQL_HOST || '127.0.0.1',
-    port: Number(env.MYSQL_PORT) || 3306,
-    user: env.MYSQL_USER || 'zmqaa',
-    password: env.MYSQL_PASSWORD || '',
-    database: env.MYSQL_DATABASE || 'anime_track',
-    connectionLimit: 1,
-    waitForConnections: true,
-  });
+  const dbDir = dirname(DB_PATH);
+  if (!existsSync(dbDir)) {
+    mkdirSync(dbDir, { recursive: true });
+  }
 
-  const conn = await pool.getConnection();
+  const Database = require('better-sqlite3');
+  const db = new Database(DB_PATH);
 
-  try {
-    const raw = readFileSync(EXPORT_FILE, 'utf-8');
-    const data = JSON.parse(raw);
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+  db.pragma('busy_timeout = 5000');
 
-    const animeRecords: AnimeRecord[] = data?.anime?.records || [];
-    const historyRecords: HistoryRecord[] = data?.watchHistory?.records || [];
+  // Auto-create tables from schema
+  const schemaPath = join(process.cwd(), 'database', 'schema.sql');
+  if (existsSync(schemaPath)) {
+    const schema = readFileSync(schemaPath, 'utf-8');
+    db.exec(schema);
+  }
 
-    console.log(`📦 读取到 ${animeRecords.length} 条番剧 + ${historyRecords.length} 条观看记录`);
+  const raw = readFileSync(EXPORT_FILE, 'utf-8');
+  const data = JSON.parse(raw);
+  const animeRecords: AnimeRecord[] = data?.anime?.records || [];
+  const historyRecords: HistoryRecord[] = data?.watchHistory?.records || [];
 
-    await conn.beginTransaction();
+  console.log(`📦 读取到 ${animeRecords.length} 条番剧 + ${historyRecords.length} 条观看记录`);
 
-    // --- Import anime ---
+  const now = nowISO();
+  let createdAnime = 0;
+  let updatedAnime = 0;
+  let importedHistory = 0;
+  let skippedHistory = 0;
+
+  const importAll = db.transaction(() => {
     const titleMap = new Map<string, number>(); // title -> db id
     const idMap = new Map<string, number>();    // export id -> db id
-    let createdAnime = 0;
-    let updatedAnime = 0;
 
+    // --- Import anime ---
     for (const item of animeRecords) {
       if (!item.title?.trim()) continue;
 
       const title = item.title.trim();
       const originalTitle = item.originalTitle?.trim() || null;
 
-      // Check existing by title or original_title
-      const [existing] = await conn.query<any[]>(
-        'SELECT id FROM anime WHERE title = ? OR original_title = ? ORDER BY id DESC LIMIT 1',
-        [title, title]
-      );
+      // Check existing by title
+      const existing = db.prepare(
+        'SELECT id FROM anime WHERE title = ? OR original_title = ? ORDER BY id DESC LIMIT 1'
+      ).get(title, title) as { id: number } | undefined;
 
-      const payload = {
-        title,
-        originalTitle,
-        coverUrl: item.coverUrl || null,
-        status: item.status || 'plan_to_watch',
-        score: item.score ?? null,
-        progress: Number(item.progress ?? 0),
-        totalEpisodes: item.totalEpisodes ?? null,
-        durationMinutes: item.durationMinutes ?? null,
-        tags: JSON.stringify(item.tags || []),
-        cast: JSON.stringify(item.cast || []),
-        summary: item.summary || null,
-        startDate: null,
-        endDate: item.endDate || null,
-        premiereDate: item.premiereDate || null,
-        isFinished: item.isFinished != null ? (item.isFinished ? 1 : 0) : null,
-      };
-
-      if (existing.length > 0) {
-        const dbId = existing[0].id;
-        await conn.query(
+      if (existing) {
+        const dbId = existing.id;
+        db.prepare(
           `UPDATE anime SET title=?, original_title=?, coverUrl=?, status=?, score=?, progress=?,
-           totalEpisodes=?, durationMinutes=?, tags=?, cast=?, summary=?, end_date=?, premiere_date=?, isFinished=?
-           WHERE id=?`,
-          [payload.title, payload.originalTitle, payload.coverUrl, payload.status, payload.score,
-           payload.progress, payload.totalEpisodes, payload.durationMinutes, payload.tags, payload.cast,
-           payload.summary, payload.endDate, payload.premiereDate, payload.isFinished, dbId]
+           totalEpisodes=?, durationMinutes=?, tags=?, cast=?, summary=?, end_date=?, premiere_date=?, isFinished=?, updatedAt=?
+           WHERE id=?`
+        ).run(
+          title, originalTitle, item.coverUrl || null, item.status || 'plan_to_watch',
+          item.score ?? null, Number(item.progress ?? 0), item.totalEpisodes ?? null,
+          item.durationMinutes ?? null, JSON.stringify(item.tags || []),
+          JSON.stringify(item.cast || []), item.summary || null,
+          item.endDate || null, item.premiereDate || null,
+          item.isFinished != null ? (item.isFinished ? 1 : 0) : null,
+          now, dbId
         );
         titleMap.set(title, dbId);
         if (typeof item.id === 'string') idMap.set(item.id, dbId);
         if (typeof item.id === 'number') idMap.set(String(item.id), dbId);
         updatedAnime++;
       } else {
-        const [result] = await conn.query<any>(
+        const result = db.prepare(
           `INSERT INTO anime (title, original_title, coverUrl, status, score, progress, totalEpisodes,
-           durationMinutes, tags, cast, summary, end_date, premiere_date, isFinished)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [payload.title, payload.originalTitle, payload.coverUrl, payload.status, payload.score,
-           payload.progress, payload.totalEpisodes, payload.durationMinutes, payload.tags, payload.cast,
-           payload.summary, payload.endDate, payload.premiereDate, payload.isFinished]
+           durationMinutes, tags, cast, summary, end_date, premiere_date, isFinished, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+          title, originalTitle, item.coverUrl || null, item.status || 'plan_to_watch',
+          item.score ?? null, Number(item.progress ?? 0), item.totalEpisodes ?? null,
+          item.durationMinutes ?? null, JSON.stringify(item.tags || []),
+          JSON.stringify(item.cast || []), item.summary || null,
+          item.endDate || null, item.premiereDate || null,
+          item.isFinished != null ? (item.isFinished ? 1 : 0) : null,
+          now, now
         );
-        const dbId = result.insertId;
+        const dbId = Number(result.lastInsertRowid);
         titleMap.set(title, dbId);
         if (typeof item.id === 'string') idMap.set(item.id, dbId);
         if (typeof item.id === 'number') idMap.set(String(item.id), dbId);
@@ -145,9 +139,6 @@ async function main() {
     console.log(`✅ 番剧: 新增 ${createdAnime}, 更新 ${updatedAnime}`);
 
     // --- Import watch history ---
-    let importedHistory = 0;
-    let skippedHistory = 0;
-
     for (const item of historyRecords) {
       const episode = Number(item.episode);
       const watchedAt = item.watchedAt ? new Date(item.watchedAt) : null;
@@ -165,11 +156,10 @@ async function main() {
       if (!dbAnimeId && item.animeTitle?.trim()) {
         dbAnimeId = titleMap.get(item.animeTitle.trim());
         if (!dbAnimeId) {
-          const [rows] = await conn.query<any[]>(
-            'SELECT id FROM anime WHERE title = ? LIMIT 1',
-            [item.animeTitle.trim()]
-          );
-          if (rows.length > 0) dbAnimeId = rows[0].id;
+          const row = db.prepare(
+            'SELECT id FROM anime WHERE title = ? LIMIT 1'
+          ).get(item.animeTitle.trim()) as { id: number } | undefined;
+          if (row) dbAnimeId = row.id;
         }
       }
 
@@ -179,34 +169,31 @@ async function main() {
       }
 
       // Dedup
-      const [dup] = await conn.query<any[]>(
-        'SELECT id FROM watch_history WHERE animeId = ? AND episode = ? AND watchedAt = ? LIMIT 1',
-        [dbAnimeId, episode, watchedAt]
-      );
-      if (dup.length > 0) {
+      const dup = db.prepare(
+        'SELECT id FROM watch_history WHERE animeId = ? AND episode = ? AND watchedAt = ? LIMIT 1'
+      ).get(dbAnimeId, episode, watchedAt.toISOString()) as unknown;
+
+      if (dup) {
         skippedHistory++;
         continue;
       }
 
-      await conn.query(
-        'INSERT INTO watch_history (animeId, animeTitle, episode, watchedAt) VALUES (?, ?, ?, ?)',
-        [dbAnimeId, item.animeTitle || '', episode, watchedAt]
-      );
+      db.prepare(
+        'INSERT INTO watch_history (animeId, animeTitle, episode, watchedAt) VALUES (?, ?, ?, ?)'
+      ).run(dbAnimeId, item.animeTitle || '', episode, watchedAt.toISOString());
       importedHistory++;
     }
+  });
 
-    console.log(`✅ 观看记录: 导入 ${importedHistory}, 跳过 ${skippedHistory}`);
+  importAll();
 
-    await conn.commit();
-    console.log('🎉 全部导入完成！');
-  } catch (err) {
-    await conn.rollback();
-    console.error('❌ 导入失败:', err);
-    process.exit(1);
-  } finally {
-    conn.release();
-    await pool.end();
-  }
+  console.log(`✅ 观看记录: 导入 ${importedHistory}, 跳过 ${skippedHistory}`);
+  console.log('🎉 全部导入完成！');
+
+  db.close();
 }
 
-main();
+main().catch((err) => {
+  console.error('❌ 导入失败:', err);
+  process.exit(1);
+});

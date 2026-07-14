@@ -4,6 +4,7 @@ import { normalizeStringArray, areStringArraysEqual } from '@/lib/anime-cast';
 import { addBatchWatchHistory, deleteWatchHistoryByAnime } from '@/lib/history';
 import { query } from '@/lib/db';
 import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
+import { resolveCoverImage, deleteCoverImage } from '@/lib/cover-image';
 
 function areAllowedFieldValuesEqual(key: string, nextValue: unknown, currentValue: unknown) {
   if (key === 'tags' || key === 'cast' || key === 'castAliases') {
@@ -45,8 +46,9 @@ export async function DELETE(
   if (!id) return apiError('Invalid ID', 400);
 
   await deleteAnimeRecord(id);
-  // Also clean up history when anime is deleted
+  // Also clean up history and cover when anime is deleted
   await deleteWatchHistoryByAnime(id);
+  await deleteCoverImage(id);
   
   return apiSuccess({ ok: true });
 }
@@ -120,6 +122,15 @@ export async function PATCH(
 
   const updated = await updateAnimeRecord(id, updateData);
   if (!updated) return apiError('Not found', 404);
+
+  // 如果更新了 coverUrl，同步下载封面到本地
+  if (updateData.coverUrl !== undefined) {
+    const resolved = await resolveCoverImage(updateData.coverUrl, id);
+    if (resolved !== (updateData.coverUrl || null)) {
+      await updateAnimeRecord(id, { coverUrl: resolved ?? undefined });
+      updated.coverUrl = resolved ?? undefined;
+    }
+  }
 
   if (before) {
     const delta = updated.progress - before.progress;

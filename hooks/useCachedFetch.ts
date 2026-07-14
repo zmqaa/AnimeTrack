@@ -31,10 +31,8 @@ export function useCachedFetch<T>(options: UseCachedFetchOptions<T>): UseCachedF
   const transformRef = useRef(transform);
   transformRef.current = transform;
 
-  const [data, setData] = useState<T>(() => {
-    const cached = readSessionCache<T>(cacheKey);
-    return (cached ?? []) as T;
-  });
+  // 不在 useState 初始化器中读取 sessionStorage，避免服务端/客户端渲染不一致导致 hydration 报错
+  const [data, setData] = useState<T>([] as unknown as T);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 

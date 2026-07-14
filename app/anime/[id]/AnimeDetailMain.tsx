@@ -44,28 +44,28 @@ export default function AnimeDetailMain({
                 <input
                   value={formData.title || ''}
                   onChange={(event) => onChange('title', event.target.value)}
-                  className="theme-focus-accent w-full border-b border-white/10 bg-transparent pb-2 text-3xl font-semibold tracking-tight text-white transition"
+                  className="theme-focus-accent w-full border-b border-[var(--border)] bg-transparent pb-2 text-3xl font-semibold tracking-tight text-[var(--text-primary)] transition"
                 />
                 <input
                   value={formData.originalTitle || ''}
                   placeholder="原名 / 日文名"
                   onChange={(event) => onChange('originalTitle', event.target.value)}
-                  className="theme-focus-accent w-full border-b border-white/10 bg-transparent pb-2 text-lg text-zinc-400 transition"
+                  className="theme-focus-accent w-full border-b border-[var(--border)] bg-transparent pb-2 text-lg text-[var(--text-secondary)] transition"
                 />
                 <input
                   value={toTagInputValue(formData.tags)}
                   onChange={(event) => onChange('tags', event.target.value)}
                   placeholder="标签 (逗号分隔)"
-                  className="surface-input theme-focus-accent w-full rounded-2xl px-4 py-3 text-sm text-white transition"
+                  className="surface-input theme-focus-accent w-full rounded-2xl px-4 py-3 text-sm text-[var(--text-primary)] transition"
                 />
               </>
             ) : (
               <>
-                <h1 className="text-3xl font-semibold tracking-tight text-white md:text-[2.5rem]">{item.title}</h1>
-                {item.originalTitle && <p className="text-lg text-zinc-400">{item.originalTitle}</p>}
+                <h1 className="text-3xl font-semibold tracking-tight text-[var(--text-primary)] md:text-[2.5rem]">{item.title}</h1>
+                {item.originalTitle && <p className="text-lg text-[var(--text-secondary)]">{item.originalTitle}</p>}
                 <div className="flex flex-wrap gap-2">
                   {displayTags.map((tag) => (
-                    <span key={tag} className="surface-pill rounded-full px-3 py-1 text-xs text-zinc-200">#{tag}</span>
+                    <span key={tag} className="surface-pill rounded-full px-3 py-1 text-xs text-[var(--text-primary)]">#{tag}</span>
                   ))}
                 </div>
               </>
@@ -77,10 +77,10 @@ export default function AnimeDetailMain({
               {canEdit ? (
                 <>
                   <button onClick={onEnrich} disabled={isAiEnriching}
-                    className="surface-pill rounded-xl px-4 py-2.5 text-sm text-zinc-200 transition hover:bg-zinc-800 disabled:opacity-50">
+                    className="surface-pill rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] transition hover:bg-[var(--color-surface-hover)] disabled:opacity-50">
                     {isAiEnriching ? 'AI补充中...' : 'AI补充'}
                   </button>
-                  <button onClick={onCancel} className="rounded-xl px-4 py-2.5 text-sm text-zinc-400 transition hover:bg-zinc-900/80 hover:text-white">
+                  <button onClick={onCancel} className="rounded-xl px-4 py-2.5 text-sm text-[var(--text-secondary)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--text-primary)]">
                     取消
                   </button>
                   <button onClick={onSave} disabled={saving}
@@ -91,11 +91,11 @@ export default function AnimeDetailMain({
               ) : (
                 <>
                   <button onClick={onEnrich} disabled={isAiEnriching}
-                    className="surface-pill rounded-xl px-4 py-2.5 text-sm text-zinc-200 transition hover:bg-zinc-800 disabled:opacity-50">
+                    className="surface-pill rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] transition hover:bg-[var(--color-surface-hover)] disabled:opacity-50">
                     {isAiEnriching ? 'AI补充中...' : 'AI补充'}
                   </button>
                   <button onClick={onEdit}
-                    className="surface-pill rounded-xl p-2.5 text-zinc-300 transition hover:bg-white/[0.08] hover:text-white">
+                    className="surface-pill rounded-xl p-2.5 text-[var(--text-secondary)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--text-primary)]">
                     <PencilSquareIcon className="h-5 w-5" />
                   </button>
                 </>
@@ -107,19 +107,19 @@ export default function AnimeDetailMain({
         {/* Quick stats */}
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           <div className="surface-card-muted rounded-2xl p-4">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">观看状态</div>
-            <div className="mt-2 text-sm font-semibold text-zinc-100">{statusMap[displayStatus]}</div>
-            <div className="mt-1 text-xs text-zinc-500">{item.isFinished ? '片源已完结' : '仍可能继续更新'}</div>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">观看状态</div>
+            <div className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{statusMap[displayStatus]}</div>
+            <div className="mt-1 text-xs text-[var(--text-muted)]">{item.isFinished ? '片源已完结' : '仍可能继续更新'}</div>
           </div>
           <div className="surface-card-muted rounded-2xl p-4">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">当前进度</div>
-            <div className="mt-2 text-sm font-semibold text-zinc-100">{displayProgress} / {displayTotalEpisodes || '?'} EP</div>
-            <div className="mt-1 text-xs text-zinc-500">完成度 {Math.round(progressPercent)}%</div>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">当前进度</div>
+            <div className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{displayProgress} / {displayTotalEpisodes || '?'} EP</div>
+            <div className="mt-1 text-xs text-[var(--text-muted)]">完成度 {Math.round(progressPercent)}%</div>
           </div>
           <div className="surface-card-muted rounded-2xl p-4">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">最近编辑</div>
-            <div className="mt-2 text-sm font-semibold text-zinc-100">{formatTimestampLabel(item.updatedAt)}</div>
-            <div className="mt-1 text-xs text-zinc-500">创建于 {formatDateLabel(item.createdAt?.slice(0, 10))}</div>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">最近编辑</div>
+            <div className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{formatTimestampLabel(item.updatedAt)}</div>
+            <div className="mt-1 text-xs text-[var(--text-muted)]">创建于 {formatDateLabel(item.createdAt?.slice(0, 10))}</div>
           </div>
         </div>
       </div>
@@ -131,39 +131,39 @@ export default function AnimeDetailMain({
           {/* Progress */}
           <div className="surface-card rounded-[24px] p-6 backdrop-blur-xl">
             <div className="flex items-center justify-between gap-4">
-              <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-zinc-400">
+              <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
                 <CheckCircleIcon className="h-4 w-4" />观看进度
               </h3>
-              <span className="font-mono text-sm text-zinc-300">
+              <span className="font-mono text-sm text-[var(--text-secondary)]">
                 {canEdit ? (
                   <div className="flex items-center gap-2">
                     <input type="number" value={formData.progress ?? item.progress}
                       onChange={(event) => onChange('progress', event.target.value)}
-                      className="surface-input theme-focus-accent w-20 rounded-xl px-2 py-1.5 text-center text-sm text-white transition" />
+                      className="surface-input theme-focus-accent w-20 rounded-xl px-2 py-1.5 text-center text-sm text-[var(--text-primary)] transition" />
                     <span>/</span>
                     <input type="number" value={formData.totalEpisodes ?? item.totalEpisodes ?? ''}
                       onChange={(event) => onChange('totalEpisodes', event.target.value)} placeholder="?"
-                      className="surface-input theme-focus-accent w-20 rounded-xl px-2 py-1.5 text-center text-sm text-white transition" />
+                      className="surface-input theme-focus-accent w-20 rounded-xl px-2 py-1.5 text-center text-sm text-[var(--text-primary)] transition" />
                   </div>
                 ) : (
-                  <><span className="text-2xl text-white">{displayProgress}</span><span className="mx-1 text-zinc-500">/</span><span>{displayTotalEpisodes || '?'}</span><span className="ml-1 text-xs text-zinc-500">EP</span></>
+                  <><span className="text-2xl text-[var(--text-primary)]">{displayProgress}</span><span className="mx-1 text-[var(--text-muted)]">/</span><span>{displayTotalEpisodes || '?'}</span><span className="ml-1 text-xs text-[var(--text-muted)]">EP</span></>
                 )}
               </span>
             </div>
-            <div className="mt-4 h-3 overflow-hidden rounded-full bg-zinc-900/90">
+            <div className="mt-4 h-3 overflow-hidden rounded-full bg-[var(--bg-card)]">
               <div className="theme-spectrum-gradient h-full rounded-full transition-all duration-700" style={{ width: `${progressPercent}%` }} />
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <div className="surface-card-muted rounded-2xl p-4">
-                <div className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">首播</div>
-                <div className="mt-2 text-sm text-zinc-100">{formatDateLabel(item.premiereDate)}</div>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">首播</div>
+                <div className="mt-2 text-sm text-[var(--text-primary)]">{formatDateLabel(item.premiereDate)}</div>
               </div>
               <div className="surface-card-muted rounded-2xl p-4">
-                <div className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">单集时长</div>
-                <div className="mt-2 text-sm text-zinc-100">{displayDuration ? `${displayDuration} min` : '未知'}</div>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">单集时长</div>
+                <div className="mt-2 text-sm text-[var(--text-primary)]">{displayDuration ? `${displayDuration} min` : '未知'}</div>
               </div>
               <div className="surface-card-muted rounded-2xl p-4">
-                <div className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">片源状态</div>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">片源状态</div>
                 <div className={`mt-2 text-sm font-medium ${item.isFinished ? 'theme-accent-text' : 'theme-secondary-text'}`}>
                   {item.isFinished ? '已完结' : '连载中'}
                 </div>
@@ -173,29 +173,29 @@ export default function AnimeDetailMain({
 
           {/* Summary */}
           <div className="surface-card rounded-[24px] p-6 backdrop-blur-xl">
-            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-zinc-400">
+            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
               <SparklesIcon className="h-4 w-4" />简介 / 剧情
             </div>
             {canEdit ? (
               <textarea rows={8} value={formData.summary || ''}
                 onChange={(event) => onChange('summary', event.target.value)}
-                className="surface-input theme-focus-accent mt-4 min-h-[220px] w-full rounded-2xl p-4 text-sm leading-7 text-zinc-200 transition" />
+                className="surface-input theme-focus-accent mt-4 min-h-[220px] w-full rounded-2xl p-4 text-sm leading-7 text-[var(--text-primary)] transition" />
             ) : (
-              <p className="mt-4 whitespace-pre-wrap text-sm leading-8 text-zinc-300">{item.summary || '暂无简介'}</p>
+              <p className="mt-4 whitespace-pre-wrap text-sm leading-8 text-[var(--text-secondary)]">{item.summary || '暂无简介'}</p>
             )}
           </div>
 
           {/* Notes */}
           <div className="surface-card rounded-[24px] p-6 backdrop-blur-xl">
-            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-zinc-400">
+            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
               <ClockIcon className="h-4 w-4" />个人备注
             </div>
             {canEdit ? (
               <textarea rows={4} value={formData.notes || ''}
                 onChange={(event) => onChange('notes', event.target.value)}
-                className="surface-input theme-focus-accent mt-4 w-full rounded-2xl p-4 text-sm leading-7 text-zinc-200 transition" />
+                className="surface-input theme-focus-accent mt-4 w-full rounded-2xl p-4 text-sm leading-7 text-[var(--text-primary)] transition" />
             ) : (
-              <p className="mt-4 text-sm italic leading-7 text-zinc-400">{item.notes || '还没有留下观后感。'}</p>
+              <p className="mt-4 text-sm italic leading-7 text-[var(--text-secondary)]">{item.notes || '还没有留下观后感。'}</p>
             )}
           </div>
         </div>
@@ -204,7 +204,7 @@ export default function AnimeDetailMain({
         <div className="space-y-6">
           {/* Timeline */}
           <div className="surface-card rounded-[24px] p-6 backdrop-blur-xl">
-            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-zinc-400">
+            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
               <CalendarIcon className="h-4 w-4" />时间轴
             </div>
             <div className="mt-4 space-y-3 text-sm">
@@ -214,23 +214,23 @@ export default function AnimeDetailMain({
                 ['首播日期', 'premiereDate'],
               ] as const).map(([label, key]) => (
                 <div key={key} className="surface-card-muted flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
-                  <span className="text-zinc-500">{label}</span>
+                  <span className="text-[var(--text-muted)]">{label}</span>
                   {canEdit ? (
                     <input type="date" value={(formData[key] as string) || ''}
                       onChange={(event) => onChange(key, event.target.value)}
-                      className="surface-input theme-focus-accent rounded-xl px-2 py-1.5 text-sm text-white transition" />
+                      className="surface-input theme-focus-accent rounded-xl px-2 py-1.5 text-sm text-[var(--text-primary)] transition" />
                   ) : (
-                    <span className="text-zinc-100">{formatDateLabel(item[key] as string | undefined)}</span>
+                    <span className="text-[var(--text-primary)]">{formatDateLabel(item[key] as string | undefined)}</span>
                   )}
                 </div>
               ))}
               <div className="surface-card-muted flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
-                <span className="text-zinc-500">放送状态</span>
+                <span className="text-[var(--text-muted)]">放送状态</span>
                 {canEdit ? (
-                  <label className="flex items-center gap-2 text-sm text-zinc-200">
+                  <label className="flex items-center gap-2 text-sm text-[var(--text-primary)]">
                     <input type="checkbox" checked={Boolean(formData.isFinished ?? item.isFinished)}
                       onChange={(event) => onChange('isFinished', event.target.checked)}
-                      className="h-4 w-4 rounded border-white/10 bg-zinc-950 text-primary focus:ring-primary" />
+                      className="h-4 w-4 rounded border-[var(--border)] bg-[var(--bg-card)] text-primary focus:ring-primary" />
                     已完结
                   </label>
                 ) : (
@@ -245,11 +245,11 @@ export default function AnimeDetailMain({
           {/* Cast */}
           <div className="surface-card rounded-[24px] p-6 backdrop-blur-xl">
             <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-zinc-400">
+              <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
                 <SparklesIcon className="h-4 w-4" />声优阵容
               </div>
               {!canEdit && item.cast && item.cast.length > 0 && (
-                <span className="text-xs text-zinc-500">{item.cast.length} 名</span>
+                <span className="text-xs text-[var(--text-muted)]">{item.cast.length} 名</span>
               )}
             </div>
             {canEdit ? (
@@ -257,7 +257,7 @@ export default function AnimeDetailMain({
                 value={Array.isArray(formData.cast) ? formData.cast.join(', ') : (formData.cast || '')}
                 placeholder="花泽香菜, 宫野真守 (逗号分隔)"
                 onChange={(event) => onChange('cast', event.target.value.split(/[,，]/).map((name) => name.trim()).filter(Boolean))}
-                className="surface-input theme-focus-accent mt-4 w-full rounded-2xl p-4 text-sm leading-7 text-zinc-200 transition" />
+                className="surface-input theme-focus-accent mt-4 w-full rounded-2xl p-4 text-sm leading-7 text-[var(--text-primary)] transition" />
             ) : item.cast && item.cast.length > 0 ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 {item.cast.map((cv, index) => (
@@ -268,7 +268,7 @@ export default function AnimeDetailMain({
                 ))}
               </div>
             ) : (
-              <p className="mt-4 text-sm text-zinc-500">还没有补到声优信息。</p>
+              <p className="mt-4 text-sm text-[var(--text-muted)]">还没有补到声优信息。</p>
             )}
           </div>
         </div>
@@ -276,8 +276,8 @@ export default function AnimeDetailMain({
 
       {/* Delete section */}
       {canEdit && (
-        <div className="rounded-[24px] border border-rose-400/20 bg-rose-400/5 p-5 backdrop-blur-xl">
-          <button onClick={onDelete} className="flex items-center gap-2 text-sm text-rose-300 transition hover:text-rose-200">
+        <div className="rounded-[24px] border border-[var(--color-danger)]/20 bg-[var(--color-danger)]/5 p-5 backdrop-blur-xl">
+          <button onClick={onDelete} className="flex items-center gap-2 text-sm text-danger transition hover:text-danger">
             <TrashIcon className="h-4 w-4" />删除此番剧
           </button>
         </div>

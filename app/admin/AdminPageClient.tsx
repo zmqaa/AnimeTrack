@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { fetchJson } from '@/lib/client-api';
+import { clearSessionCache } from '@/lib/hooks-shared';
+import { DASHBOARD_CACHE_KEYS } from '@/lib/dashboard-shared';
 import {
   Checkbox,
   DeleteButton,
@@ -47,10 +49,10 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_COLOR: Record<string, string> = {
-  watching: 'text-emerald-400',
-  completed: 'text-blue-400',
-  dropped: 'text-zinc-500',
-  plan_to_watch: 'text-amber-400',
+  watching: 'text-[var(--color-watching)]',
+  completed: 'text-[var(--color-completed)]',
+  dropped: 'text-[var(--text-muted)]',
+  plan_to_watch: 'text-[var(--color-plan)]',
 };
 
 function formatDate(iso: string) {
@@ -108,6 +110,10 @@ function AnimeTab() {
       }, '删除失败');
       toast.success(`已删除 ${ids.length} 条番剧记录`);
       removeSelected(ids);
+      // 清除 Dashboard / Timeline / 番剧列表 缓存，确保后续访问获取最新数据
+      clearSessionCache(DASHBOARD_CACHE_KEYS.dashboardAnime);
+      clearSessionCache(DASHBOARD_CACHE_KEYS.dashboardHistory);
+      clearSessionCache(DASHBOARD_CACHE_KEYS.animeList);
       fetchRecords();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '删除失败');
@@ -124,11 +130,11 @@ function AnimeTab() {
         <DeleteButton count={selected.size} onClick={() => setConfirmDelete({ ids: Array.from(selected) })} disabled={deleting} />
       </div>
 
-      <div className="glass-panel rounded-3xl border border-white/5 overflow-hidden">
+      <div className="glass-panel rounded-3xl border border-[var(--border)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/5 text-zinc-400 text-left text-sm">
+              <tr className="border-b border-[var(--border)] text-[var(--text-muted)] text-left text-sm">
                 <th className="px-5 py-4 w-12"><Checkbox checked={allSelected} onChange={toggleSelectAll} /></th>
                 <th className="px-5 py-4 font-medium">ID</th>
                 <th className="px-5 py-4 font-medium">标题</th>
@@ -144,31 +150,31 @@ function AnimeTab() {
                 <SkeletonRows cols={8} />
               ) : records.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-16 text-center text-zinc-500 text-base">
+                  <td colSpan={8} className="px-5 py-16 text-center text-[var(--text-muted)] text-base">
                     {search ? '没有找到匹配的番剧' : '暂无番剧记录'}
                   </td>
                 </tr>
               ) : (
                 records.map((r) => (
-                  <tr key={r.id} className={`border-b border-white/[0.03] transition-colors ${selected.has(r.id) ? 'bg-emerald-400/[0.04]' : 'hover:bg-white/[0.02]'}`}>
+                  <tr key={r.id} className={`border-b border-[var(--border)] transition-colors ${selected.has(r.id) ? 'bg-[var(--color-surface-raised)]' : 'hover:bg-[var(--color-surface-hover)]'}`}>
                     <td className="px-5 py-4"><Checkbox checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} /></td>
-                    <td className="px-5 py-4 text-zinc-500 tabular-nums text-sm">{r.id}</td>
+                    <td className="px-5 py-4 text-[var(--text-muted)] tabular-nums text-sm">{r.id}</td>
                     <td className="px-5 py-4">
-                      <div className="text-zinc-200 font-medium text-base truncate max-w-xs" title={r.title}>{r.title}</div>
+                      <div className="text-[var(--text-secondary)] font-medium text-base truncate max-w-xs" title={r.title}>{r.title}</div>
                       {r.original_title && (
-                        <div className="text-zinc-500 text-sm mt-0.5 truncate max-w-xs" title={r.original_title}>{r.original_title}</div>
+                        <div className="text-[var(--text-muted)] text-sm mt-0.5 truncate max-w-xs" title={r.original_title}>{r.original_title}</div>
                       )}
                     </td>
                     <td className="px-5 py-4">
-                      <span className={`text-sm font-medium ${STATUS_COLOR[r.status] || 'text-zinc-400'}`}>
+                      <span className={`text-sm font-medium ${STATUS_COLOR[r.status] || 'text-[var(--text-muted)]'}`}>
                         {STATUS_LABEL[r.status] || r.status}
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-zinc-300 tabular-nums text-sm">{r.score != null ? `${r.score} 分` : '—'}</td>
-                    <td className="px-5 py-4 text-zinc-300 tabular-nums text-sm">
+                    <td className="px-5 py-4 text-[var(--text-secondary)] tabular-nums text-sm">{r.score != null ? `${r.score} 分` : '—'}</td>
+                    <td className="px-5 py-4 text-[var(--text-secondary)] tabular-nums text-sm">
                       {r.progress}{r.totalEpisodes ? ` / ${r.totalEpisodes}` : ''} 集
                     </td>
-                    <td className="px-5 py-4 text-zinc-400 tabular-nums text-sm">{formatDate(r.createdAt)}</td>
+                    <td className="px-5 py-4 text-[var(--text-muted)] tabular-nums text-sm">{formatDate(r.createdAt)}</td>
                     <td className="px-5 py-4">
                       <DeleteIconButton onClick={() => setConfirmDelete({ ids: [r.id] })} disabled={deleting} />
                     </td>
@@ -250,6 +256,8 @@ function HistoryTab() {
       }
       toast.success(`已删除 ${ids.length} 条记录`);
       removeSelected(ids);
+      // 清除 Dashboard / Timeline 缓存，确保后续访问获取最新数据
+      clearSessionCache(DASHBOARD_CACHE_KEYS.dashboardHistory);
       fetchRecords();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '删除失败');
@@ -266,11 +274,11 @@ function HistoryTab() {
         <DeleteButton count={selected.size} onClick={() => setConfirmDelete({ ids: Array.from(selected) })} disabled={deleting} />
       </div>
 
-      <div className="glass-panel rounded-3xl border border-white/5 overflow-hidden">
+      <div className="glass-panel rounded-3xl border border-[var(--border)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/5 text-zinc-400 text-left text-sm">
+              <tr className="border-b border-[var(--border)] text-[var(--text-muted)] text-left text-sm">
                 <th className="px-5 py-4 w-12"><Checkbox checked={allSelected} onChange={toggleSelectAll} /></th>
                 <th className="px-5 py-4 font-medium">ID</th>
                 <th className="px-5 py-4 font-medium">番剧名称</th>
@@ -284,18 +292,18 @@ function HistoryTab() {
                 <SkeletonRows cols={6} />
               ) : records.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-16 text-center text-zinc-500 text-base">
+                  <td colSpan={6} className="px-5 py-16 text-center text-[var(--text-muted)] text-base">
                     {search ? '没有找到匹配的记录' : '暂无历史记录'}
                   </td>
                 </tr>
               ) : (
                 records.map((r) => (
-                  <tr key={r.id} className={`border-b border-white/[0.03] transition-colors ${selected.has(r.id) ? 'bg-emerald-400/[0.04]' : 'hover:bg-white/[0.02]'}`}>
+                  <tr key={r.id} className={`border-b border-[var(--border)] transition-colors ${selected.has(r.id) ? 'bg-[var(--color-surface-raised)]' : 'hover:bg-[var(--color-surface-hover)]'}`}>
                     <td className="px-5 py-4"><Checkbox checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} /></td>
-                    <td className="px-5 py-4 text-zinc-500 tabular-nums text-sm">{r.id}</td>
-                    <td className="px-5 py-4 text-zinc-200 font-medium text-base truncate max-w-xs" title={r.animeTitle}>{r.animeTitle}</td>
-                    <td className="px-5 py-4 text-zinc-300 tabular-nums text-sm">第 {r.episode} 集</td>
-                    <td className="px-5 py-4 text-zinc-400 tabular-nums text-sm">{formatDate(r.watchedAt)}</td>
+                    <td className="px-5 py-4 text-[var(--text-muted)] tabular-nums text-sm">{r.id}</td>
+                    <td className="px-5 py-4 text-[var(--text-secondary)] font-medium text-base truncate max-w-xs" title={r.animeTitle}>{r.animeTitle}</td>
+                    <td className="px-5 py-4 text-[var(--text-secondary)] tabular-nums text-sm">第 {r.episode} 集</td>
+                    <td className="px-5 py-4 text-[var(--text-muted)] tabular-nums text-sm">{formatDate(r.watchedAt)}</td>
                     <td className="px-5 py-4">
                       <DeleteIconButton onClick={() => setConfirmDelete({ ids: [r.id] })} disabled={deleting} />
                     </td>
@@ -343,15 +351,15 @@ export default function AdminPageClient() {
   }, [status, role, router]);
 
   if (status === 'loading' || (status === 'authenticated' && role !== 'admin')) {
-    return <main className="p-6 text-zinc-400">验证权限中...</main>;
+    return <main className="p-6 text-[var(--text-muted)]">验证权限中...</main>;
   }
 
   return (
     <main className="p-4 md:p-8 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl md:text-3xl font-display tracking-tight text-zinc-100">数据管理</h1>
-        <p className="text-base text-zinc-500 mt-2">管理番剧条目和观看记录</p>
+        <h1 className="text-2xl md:text-3xl font-display tracking-tight text-[var(--text-primary)]">数据管理</h1>
+        <p className="text-base text-[var(--text-muted)] mt-2">管理番剧条目和观看记录</p>
       </div>
 
       {/* Tabs */}
@@ -365,8 +373,8 @@ export default function AdminPageClient() {
             onClick={() => setActiveTab(tab.key)}
             className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
               activeTab === tab.key
-                ? 'bg-white/10 text-zinc-100'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5'
+                ? 'bg-[var(--color-surface-hover)] text-[var(--text-primary)]'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--color-surface-hover)]'
             }`}
           >
             {tab.label}

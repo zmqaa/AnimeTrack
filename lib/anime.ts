@@ -1,8 +1,8 @@
 import 'server-only';
-import { query } from './db';
-import { type ResultSetHeader, type RowDataPacket } from 'mysql2';
+import { query, type DbResult } from './db';
 import { parseJsonStringArray } from './anime-cast';
 import { extractSeasonNumber, hasSeasonMarker, normalizeTitleToken } from './chinese-parser';
+import { nowISO } from './date-utils';
 import type { AnimeStatus } from './anime-shared';
 
 export type { AnimeStatus };
@@ -14,30 +14,25 @@ export function parseAnimeId(idParam: string): number | null {
   return id;
 }
 
-/** 将 Date 对象按 CST (UTC+8) 截取为 YYYY-MM-DD 字符串，避免 UTC 截断导致差一天 */
-function toDateStringCST(d: Date): string {
-  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' }).format(d);
-}
-
 export interface AnimeRecord {
   id: number;
   title: string;
-  originalTitle?: string; // Japanese or original name
-  coverUrl?: string; // Optional cover image
+  originalTitle?: string;
+  coverUrl?: string;
   status: AnimeStatus;
-  score?: number; // 0-10
-  progress: number; // Current episode
-  totalEpisodes?: number; // Total episodes if known
-  durationMinutes?: number; // Average duration per episode in minutes
+  score?: number;
+  progress: number;
+  totalEpisodes?: number;
+  durationMinutes?: number;
   notes?: string;
-  tags?: string[]; // New: Tags
+  tags?: string[];
   cast?: string[];
   castAliases?: string[];
   summary?: string;
-  startDate?: string; // Date string YYYY-MM-DD
-  endDate?: string; // Date string YYYY-MM-DD
-  premiereDate?: string; // Date string YYYY-MM-DD
-  isFinished?: boolean; // New: Whether the anime itself is finished airing
+  startDate?: string;
+  endDate?: string;
+  premiereDate?: string;
+  isFinished?: boolean;
   createdAt: string;
   updatedAt: string;
   lastWatchedAt?: string;
@@ -63,7 +58,7 @@ export interface CreateAnimeDTO {
   isFinished?: boolean;
 }
 
-/** 将 AnimeRecord 转换为 CreateAnimeDTO（用于补全/更新场景） */
+/** 将 AnimeRecord 转换为 CreateAnimeDTO */
 export function animeRecordToDTO(record: AnimeRecord): CreateAnimeDTO {
   return {
     title: record.title,
@@ -86,7 +81,7 @@ export function animeRecordToDTO(record: AnimeRecord): CreateAnimeDTO {
   };
 }
 
-interface AnimeRow extends RowDataPacket {
+interface AnimeRow {
   id: number;
   title: string;
   original_title?: string | null;
@@ -99,18 +94,17 @@ interface AnimeRow extends RowDataPacket {
   notes?: string | null;
   tags?: string | null;
   summary?: string | null;
-  start_date?: Date | string | null;
-  end_date?: Date | string | null;
-  premiere_date?: Date | string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  premiere_date?: string | null;
   cast?: string | null;
   cast_aliases?: string | null;
-  isFinished?: number | boolean | null;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  lastWatchedAt?: Date | string | null;
+  isFinished?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  lastWatchedAt?: string | null;
 }
 
-// Helper to convert DB Row to AnimeRecord
 function mapRowToAnimeRecord(row: AnimeRow): AnimeRecord {
   return {
     id: row.id,
@@ -118,24 +112,22 @@ function mapRowToAnimeRecord(row: AnimeRow): AnimeRecord {
     originalTitle: row.original_title || undefined,
     coverUrl: row.coverUrl || undefined,
     status: row.status as AnimeStatus,
-    score: row.score ? Number(row.score) : undefined,
+    score: row.score != null ? Number(row.score) : undefined,
     progress: row.progress,
     cast: parseJsonStringArray(row.cast),
     castAliases: parseJsonStringArray(row.cast_aliases),
-    totalEpisodes: row.totalEpisodes || undefined,
-    durationMinutes: row.durationMinutes || undefined,
+    totalEpisodes: row.totalEpisodes ?? undefined,
+    durationMinutes: row.durationMinutes ?? undefined,
     notes: row.notes || undefined,
     tags: parseJsonStringArray(row.tags),
     summary: row.summary || undefined,
-    startDate: row.start_date instanceof Date ? toDateStringCST(row.start_date) : (row.start_date || undefined),
-    endDate: row.end_date instanceof Date ? toDateStringCST(row.end_date) : (row.end_date || undefined),
-    premiereDate: row.premiere_date instanceof Date ? toDateStringCST(row.premiere_date) : (row.premiere_date || undefined),
+    startDate: row.start_date || undefined,
+    endDate: row.end_date || undefined,
+    premiereDate: row.premiere_date || undefined,
     isFinished: row.isFinished != null ? Boolean(row.isFinished) : undefined,
-    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
-    updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : String(row.updatedAt),
-    lastWatchedAt: row.lastWatchedAt
-      ? (row.lastWatchedAt instanceof Date ? row.lastWatchedAt.toISOString() : String(row.lastWatchedAt))
-      : undefined,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    lastWatchedAt: row.lastWatchedAt || undefined,
   };
 }
 
@@ -154,31 +146,17 @@ function getCandidateSeason(row: AnimeRow): number | undefined {
 function classifyPrefixSuffix(queryTitle: string, candidateTitle: string): 'none' | 'exact' | 'first-season' | 'later-season' | 'subtitle' {
   const trimmedQuery = queryTitle.trim();
   const trimmedCandidate = candidateTitle.trim();
-  if (!trimmedQuery || !trimmedCandidate.startsWith(trimmedQuery)) {
-    return 'none';
-  }
+  if (!trimmedQuery || !trimmedCandidate.startsWith(trimmedQuery)) return 'none';
 
   const suffix = trimmedCandidate.slice(trimmedQuery.length).trim();
-  if (!suffix) {
-    return 'exact';
-  }
-
-  if (/^第\s*[一1]\s*[季期]$/i.test(suffix) || /^season\s*1$/i.test(suffix) || /^s\s*1$/i.test(suffix)) {
-    return 'first-season';
-  }
-
-  if (/^第\s*[0-9一二三四五六七八九十百零两〇]+\s*[季期]$/i.test(suffix) || /^season\s*[0-9]{1,3}$/i.test(suffix) || /^s\s*[0-9]{1,3}$/i.test(suffix)) {
-    return 'later-season';
-  }
-
+  if (!suffix) return 'exact';
+  if (/^第\s*[一1]\s*[季期]$/i.test(suffix) || /^season\s*1$/i.test(suffix) || /^s\s*1$/i.test(suffix)) return 'first-season';
+  if (/^第\s*[0-9一二三四五六七八九十百零两〇]+\s*[季期]$/i.test(suffix) || /^season\s*[0-9]{1,3}$/i.test(suffix) || /^s\s*[0-9]{1,3}$/i.test(suffix)) return 'later-season';
   return 'subtitle';
 }
 
-function toSortableTime(value: Date | string | null | undefined, fallback: number): number {
-  if (!value) {
-    return fallback;
-  }
-
+function toSortableTime(value: string | null | undefined, fallback: number): number {
+  if (!value) return fallback;
   const timestamp = new Date(value).getTime();
   return Number.isFinite(timestamp) ? timestamp : fallback;
 }
@@ -200,37 +178,27 @@ function scoreAnimeTitleCandidate(row: AnimeRow, queryTitle: string) {
   const prefixKind = classifyPrefixSuffix(trimmedQuery, title);
 
   let score = 0;
-
   if (title === trimmedQuery) score += 10000;
   if (originalTitle && originalTitle === trimmedQuery) score += 9500;
   if (titleToken === queryToken) score += 9000;
   if (originalTitleToken && originalTitleToken === queryToken) score += 8500;
   if (titleComparable && titleComparable === queryComparable) score += 8000;
   if (originalComparable && originalComparable === queryComparable) score += 7600;
-
   if (title.startsWith(trimmedQuery)) score += 1400;
   if (titleToken.startsWith(queryToken)) score += 1100;
   if (originalTitleToken && originalTitleToken.startsWith(queryToken)) score += 900;
   if (title.includes(trimmedQuery)) score += 500;
   if (titleToken.includes(queryToken)) score += 350;
   if (originalTitleToken && originalTitleToken.includes(queryToken)) score += 250;
-
   if (prefixKind === 'exact') score += 600;
   if (prefixKind === 'first-season') score += 520;
 
   if (queryHasSeason && requestedSeason) {
-    if (candidateSeason === requestedSeason) {
-      score += 3200;
-    } else if (candidateSeason !== undefined) {
-      score -= Math.abs(candidateSeason - requestedSeason) * 700;
-    }
+    if (candidateSeason === requestedSeason) score += 3200;
+    else if (candidateSeason !== undefined) score -= Math.abs(candidateSeason - requestedSeason) * 700;
   } else {
-    if (candidateSeason === 1) {
-      score += 450;
-    } else if (candidateSeason && candidateSeason > 1) {
-      score -= candidateSeason * 180;
-    }
-
+    if (candidateSeason === 1) score += 450;
+    else if (candidateSeason && candidateSeason > 1) score -= candidateSeason * 180;
     if (prefixKind === 'later-season') score -= 300;
     if (prefixKind === 'subtitle') score -= 120;
   }
@@ -245,29 +213,16 @@ function scoreAnimeTitleCandidate(row: AnimeRow, queryTitle: string) {
 }
 
 function pickBestAnimeTitleCandidate(rows: AnimeRow[], queryTitle: string): AnimeRow | null {
-  if (rows.length === 0) {
-    return null;
-  }
-
+  if (rows.length === 0) return null;
   const queryHasSeason = hasSeasonMarker(queryTitle);
   const ranked = rows
     .map((row) => scoreAnimeTitleCandidate(row, queryTitle))
     .sort((left, right) => {
-      if (right.score !== left.score) {
-        return right.score - left.score;
-      }
-
-      if (!queryHasSeason && left.premiereTime !== right.premiereTime) {
-        return left.premiereTime - right.premiereTime;
-      }
-
-      if (right.updatedTime !== left.updatedTime) {
-        return right.updatedTime - left.updatedTime;
-      }
-
+      if (right.score !== left.score) return right.score - left.score;
+      if (!queryHasSeason && left.premiereTime !== right.premiereTime) return left.premiereTime - right.premiereTime;
+      if (right.updatedTime !== left.updatedTime) return right.updatedTime - left.updatedTime;
       return left.createdTime - right.createdTime;
     });
-
   return ranked[0]?.row || null;
 }
 
@@ -276,21 +231,42 @@ export interface ListAnimeOptions {
   limit?: number;
   offset?: number;
   search?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
-/** 列表视图所需的列（排除 summary/notes/cast/cast_aliases 等大字段） */
-const LIST_COLUMNS = [
+export interface PaginatedAnimeResult {
+  records: AnimeRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+const SORT_COLUMN_MAP: Record<string, string> = {
+  lastWatchedAt: 'latest_watch.lastWatchedAt',
+  updatedAt: 'anime.updatedAt',
+  createdAt: 'anime.createdAt',
+  score: 'anime.score',
+  progress: 'anime.progress',
+  title: 'anime.title',
+  startDate: 'anime.start_date',
+  endDate: 'anime.end_date',
+};
+
+const LIST_COLUMNS_RAW = [
   'id', 'title', 'original_title', 'coverUrl', 'status', 'score',
   'progress', 'totalEpisodes', 'durationMinutes', 'tags',
   'start_date', 'end_date', 'premiere_date', 'isFinished',
+  'cast', 'cast_aliases', 'summary',
   'createdAt', 'updatedAt',
-].join(', ');
+];
 
-const LIST_COLUMNS_WITH_TABLE = LIST_COLUMNS.split(', ').map((col) => `anime.${col}`).join(', ');
+const LIST_COLUMNS_WITH_TABLE = LIST_COLUMNS_RAW.map((col) => `anime.${col}`).join(', ');
 
 export async function listAnimeRecords(options: ListAnimeOptions = {}): Promise<AnimeRecord[]> {
   const { status, limit, offset } = options;
-  let sql = `SELECT ${LIST_COLUMNS} FROM anime`;
+  let sql = `SELECT ${LIST_COLUMNS_WITH_TABLE} FROM anime`;
   const params: unknown[] = [];
 
   if (status) {
@@ -354,6 +330,71 @@ export async function listAnimeRecordsWithLastWatched(options: ListAnimeOptions 
   return rows.map(mapRowToAnimeRecord);
 }
 
+export async function listAnimeRecordsPaginated(options: ListAnimeOptions = {}): Promise<PaginatedAnimeResult> {
+  const { status, search, sortBy, sortOrder } = options;
+  const page = Math.max(1, Math.floor(Number(options.limit) ? (Number(options.offset) / Number(options.limit) + 1) : 1));
+  const pageSize = Math.min(100, Math.max(1, Math.floor(Number(options.limit) || 12)));
+  const offset = (page - 1) * pageSize;
+
+  const baseFrom = `
+    FROM anime
+    LEFT JOIN (
+      SELECT animeId, MAX(watchedAt) AS lastWatchedAt
+      FROM watch_history
+      GROUP BY animeId
+    ) AS latest_watch ON latest_watch.animeId = anime.id
+  `;
+
+  const params: unknown[] = [];
+  const conditions: string[] = [];
+
+  if (status) {
+    conditions.push('anime.status = ?');
+    params.push(status);
+  }
+  if (search) {
+    conditions.push('(anime.title LIKE ? OR anime.original_title LIKE ? OR anime.cast LIKE ? OR anime.cast_aliases LIKE ?)');
+    const pattern = `%${search}%`;
+    params.push(pattern, pattern, pattern, pattern);
+  }
+
+  const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
+
+  // Count total
+  const countParams = [...params];
+  const countSql = `SELECT COUNT(*) as count ${baseFrom}${whereClause}`;
+  const [countRow] = await query<{ count: number }[]>(countSql, countParams);
+  const total = Number(countRow?.count ?? 0);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  // Sort column
+  const sortCol = SORT_COLUMN_MAP[sortBy || ''] || 'anime.updatedAt';
+  const order = sortOrder === 'asc' ? 'ASC' : 'DESC';
+
+  // Handle nullable sorts (lastWatchedAt can be NULL for anime with no history)
+  const nullsHandling = sortBy === 'lastWatchedAt'
+    ? `${sortCol} IS NULL, ${sortCol} ${order}`
+    : `${sortCol} ${order}`;
+
+  const dataSql = `
+    SELECT ${LIST_COLUMNS_WITH_TABLE}, latest_watch.lastWatchedAt
+    ${baseFrom}${whereClause}
+    ORDER BY ${nullsHandling}
+    LIMIT ? OFFSET ?
+  `;
+
+  const dataParams = [...params, pageSize, offset];
+  const rows = await query<AnimeRow[]>(dataSql, dataParams);
+
+  return {
+    records: rows.map(mapRowToAnimeRecord),
+    total,
+    page,
+    pageSize,
+    totalPages,
+  };
+}
+
 export async function countAnimeRecords(status?: AnimeStatus): Promise<number> {
   let sql = 'SELECT COUNT(*) as count FROM anime';
   const params: unknown[] = [];
@@ -361,7 +402,7 @@ export async function countAnimeRecords(status?: AnimeStatus): Promise<number> {
     sql += ' WHERE status = ?';
     params.push(status);
   }
-  const rows = await query<(RowDataPacket & { count: number })[]>(sql, params);
+  const rows = await query<{ count: number }[]>(sql, params);
   return Number(rows[0]?.count || 0);
 }
 
@@ -372,20 +413,21 @@ export async function getAnimeRecord(id: number): Promise<AnimeRecord | null> {
 }
 
 export async function createAnimeRecord(input: CreateAnimeDTO): Promise<AnimeRecord> {
+  const now = nowISO();
   const sql = `
-    INSERT INTO anime (title, original_title, coverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO anime (title, original_title, coverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
-  
+
   const params = [
     input.title,
     input.originalTitle || null,
     input.coverUrl || null,
     input.status,
-    input.score || null,
+    input.score ?? null,
     input.progress,
-    input.totalEpisodes || null,
-    input.durationMinutes || null,
+    input.totalEpisodes ?? null,
+    input.durationMinutes ?? null,
     input.notes || null,
     JSON.stringify(input.tags || []),
     input.summary || null,
@@ -394,13 +436,13 @@ export async function createAnimeRecord(input: CreateAnimeDTO): Promise<AnimeRec
     input.premiereDate || null,
     JSON.stringify(input.cast || []),
     JSON.stringify(input.castAliases || []),
-    input.isFinished != null ? (input.isFinished ? 1 : 0) : null
+    input.isFinished != null ? (input.isFinished ? 1 : 0) : null,
+    now,
+    now,
   ];
 
-  const result = await query<ResultSetHeader>(sql, params);
-  
-  // 直接构造返回值，避免多余的 SELECT 查询
-  const now = new Date().toISOString();
+  const result = await query<DbResult>(sql, params);
+
   return {
     id: result.insertId,
     title: input.title,
@@ -429,9 +471,12 @@ export async function updateAnimeRecord(
   id: number,
   input: Partial<CreateAnimeDTO>
 ): Promise<AnimeRecord | null> {
-  // Dynamic update query
   const fields: string[] = [];
   const params: unknown[] = [];
+
+  // Always update updatedAt
+  fields.push('updatedAt = ?');
+  params.push(nowISO());
 
   if (input.originalTitle !== undefined) { fields.push('original_title = ?'); params.push(input.originalTitle); }
   if (input.title !== undefined) { fields.push('title = ?'); params.push(input.title); }
@@ -451,14 +496,14 @@ export async function updateAnimeRecord(
   if (input.castAliases !== undefined) { fields.push('cast_aliases = ?'); params.push(JSON.stringify(input.castAliases)); }
   if (input.isFinished !== undefined) { fields.push('isFinished = ?'); params.push(input.isFinished ? 1 : 0); }
 
-  if (fields.length === 0) return await getAnimeRecord(id);
+  if (fields.length <= 1) return await getAnimeRecord(id);
 
-  const sql = `UPDATE anime SET ${fields.join(', ')} WHERE id = ?`;
+  const sql = `UPDATE anime SET ${fields.join(', ')} WHERE id = ? RETURNING *`;
   params.push(id);
 
-  await query(sql, params);
-  
-  return await getAnimeRecord(id);
+  const rows = await query<AnimeRow[]>(sql, params);
+  if (rows.length === 0) return null;
+  return mapRowToAnimeRecord(rows[0]);
 }
 
 export async function deleteAnimeRecord(id: number): Promise<void> {
@@ -467,11 +512,8 @@ export async function deleteAnimeRecord(id: number): Promise<void> {
 
 export async function findAnimeByTitle(title: string): Promise<AnimeRecord | null> {
   const normalizedTitle = title.trim();
-  if (!normalizedTitle) {
-    return null;
-  }
+  if (!normalizedTitle) return null;
 
-  // 单次查询：精确匹配 + 模糊匹配合并，避免多次 round-trip
   const escapedTitle = escapeLikePattern(normalizedTitle);
   const rows = await query<AnimeRow[]>(
     `
@@ -489,10 +531,7 @@ export async function findAnimeByTitle(title: string): Promise<AnimeRecord | nul
   );
 
   const bestCandidate = pickBestAnimeTitleCandidate(rows, normalizedTitle);
-  if (!bestCandidate) {
-    return null;
-  }
-
+  if (!bestCandidate) return null;
   return mapRowToAnimeRecord(bestCandidate);
 }
 
@@ -502,5 +541,6 @@ export async function listAnimeRecordsByExactTitle(title: string): Promise<Anime
 }
 
 export async function updateAnimeProgress(id: number, progress: number): Promise<void> {
-    await query('UPDATE anime SET progress = ?, updatedAt = NOW() WHERE id = ?', [progress, id]);
+  const now = nowISO();
+  await query('UPDATE anime SET progress = ?, updatedAt = ? WHERE id = ?', [progress, now, id]);
 }

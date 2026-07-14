@@ -68,8 +68,3 @@ export function getRelativeTime(date: Date | string): string {
   if (hours < 24) return `${hours}小时前`;
   return `${days}天前`;
 }
-
-/** 生成唯一ID */
-export function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2);
-}

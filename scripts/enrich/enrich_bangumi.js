@@ -25,9 +25,9 @@
 
 'use strict';
 
-const mysql = require('mysql2/promise');
 const path = require('path');
 const dotenv = require('dotenv');
+const { getDb } = require('../shared/db_env');
 
 dotenv.config({ path: path.join(__dirname, '../../.env.local') });
 dotenv.config({ path: path.join(__dirname, '../../.env') });
@@ -435,17 +435,7 @@ async function runPool(items, concurrency, fn) {
 
 // ─── 数据库操作 ──────────────────────────────────────────────────────────────
 
-function buildDbConfig() {
-  return {
-    host:     process.env.MYSQL_HOST || 'localhost',
-    port:     Number(process.env.MYSQL_PORT) || 3306,
-    user:     process.env.MYSQL_USER,
-    password: process.env.MYSQL_PASSWORD,
-    database: process.env.MYSQL_DATABASE,
-  };
-}
-
-async function applyPatch(conn, animeId, patch) {
+async function applyPatch(db, animeId, patch) {
   const setClauses = [];
   const values = [];
 
@@ -457,13 +447,16 @@ async function applyPatch(conn, animeId, patch) {
   }
 
   if (setClauses.length === 0) return;
-  setClauses.push('updatedAt = NOW()');
-  values.push(animeId);
+  const now = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).format(new Date()).replace(' ', 'T');
+  setClauses.push('updatedAt = ?');
+  values.push(now, animeId);
 
-  await conn.execute(
-    `UPDATE anime SET ${setClauses.join(', ')} WHERE id = ?`,
-    values
-  );
+  db.prepare(`UPDATE anime SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
 }
 
 function fieldToColumn(field) {
@@ -504,7 +497,7 @@ async function main() {
   if (opts.force) console.log('  --force: 强制覆盖已有字段');
   console.log();
 
-  const conn = await mysql.createConnection(buildDbConfig());
+  const db = getDb();
 
   try {
     // 查询需要处理的记录
@@ -518,11 +511,11 @@ async function main() {
     }
 
     if (!opts.force) {
-      // 只取至少有一个字段为空的记录
+      // 只取至少有一个字段为空的记录（SQLite 中 JSON 字段存储为 TEXT）
       conditions.push(`(
         score IS NULL OR totalEpisodes IS NULL OR durationMinutes IS NULL
         OR summary IS NULL OR summary = ''
-        OR tags IS NULL OR JSON_LENGTH(tags) = 0
+        OR tags IS NULL OR tags = '[]' OR tags = ''
         OR coverUrl IS NULL OR isFinished IS NULL
         OR premiere_date IS NULL
       )`);
@@ -532,7 +525,9 @@ async function main() {
     query += ' ORDER BY id';
     if (opts.limit) query += ` LIMIT ${opts.limit}`;
 
-    const [rows] = await conn.query(query, params);
+    const rows = params.length > 0
+      ? db.prepare(query).all(...params)
+      : db.prepare(query).all();
     console.log(`待处理: ${rows.length} 条记录\n`);
 
     if (rows.length === 0) {
@@ -584,7 +579,7 @@ async function main() {
     if (!opts.dryRun && patches.length > 0) {
       console.log('\n写入数据库...');
       for (const { id, patch } of patches) {
-        await applyPatch(conn, id, patch);
+        await applyPatch(db, id, patch);
       }
       console.log(`✅ 已写入 ${patches.length} 条`);
     } else if (opts.dryRun && patches.length > 0) {
@@ -592,7 +587,7 @@ async function main() {
     }
 
   } finally {
-    await conn.end();
+    db.close();
   }
 }
 

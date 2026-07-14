@@ -10,10 +10,10 @@ export default function Toast() {
       toastOptions={{
         duration: 3000,
         style: {
-          background: 'rgba(14, 21, 19, 0.95)',
+          background: 'var(--color-toast-bg)',
           backdropFilter: 'blur(20px)',
-          color: '#f5f7f4',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
+          color: 'var(--color-toast-text)',
+          border: '1px solid var(--color-toast-border)',
           borderRadius: '16px',
           fontSize: '13px',
           padding: '12px 16px',
@@ -22,14 +22,14 @@ export default function Toast() {
         },
         success: {
           iconTheme: {
-            primary: '#56d39c',
-            secondary: '#07110f',
+            primary: 'var(--color-toast-success-icon)',
+            secondary: 'var(--color-toast-icon-bg)',
           },
         },
         error: {
           iconTheme: {
-            primary: '#f87171',
-            secondary: '#07110f',
+            primary: 'var(--color-toast-error-icon)',
+            secondary: 'var(--color-toast-icon-bg)',
           },
           duration: 4000,
         },

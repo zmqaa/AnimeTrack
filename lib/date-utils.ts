@@ -1,3 +1,13 @@
+/** 生成当前 CST (UTC+8) ISO 时间字符串，格式 "2026-03-31T14:05:00" */
+export function nowISO(): string {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  }).format(new Date()).replace(' ', 'T');
+}
+
 export function normalizeDateString(value: unknown): string | undefined {
   if (!value) {
     return undefined;

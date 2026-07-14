@@ -21,7 +21,7 @@ export function DonutChart({ data, size = 96, strokeWidth = 12 }: DonutChartProp
 
   if (total === 0) {
     return (
-      <svg width={size} height={size} className="text-zinc-800">
+      <svg width={size} height={size} style={{ color: 'var(--text-muted)' }}>
         <circle
           cx={size / 2}
           cy={size / 2}

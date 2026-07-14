@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
-const mysql = require('mysql2/promise');
-const { createDbConfig, loadDatabaseEnv } = require('../shared/db_env');
+const path = require('path');
+const fs = require('fs');
+const { getDb, loadDatabaseEnv } = require('../shared/db_env');
 
 async function main() {
   loadDatabaseEnv();
@@ -12,28 +13,25 @@ async function main() {
 
   const displayName = nameArg || username;
   const passwordHash = await bcrypt.hash(password, 10);
-  const connection = await mysql.createConnection(createDbConfig());
+  const db = getDb();
 
   try {
-    const [rows] = await connection.query('SELECT id FROM users WHERE username = ? LIMIT 1', [username]);
-    const existingRows = Array.isArray(rows) ? rows : [];
+    const existing = db.prepare('SELECT id FROM users WHERE username = ? LIMIT 1').get(username);
 
-    if (existingRows.length > 0) {
-      await connection.query(
-        'UPDATE users SET password_hash = ?, name = ?, role = ? WHERE username = ?',
-        [passwordHash, displayName, 'admin', username]
-      );
+    if (existing) {
+      db.prepare(
+        'UPDATE users SET password_hash = ?, name = ?, role = ? WHERE username = ?'
+      ).run(passwordHash, displayName, 'admin', username);
       console.log(`Updated existing user ${username} as admin.`);
       return;
     }
 
-    await connection.query(
-      'INSERT INTO users (username, password_hash, name, role) VALUES (?, ?, ?, ?)',
-      [username, passwordHash, displayName, 'admin']
-    );
+    db.prepare(
+      'INSERT INTO users (username, password_hash, name, role) VALUES (?, ?, ?, ?)'
+    ).run(username, passwordHash, displayName, 'admin');
     console.log(`Created admin user ${username}.`);
   } finally {
-    await connection.end();
+    db.close();
   }
 }
 

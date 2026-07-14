@@ -1,5 +1,5 @@
 /**
- * 逐表备份脚本（纯 Node.js，不依赖 mysqldump）
+ * 逐表备份脚本（SQLite 版本）
  *
  * 为当前数据库中的每张表分别导出：
  *   1) .schema.sql  表结构快照
@@ -11,55 +11,31 @@
  */
 const fs = require('fs');
 const path = require('path');
-const mysql = require('mysql2');
-const mysqlPromise = require('mysql2/promise');
-const {
-  createDbConfig,
-  projectRoot,
-  nowCSTTimestamp,
-  nowCSTReadable,
-} = require('../shared/db_env');
+const { getDb, projectRoot, nowCSTTimestamp, nowCSTReadable } = require('../shared/db_env');
 
 const BACKUP_PREFIX = 'table-backup-';
 
 function ensureDir(dirPath) {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
-  }
+  if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
 }
 
-function quoteIdentifier(name) {
-  return `\`${String(name).replace(/`/g, '``')}\``;
-}
-
-function normalizeValue(value) {
-  if (value === null || value === undefined) return null;
-  if (Buffer.isBuffer(value)) return value;
-  if (value instanceof Date) return value.toISOString().slice(0, 19).replace('T', ' ');
-  if (typeof value === 'object') return JSON.stringify(value);
-  return value;
-}
-
-function escapeValue(value) {
+function escapeSql(value) {
   if (value === null || value === undefined) return 'NULL';
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'boolean') return value ? '1' : '0';
   if (Buffer.isBuffer(value)) return `X'${value.toString('hex')}'`;
-  return mysql.escape(normalizeValue(value));
+  return `'${String(value).replace(/'/g, "''")}'`;
 }
 
 function buildInsert(tableName, columns, row) {
-  const quotedColumns = columns.map(quoteIdentifier).join(', ');
-  const values = columns.map((column) => escapeValue(row[column])).join(', ');
-  return `INSERT INTO ${quoteIdentifier(tableName)} (${quotedColumns}) VALUES (${values});`;
-}
-
-function withSemicolon(sql) {
-  return /;\s*$/.test(sql) ? sql : `${sql};`;
+  const quotedColumns = columns.join(', ');
+  const values = columns.map((column) => escapeSql(row[column])).join(', ');
+  return `INSERT INTO ${tableName} (${quotedColumns}) VALUES (${values});`;
 }
 
 function parseArgs() {
   const args = process.argv.slice(2);
   let outputDir = null;
-
   for (let i = 0; i < args.length; i++) {
     if ((args[i] === '-o' || args[i] === '--output-dir') && args[i + 1]) {
       outputDir = path.resolve(args[++i]);
@@ -67,94 +43,79 @@ function parseArgs() {
       outputDir = path.resolve(args[i]);
     }
   }
-
   if (!outputDir) {
     outputDir = path.join(projectRoot, 'backups', `${BACKUP_PREFIX}${nowCSTTimestamp()}`);
   }
-
   return { outputDir };
 }
 
-async function listTables(connection) {
-  const [rows] = await connection.query('SHOW TABLES');
-  return rows.map((row) => String(Object.values(row)[0]));
+function listTables(db) {
+  return db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all()
+    .map((row) => row.name);
 }
 
-async function getTableSnapshot(connection, tableName) {
-  const quotedTable = quoteIdentifier(tableName);
+function getTableSchema(db, tableName) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name = ?").get(tableName);
+  return row ? row.sql : null;
+}
 
-  const [createRows] = await connection.query(`SHOW CREATE TABLE ${quotedTable}`);
-  const createSql = createRows[0]?.['Create Table'] || createRows[0]?.['Create View'];
+function getTableColumns(db, tableName) {
+  return db.prepare(`PRAGMA table_info(${tableName})`).all()
+    .map((col) => col.name);
+}
+
+function getPrimaryKeyColumns(db, tableName) {
+  return db.prepare(`PRAGMA table_info(${tableName})`).all()
+    .filter((col) => col.pk > 0)
+    .sort((a, b) => a.pk - b.pk)
+    .map((col) => col.name);
+}
+
+function getTableSnapshot(db, tableName) {
+  const createSql = getTableSchema(db, tableName);
   if (!createSql) {
-    throw new Error(`Unable to read CREATE statement for table: ${tableName}`);
+    throw new Error(`Unable to read schema for table: ${tableName}`);
   }
 
-  const [columnRows] = await connection.query(`SHOW FULL COLUMNS FROM ${quotedTable}`);
-  const columns = columnRows.map((row) => String(row.Field));
+  const columns = getTableColumns(db, tableName);
+  const primaryKeyColumns = getPrimaryKeyColumns(db, tableName);
 
-  const [indexRows] = await connection.query(`SHOW INDEX FROM ${quotedTable}`);
-  const primaryKeyColumns = indexRows
-    .filter((row) => row.Key_name === 'PRIMARY')
-    .sort((left, right) => Number(left.Seq_in_index) - Number(right.Seq_in_index))
-    .map((row) => String(row.Column_name));
+  let sql = `SELECT * FROM ${tableName}`;
+  if (primaryKeyColumns.length > 0) {
+    sql += ` ORDER BY ${primaryKeyColumns.join(', ')}`;
+  }
+  const rows = db.prepare(sql).all();
 
-  const orderBy = primaryKeyColumns.length > 0
-    ? ` ORDER BY ${primaryKeyColumns.map(quoteIdentifier).join(', ')}`
-    : '';
-  const [dataRows] = await connection.query(`SELECT * FROM ${quotedTable}${orderBy}`);
-
-  const [statusRows] = await connection.query('SHOW TABLE STATUS LIKE ?', [tableName]);
-  const autoIncrement = statusRows[0]?.Auto_increment ?? null;
-
-  return {
-    tableName,
-    createSql,
-    columns,
-    primaryKeyColumns,
-    rows: dataRows,
-    autoIncrement,
-  };
+  return { tableName, createSql, columns, primaryKeyColumns, rows };
 }
 
-function writeTableFiles(outputDir, databaseName, snapshot, index) {
+function writeTableFiles(outputDir, snapshot, index) {
   const filePrefix = `${String(index + 1).padStart(2, '0')}-${snapshot.tableName}`;
   const schemaFile = `${filePrefix}.schema.sql`;
   const dataFile = `${filePrefix}.data.sql`;
 
   const schemaLines = [
     `-- Table schema backup (${snapshot.tableName})`,
-    `-- Database: ${databaseName}`,
+    `-- Source: SQLite database`,
     `-- Generated: ${nowCSTReadable()} (UTC+8)`,
     '',
-    'SET NAMES utf8mb4;',
-    '',
-    withSemicolon(snapshot.createSql),
+    snapshot.createSql + ';',
     '',
   ];
 
   const dataLines = [
     `-- Table data backup (${snapshot.tableName})`,
-    `-- Database: ${databaseName}`,
+    `-- Source: SQLite database`,
     `-- Generated: ${nowCSTReadable()} (UTC+8)`,
     `-- Rows: ${snapshot.rows.length}`,
     '',
-    'SET NAMES utf8mb4;',
-    'SET FOREIGN_KEY_CHECKS = 0;',
-    '',
-    `DELETE FROM ${quoteIdentifier(snapshot.tableName)};`,
+    `DELETE FROM ${snapshot.tableName};`,
     '',
   ];
 
   for (const row of snapshot.rows) {
     dataLines.push(buildInsert(snapshot.tableName, snapshot.columns, row));
   }
-
-  if (snapshot.autoIncrement !== null) {
-    dataLines.push('');
-    dataLines.push(`ALTER TABLE ${quoteIdentifier(snapshot.tableName)} AUTO_INCREMENT = ${Number(snapshot.autoIncrement)};`);
-  }
-
-  dataLines.push('SET FOREIGN_KEY_CHECKS = 1;');
   dataLines.push('');
 
   fs.writeFileSync(path.join(outputDir, schemaFile), schemaLines.join('\n'), 'utf8');
@@ -165,15 +126,14 @@ function writeTableFiles(outputDir, databaseName, snapshot, index) {
 
 async function main() {
   const { outputDir } = parseArgs();
-  const dbConfig = createDbConfig({ dateStrings: true });
-  const connection = await mysqlPromise.createConnection(dbConfig);
+  const db = getDb();
 
   ensureDir(outputDir);
 
   try {
-    const tableNames = await listTables(connection);
+    const tableNames = listTables(db);
     const manifest = {
-      database: dbConfig.database,
+      source: 'SQLite database',
       generatedAt: `${nowCSTReadable()} (UTC+8)`,
       outputDir: path.relative(projectRoot, outputDir),
       tables: [],
@@ -181,14 +141,13 @@ async function main() {
 
     for (let index = 0; index < tableNames.length; index += 1) {
       const tableName = tableNames[index];
-      const snapshot = await getTableSnapshot(connection, tableName);
-      const files = writeTableFiles(outputDir, dbConfig.database, snapshot, index);
+      const snapshot = getTableSnapshot(db, tableName);
+      const files = writeTableFiles(outputDir, snapshot, index);
 
       manifest.tables.push({
         tableName,
         rowCount: snapshot.rows.length,
         primaryKeyColumns: snapshot.primaryKeyColumns,
-        autoIncrement: snapshot.autoIncrement,
         schemaFile: files.schemaFile,
         dataFile: files.dataFile,
       });
@@ -204,7 +163,7 @@ async function main() {
 
     console.log(`[table-backup] Backup complete -> ${path.relative(projectRoot, outputDir)}`);
   } finally {
-    await connection.end();
+    db.close();
   }
 }
 

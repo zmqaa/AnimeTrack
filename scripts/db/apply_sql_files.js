@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const mysql = require('mysql2/promise');
-const { createDbConfig, loadDatabaseEnv, projectRoot } = require('../shared/db_env');
+const { getDb, loadDatabaseEnv, projectRoot } = require('../shared/db_env');
 
 async function main() {
   loadDatabaseEnv();
@@ -11,7 +10,7 @@ async function main() {
     throw new Error('Usage: node scripts/db/apply_sql_files.js <file.sql> [more.sql]');
   }
 
-  const connection = await mysql.createConnection(createDbConfig({ multipleStatements: true }));
+  const db = getDb();
 
   try {
     for (const file of inputFiles) {
@@ -20,11 +19,11 @@ async function main() {
       const displayPath = path.relative(projectRoot, absolutePath) || absolutePath;
 
       console.log(`Applying ${displayPath} ...`);
-      await connection.query(sql);
+      db.exec(sql);
       console.log(`Applied ${displayPath}`);
     }
   } finally {
-    await connection.end();
+    db.close();
   }
 }
 
