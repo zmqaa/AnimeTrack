@@ -2,7 +2,7 @@ import { getAnimeRecord, updateAnimeRecord, CreateAnimeDTO, parseAnimeId, animeR
 import { enrichAnimeInput } from '@/lib/anime-enrichment';
 import { DEFAULT_METADATA_FIELDS, buildMetadataPatch } from '@/lib/metadata/merge-policy';
 import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
-import { resolveCoverImage } from '@/lib/cover-image';
+import { isPlaceholderCoverPath, resolveCoverImage } from '@/lib/cover-image';
 
 export async function POST(
   _request: Request,
@@ -53,7 +53,20 @@ export async function POST(
     delete metadataPatch.score;
   }
 
+  if (metadataPatch.coverUrl && record.coverUrl && !isPlaceholderCoverPath(record.coverUrl)) {
+    delete metadataPatch.coverUrl;
+  }
+
   Object.assign(patch, metadataPatch);
+
+  if (patch.coverUrl !== undefined) {
+    patch.coverUrl = await resolveCoverImage(patch.coverUrl, id, {
+      fallbackOnDownloadFailure: record.coverUrl || null,
+    }) ?? undefined;
+    if (patch.coverUrl === undefined || patch.coverUrl === record.coverUrl) {
+      delete patch.coverUrl;
+    }
+  }
 
   const appliedFields = Object.keys(patch);
   if (appliedFields.length === 0) {
@@ -63,17 +76,6 @@ export async function POST(
   const updated = await updateAnimeRecord(id, patch);
   if (!updated) {
     return apiError('更新失败', 500);
-  }
-
-  // 如果更新了 coverUrl，同步下载封面到本地
-  if (patch.coverUrl !== undefined) {
-    const resolved = await resolveCoverImage(patch.coverUrl, id);
-    if (resolved !== (patch.coverUrl || null)) {
-      const reUpdated = await updateAnimeRecord(id, { coverUrl: resolved ?? undefined });
-      if (reUpdated) {
-        return apiSuccess({ ok: true, appliedFields, entry: reUpdated });
-      }
-    }
   }
 
   return apiSuccess({ ok: true, appliedFields, entry: updated });

@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { getRawDb, closeDb } from '@/lib/db';
+import { getRawDb } from '@/lib/db';
 import { apiError, apiSuccess } from '@/lib/api-response';
 
 type SetupStatus = {
@@ -15,8 +15,6 @@ type SetupStatus = {
   envFileHint: string;
   databaseError?: string;
 };
-
-const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'animetrack.db');
 
 function isSetupAllowed() {
   return process.env.NODE_ENV !== 'production' || process.env.ALLOW_LOCAL_SETUP === 'true';

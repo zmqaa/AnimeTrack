@@ -30,6 +30,13 @@ export function isLocalCoverPath(value: string | null | undefined): boolean {
   return value.trim().startsWith(COVERS_PUBLIC_PREFIX);
 }
 
+/** 判断是否为系统生成的本地占位封面 */
+export function isPlaceholderCoverPath(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const trimmed = value.trim();
+  return /placeholder/i.test(trimmed) || /^\/covers\/\d+\.svg(?:[?#].*)?$/i.test(trimmed);
+}
+
 /** 获取封面文件的磁盘绝对路径 */
 function coverFilePath(animeId: number): string {
   return join(COVERS_DIR, `${animeId}.jpg`);
@@ -128,6 +135,7 @@ export function deleteCoverImageSync(animeId: number): void {
 export async function resolveCoverImage(
   coverUrl: string | null | undefined,
   animeId: number,
+  options: { fallbackOnDownloadFailure?: string | null; preserveRemoteOnFailure?: boolean } = {},
 ): Promise<string | null> {
   const trimmed = (coverUrl ?? '').trim();
 
@@ -148,7 +156,15 @@ export async function resolveCoverImage(
     if (localPath) {
       return localPath;
     }
-    // 下载失败：返回 null，让前端显示占位符
+    const fallback = options.fallbackOnDownloadFailure;
+    if (fallback !== undefined) {
+      console.warn(`[cover] 封面下载失败，保留原封面: ${trimmed}`);
+      return fallback;
+    }
+    if (options.preserveRemoteOnFailure !== false) {
+      console.warn(`[cover] 封面下载失败，保留远程 URL: ${trimmed}`);
+      return trimmed;
+    }
     console.warn(`[cover] 封面下载失败，清空 coverUrl: ${trimmed}`);
     return null;
   }

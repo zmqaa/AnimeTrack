@@ -1,5 +1,4 @@
 import { normalizeStringArray } from '@/lib/anime-cast';
-import { readSessionCache, writeSessionCache } from '@/lib/hooks-shared';
 import type { AnimeStatus, AnimeDetailItem } from '@/lib/anime-shared';
 import { ANIME_STATUS_LABELS } from '@/lib/anime-shared';
 
@@ -51,20 +50,6 @@ export type AnimeDetailPatchPayload = Partial<Record<EditableField, unknown>>;
 export function resolveReturnTo(rawValue: string | null) {
   if (!rawValue) return '/anime';
   return rawValue.startsWith('/anime') ? rawValue : '/anime';
-}
-
-const ANIME_LIST_CACHE_KEY = 'anime-list-items';
-
-export function updateAnimeListCache(nextEntry: AnimeDetailItem) {
-  const cached = readSessionCache<AnimeDetailItem[]>(ANIME_LIST_CACHE_KEY);
-  if (!cached) return;
-  writeSessionCache(ANIME_LIST_CACHE_KEY, cached.map((item) => (item.id === nextEntry.id ? { ...item, ...nextEntry } : item)));
-}
-
-export function removeAnimeFromListCache(animeId: number) {
-  const cached = readSessionCache<AnimeDetailItem[]>(ANIME_LIST_CACHE_KEY);
-  if (!cached) return;
-  writeSessionCache(ANIME_LIST_CACHE_KEY, cached.filter((item) => item.id !== animeId));
 }
 
 function areStringArraysEqual(left: unknown, right: unknown) {

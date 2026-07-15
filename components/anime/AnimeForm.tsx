@@ -11,7 +11,7 @@ interface AnimeFormProps {
   editingId: number | null;
         initialData: AnimeFormInitialData;
   resetForm: () => void;
-  loadItems: () => Promise<void>;
+  onSaved: () => void;
   deleteAnime: (id: number) => Promise<void>;
 }
 
@@ -19,7 +19,7 @@ export default function AnimeForm({
   editingId,
   initialData,
   resetForm,
-  loadItems,
+  onSaved,
   deleteAnime
 }: AnimeFormProps) {
   const [title, setTitle] = useState(initialData.title || '');
@@ -86,7 +86,7 @@ export default function AnimeForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
             }, '操作失败');
-            loadItems();
+            onSaved();
             resetForm();
             toast.success(editingId ? '已保存' : '已添加');
                 } catch (error) {

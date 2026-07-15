@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import useSWR, { mutate as globalMutate } from 'swr';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { fetchJson } from '@/lib/client-api';
-import { clearSessionCache } from '@/lib/hooks-shared';
-import { DASHBOARD_CACHE_KEYS } from '@/lib/dashboard-shared';
+import { adminAnimeKey, adminHistoryKey, ANIME_LIST_KEY, HISTORY_KEY, swrFetcher } from '@/lib/swr-config';
 import {
   Checkbox,
   DeleteButton,
@@ -15,6 +15,7 @@ import {
   Pagination,
   SearchBar,
   SkeletonRows,
+  UndoWatchIconButton,
   useDebouncedSearch,
   useSelectableRows,
 } from './admin-table-shared';
@@ -39,6 +40,18 @@ interface HistoryRow {
   animeTitle: string;
   episode: number;
   watchedAt: string;
+}
+
+interface UndoPreview {
+  historyId: number;
+  animeId: number;
+  animeTitle: string;
+  episode: number;
+  currentProgress: number;
+  targetProgress: number;
+  affectedHistoryCount: number;
+  firstAffectedEpisode: number | null;
+  lastAffectedEpisode: number | null;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -67,38 +80,41 @@ function formatDate(iso: string) {
 // ─────────────────────────────────────────────
 
 function AnimeTab() {
-  const [records, setRecords] = useState<AnimeRow[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
-  const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<{ ids: number[] } | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const { selected, clearSelection, removeSelected, toggleSelect, toggleSelectAll } = useSelectableRows(records);
   const { search, searchInput, handleSearchInput } = useDebouncedSearch(() => {
     setPage(1);
-    clearSelection();
   });
+
+  // SWR key 随分页/搜索变化自动重建
+  const swrKey = useMemo(
+    () => adminAnimeKey({ page, pageSize, search }),
+    [page, pageSize, search],
+  );
+
+  const { data, isLoading, mutate } = useSWR<{ records: AnimeRow[]; total: number }>(
+    swrKey,
+    swrFetcher,
+  );
+
+  const records = data?.records ?? [];
+  const total = data?.total ?? 0;
+
+  const { selected, clearSelection, removeSelected, toggleSelect, toggleSelectAll } = useSelectableRows(records);
+
+  // 搜索变化时清除已选项（在 useSelectableRows 之后执行）
+  const prevSearchRef = useRef(search);
+  useEffect(() => {
+    if (prevSearchRef.current !== search) {
+      clearSelection();
+      prevSearchRef.current = search;
+    }
+  }, [search, clearSelection]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const allSelected = records.length > 0 && records.every((record) => selected.has(record.id));
-
-  const fetchRecords = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
-      if (search) params.set('search', search);
-      const data = await fetchJson<{ records: AnimeRow[]; total: number }>(`/api/admin/anime?${params}`, undefined, '加载番剧列表失败');
-      setRecords(data.records);
-      setTotal(data.total);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '加载番剧列表失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [page, pageSize, search]);
-
-  useEffect(() => { fetchRecords(); }, [fetchRecords]);
 
   const handleDelete = async (ids: number[]) => {
     setDeleting(true);
@@ -110,11 +126,10 @@ function AnimeTab() {
       }, '删除失败');
       toast.success(`已删除 ${ids.length} 条番剧记录`);
       removeSelected(ids);
-      // 清除 Dashboard / Timeline / 番剧列表 缓存，确保后续访问获取最新数据
-      clearSessionCache(DASHBOARD_CACHE_KEYS.dashboardAnime);
-      clearSessionCache(DASHBOARD_CACHE_KEYS.dashboardHistory);
-      clearSessionCache(DASHBOARD_CACHE_KEYS.animeList);
-      fetchRecords();
+      // 全局缓存刷新：管理页当前页 + 番剧全量列表 + Dashboard
+      mutate();
+      globalMutate(ANIME_LIST_KEY);
+      globalMutate(HISTORY_KEY);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '删除失败');
     } finally {
@@ -146,7 +161,7 @@ function AnimeTab() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {isLoading ? (
                 <SkeletonRows cols={8} />
               ) : records.length === 0 ? (
                 <tr>
@@ -209,38 +224,42 @@ function AnimeTab() {
 // ─────────────────────────────────────────────
 
 function HistoryTab() {
-  const [records, setRecords] = useState<HistoryRow[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize] = useState(50);
-  const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<{ ids: number[] } | null>(null);
+  const [confirmUndo, setConfirmUndo] = useState<UndoPreview | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const { selected, clearSelection, removeSelected, toggleSelect, toggleSelectAll } = useSelectableRows(records);
+  const [undoing, setUndoing] = useState(false);
   const { search, searchInput, handleSearchInput } = useDebouncedSearch(() => {
     setPage(1);
-    clearSelection();
   });
+
+  const swrKey = useMemo(
+    () => adminHistoryKey({ page, pageSize, search }),
+    [page, pageSize, search],
+  );
+
+  const { data, isLoading, mutate } = useSWR<{ records: HistoryRow[]; total: number }>(
+    swrKey,
+    swrFetcher,
+  );
+
+  const records = data?.records ?? [];
+  const total = data?.total ?? 0;
+
+  const { selected, clearSelection, removeSelected, toggleSelect, toggleSelectAll } = useSelectableRows(records);
+
+  // 搜索变化时清除已选项
+  const prevSearchRef = useRef(search);
+  useEffect(() => {
+    if (prevSearchRef.current !== search) {
+      clearSelection();
+      prevSearchRef.current = search;
+    }
+  }, [search, clearSelection]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const allSelected = records.length > 0 && records.every((record) => selected.has(record.id));
-
-  const fetchRecords = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
-      if (search) params.set('search', search);
-      const data = await fetchJson<{ records: HistoryRow[]; total: number }>(`/api/admin/history?${params}`, undefined, '加载历史记录失败');
-      setRecords(data.records);
-      setTotal(data.total);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '加载历史记录失败');
-    } finally {
-      setLoading(false);
-    }
-  }, [page, pageSize, search]);
-
-  useEffect(() => { fetchRecords(); }, [fetchRecords]);
 
   const handleDelete = async (ids: number[]) => {
     setDeleting(true);
@@ -256,9 +275,9 @@ function HistoryTab() {
       }
       toast.success(`已删除 ${ids.length} 条记录`);
       removeSelected(ids);
-      // 清除 Dashboard / Timeline 缓存，确保后续访问获取最新数据
-      clearSessionCache(DASHBOARD_CACHE_KEYS.dashboardHistory);
-      fetchRecords();
+      // 全局缓存刷新：管理页当前页 + Dashboard 历史
+      mutate();
+      globalMutate(HISTORY_KEY);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '删除失败');
     } finally {
@@ -266,6 +285,55 @@ function HistoryTab() {
       setConfirmDelete(null);
     }
   };
+
+  const openUndoPreview = async (id: number) => {
+    setUndoing(true);
+    try {
+      const data = await fetchJson<{ preview: UndoPreview }>(
+        `/api/admin/history/${id}`,
+        { cache: 'no-store' },
+        '读取撤销影响范围失败',
+      );
+      setConfirmUndo(data.preview);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '读取撤销影响范围失败');
+    } finally {
+      setUndoing(false);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!confirmUndo || undoing) return;
+    const preview = confirmUndo;
+    setUndoing(true);
+    try {
+      const data = await fetchJson<{
+        undone: true;
+        result: UndoPreview;
+      }>(`/api/admin/history/${preview.historyId}`, { method: 'POST' }, '撤销观看失败');
+
+      toast.success(`已回退到第 ${data.result.targetProgress} 集`);
+      setConfirmUndo(null);
+      mutate();
+      globalMutate(HISTORY_KEY);
+      globalMutate((key) => typeof key === 'string' && (
+        key === ANIME_LIST_KEY ||
+        key.startsWith('/api/anime?') ||
+        key === `/api/anime/${data.result.animeId}` ||
+        key.startsWith('/api/admin/anime?')
+      ));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '撤销观看失败');
+    } finally {
+      setUndoing(false);
+    }
+  };
+
+  const undoRangeText = confirmUndo
+    ? confirmUndo.firstAffectedEpisode === confirmUndo.lastAffectedEpisode
+      ? `第 ${confirmUndo.firstAffectedEpisode} 集的 1 条记录`
+      : `第 ${confirmUndo.firstAffectedEpisode}–${confirmUndo.lastAffectedEpisode} 集的 ${confirmUndo.affectedHistoryCount} 条记录`
+    : '';
 
   return (
     <>
@@ -284,11 +352,11 @@ function HistoryTab() {
                 <th className="px-5 py-4 font-medium">番剧名称</th>
                 <th className="px-5 py-4 font-medium">集数</th>
                 <th className="px-5 py-4 font-medium">观看时间</th>
-                <th className="px-5 py-4 font-medium w-20">操作</th>
+                <th className="px-5 py-4 font-medium w-28">操作</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {isLoading ? (
                 <SkeletonRows cols={6} />
               ) : records.length === 0 ? (
                 <tr>
@@ -305,7 +373,10 @@ function HistoryTab() {
                     <td className="px-5 py-4 text-[var(--text-secondary)] tabular-nums text-sm">第 {r.episode} 集</td>
                     <td className="px-5 py-4 text-[var(--text-muted)] tabular-nums text-sm">{formatDate(r.watchedAt)}</td>
                     <td className="px-5 py-4">
-                      <DeleteIconButton onClick={() => setConfirmDelete({ ids: [r.id] })} disabled={deleting} />
+                      <div className="flex items-center gap-1">
+                        <UndoWatchIconButton onClick={() => openUndoPreview(r.id)} disabled={deleting || undoing} />
+                        <DeleteIconButton onClick={() => setConfirmDelete({ ids: [r.id] })} disabled={deleting || undoing} />
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -328,6 +399,18 @@ function HistoryTab() {
         variant="danger"
         onConfirm={() => confirmDelete && handleDelete(confirmDelete.ids)}
         onCancel={() => setConfirmDelete(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmUndo !== null}
+        title="撤销观看并回退进度"
+        message={confirmUndo
+          ? `撤销《${confirmUndo.animeTitle}》第 ${confirmUndo.episode} 集后，当前进度将从第 ${confirmUndo.currentProgress} 集回退到第 ${confirmUndo.targetProgress} 集，并删除${undoRangeText}。此操作不可撤销。`
+          : ''}
+        confirmText={undoing ? '正在撤销…' : '确认撤销'}
+        variant="warning"
+        onConfirm={handleUndo}
+        onCancel={() => !undoing && setConfirmUndo(null)}
       />
     </>
   );

@@ -43,6 +43,7 @@ export default memo(function AnimeListView({ items, onEdit, updateProgress, isAd
                   src={item.coverUrl}
                   alt={item.title}
                   fill
+                  unoptimized
                   sizes="56px"
                   className="object-cover"
                   onError={(e) => {

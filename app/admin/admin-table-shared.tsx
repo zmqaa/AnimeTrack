@@ -199,6 +199,22 @@ export function DeleteIconButton({ onClick, disabled }: { onClick: () => void; d
   );
 }
 
+export function UndoWatchIconButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--color-watching)] hover:bg-[var(--color-watching)]/10 transition-all disabled:opacity-50"
+      title="撤销观看并回退进度"
+      aria-label="撤销观看并回退进度"
+    >
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 15l-6-6m0 0l6-6M3 9h11a7 7 0 010 14h-1" />
+      </svg>
+    </button>
+  );
+}
+
 export function SkeletonRows({ cols, rows = 8 }: { cols: number; rows?: number }) {
   return (
     <>

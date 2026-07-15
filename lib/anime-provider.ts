@@ -290,13 +290,6 @@ function toAnimeMetadataCandidate(candidate: { subject: BangumiV0Subject; score:
     };
 }
 
-/** 从搜索结果中挑出最佳匹配：优先 name 精确匹配，次选 partial，保持与查询词的一致性 */
-function pickBestMatch(candidates: BangumiV0Subject[], keyword: string): BangumiV0Subject | null {
-    const scored = scoreBangumiCandidates(candidates, keyword);
-
-    return scored[0] && scored[0].score > 0 ? scored[0].subject : null;
-}
-
 export const normalizeDate = normalizeDateString;
 
 function extractIsFinished(detail: BangumiV0Subject): boolean | undefined {

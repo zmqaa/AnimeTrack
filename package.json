@@ -17,6 +17,7 @@
     "db:table-backup": "node scripts/db/export_table_backups.js",
     "db:full-backup": "node scripts/db/export_full_backup.js",
     "db:scheduled-backup": "node scripts/db/scheduled_backup.js",
+    "covers:retry": "node scripts/retry-placeholder-covers.js",
     "anime:enrich-titles": "node scripts/enrich/enrich_titles.js",
     "anime:enrich-titles:write": "node scripts/enrich/enrich_titles.js --write",
     "anime:enrich-bangumi": "node scripts/enrich/enrich_bangumi.js",
@@ -32,6 +33,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.6.0",
+    "swr": "^2.4.2",
     "typescript": "^5.3.3",
     "zod": "^4.3.6"
   },

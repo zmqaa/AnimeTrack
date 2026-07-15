@@ -1,15 +1,15 @@
 "use client";
 
 import { useMemo } from 'react';
+import useSWR from 'swr';
 import { AnimeRecord, AnimeStatus, ParsedWatchHistory } from '@/lib/dashboard-types';
-import { useCachedFetch } from './useCachedFetch';
+import { ANIME_LIST_KEY, swrFetcher } from '@/lib/swr-config';
 
 export function useAnimeData(parsedHistory: ParsedWatchHistory[] = []) {
-  const { data: animeList, isLoading, isRefreshing } = useCachedFetch<AnimeRecord[]>({
-    cacheKey: 'dashboard-anime',
-    url: '/api/anime',
-    errorMessage: '加载番剧数据失败',
-  });
+  const { data: animeList = [], isLoading, isValidating } = useSWR<AnimeRecord[]>(
+    ANIME_LIST_KEY,
+    swrFetcher
+  );
 
   // 合并 animeStats + animeTagStats 为单次遍历
   const { animeStats, animeTagStats } = useMemo(() => {
@@ -101,6 +101,6 @@ export function useAnimeData(parsedHistory: ParsedWatchHistory[] = []) {
     recentTagStats,
     animeCompletionRate,
     isLoading,
-    isRefreshing
+    isRefreshing: isValidating,
   };
 }

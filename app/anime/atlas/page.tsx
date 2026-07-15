@@ -82,7 +82,6 @@ export default function AnimeAtlasPage() {
       const matrix: Record<string, Record<string, number>> = {};
       castList.forEach(([name]) => { matrix[name] = {}; });
 
-      const tagSet = new Set(tagList.map(([t]) => t));
       animeList.forEach((anime) => {
         if (!Array.isArray(anime.cast) || !Array.isArray(anime.tags)) return;
         const animeTags = new Set(anime.tags.map((t: string) => String(t || '').trim()).filter(Boolean));

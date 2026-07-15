@@ -28,14 +28,14 @@ export async function GET(request: NextRequest) {
         limit: pageSize,
         offset: (page - 1) * pageSize,
       });
-      return apiSuccess(result, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' });
+      return apiSuccess(result, 200, { 'Cache-Control': 'no-store' });
     }
 
     // 兼容旧行为：无 page 参数时返回全部记录（Dashboard 使用）
     const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(limit, 5000) : undefined;
     const safeOffset = Number.isFinite(offset) && offset > 0 ? offset : undefined;
     const list = await listAnimeRecordsWithLastWatched({ status: status || undefined, limit: safeLimit, offset: safeOffset, search });
-    return apiSuccess(list, 200, { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' });
+    return apiSuccess(list, 200, { 'Cache-Control': 'no-store' });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '读取失败';
     return apiError(message);

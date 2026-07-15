@@ -3,9 +3,11 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { mutate as globalMutate } from 'swr';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { fetchBlob, fetchJson } from '@/lib/client-api';
+import { ANIME_LIST_KEY, HISTORY_KEY } from '@/lib/swr-config';
 
 interface BackupFile {
   name: string;
@@ -147,6 +149,9 @@ export default function BackupPageClient() {
       toast.success(
         `导入完成：新增 ${result.anime.created} 部，更新 ${result.anime.updated} 部，导入 ${result.watchHistory.imported} 条历史`
       );
+      // 全局刷新缓存：番剧列表 + Dashboard 数据同步更新
+      globalMutate(ANIME_LIST_KEY);
+      globalMutate(HISTORY_KEY);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '导入失败');
     } finally {

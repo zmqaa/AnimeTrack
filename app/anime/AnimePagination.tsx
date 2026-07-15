@@ -18,6 +18,7 @@ export default function AnimePagination({
   onPageChange,
 }: AnimePaginationProps) {
   const [pageInput, setPageInput] = useState(String(currentPage));
+  const pageButtonClass = 'surface-pill px-3 py-1.5 rounded-lg text-xs hover:bg-[var(--color-surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed';
 
   useEffect(() => {
     setPageInput(String(currentPage));
@@ -49,7 +50,7 @@ export default function AnimePagination({
           type="button"
           onClick={() => onPageChange(1)}
           disabled={currentPage === 1}
-          className="surface-pill px-3 py-1.5 rounded-lg text-xs text-zinc-300 hover:bg-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed"
+          className={pageButtonClass}
         >
           首页
         </button>
@@ -57,7 +58,7 @@ export default function AnimePagination({
           type="button"
           onClick={() => onPageChange(Math.max(1, currentPage - 1))}
           disabled={currentPage === 1}
-          className="surface-pill px-3 py-1.5 rounded-lg text-xs text-zinc-300 hover:bg-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed"
+          className={pageButtonClass}
         >
           上一页
         </button>
@@ -65,7 +66,7 @@ export default function AnimePagination({
           type="button"
           onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
           disabled={currentPage === totalPages}
-          className="surface-pill px-3 py-1.5 rounded-lg text-xs text-zinc-300 hover:bg-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed"
+          className={pageButtonClass}
         >
           下一页
         </button>
@@ -73,13 +74,13 @@ export default function AnimePagination({
           type="button"
           onClick={() => onPageChange(totalPages)}
           disabled={currentPage === totalPages}
-          className="surface-pill px-3 py-1.5 rounded-lg text-xs text-zinc-300 hover:bg-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed"
+          className={pageButtonClass}
         >
           末页
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-400">
+      <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-secondary)]">
         <span>第 {currentPage} / {totalPages} 页</span>
         <form
           onSubmit={(event) => {
@@ -96,7 +97,7 @@ export default function AnimePagination({
             value={pageInput}
             onChange={(event) => setPageInput(event.target.value)}
             onBlur={jumpToPage}
-            className="surface-input theme-focus-accent w-16 rounded-lg px-2 py-1.5 text-center text-xs text-zinc-200 outline-none"
+            className="surface-input theme-focus-accent w-16 rounded-lg px-2 py-1.5 text-center text-xs text-[var(--text-primary)] outline-none"
           />
           <span>页</span>
         </form>
