@@ -41,7 +41,7 @@ export interface AnimeRecord {
 export interface CreateAnimeDTO {
   title: string;
   originalTitle?: string;
-  coverUrl?: string;
+  coverUrl?: string | null;
   status: AnimeStatus;
   score?: number;
   progress: number;
@@ -447,7 +447,7 @@ export async function createAnimeRecord(input: CreateAnimeDTO): Promise<AnimeRec
     id: result.insertId,
     title: input.title,
     originalTitle: input.originalTitle,
-    coverUrl: input.coverUrl,
+    coverUrl: input.coverUrl || undefined,
     status: input.status,
     score: input.score,
     progress: input.progress,

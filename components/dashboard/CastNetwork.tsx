@@ -178,8 +178,8 @@ export function CastNetwork({ nodes: inputNodes, links: inputLinks, height = 500
         for (let j = i + 1; j < lnodes.length; j++) {
           const a = lnodes[i];
           const b = lnodes[j];
-          let dx = b.x - a.x;
-          let dy = b.y - a.y;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
           let dist = Math.sqrt(dx * dx + dy * dy) || 1;
           const minDist = a.radius + b.radius + 48;
           if (dist < minDist) dist = minDist;
@@ -279,13 +279,6 @@ export function CastNetwork({ nodes: inputNodes, links: inputLinks, height = 500
   }
 
   /* ── drag handlers ── */
-
-  const getEventPos = (e: React.MouseEvent) => {
-    const svg = svgRef.current;
-    if (!svg) return { x: 0, y: 0 };
-    const rect = svg.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  };
 
   const handleMouseDown = (e: React.MouseEvent, nodeId: string) => {
     e.stopPropagation();

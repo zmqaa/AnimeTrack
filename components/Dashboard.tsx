@@ -85,7 +85,7 @@ export default function Dashboard() {
       if (items.length > 9) items.pop();
     }
     return items;
-  }, [animeList, parsedHistory, animeById]);
+  }, [parsedHistory, animeById]);
 
   // 合并 metadataCoverage / metadataRichness / premiereByYear / recentPremiered 为单次遍历
   const dashboardStats = useMemo(() => {

@@ -136,10 +136,7 @@ async function main() {
       } catch (err) {
         failed++;
         console.log(`  ✗ ${label} — ${err.message}`);
-        // 下载失败时，清空 coverUrl 以便前端显示占位符
-        if (!DRY_RUN) {
-          db.prepare('UPDATE anime SET coverUrl = NULL, updatedAt = datetime(\'now\', \'localtime\') WHERE id = ?').run(row.id);
-        }
+        // 下载失败时保留远程 URL，方便之后继续重试。
       }
     }
   });
@@ -150,7 +147,7 @@ async function main() {
   console.log(`完成！成功: ${succeeded}, 失败: ${failed}, 总计: ${rows.length}`);
 
   if (failed > 0 && !DRY_RUN) {
-    console.log(`\n${failed} 条记录下载失败，coverUrl 已清空。可稍后重新通过 AI 补充获取新封面。`);
+    console.log(`\n${failed} 条记录下载失败，coverUrl 已保留。可稍后重新运行脚本继续重试。`);
   }
 
   db.close();

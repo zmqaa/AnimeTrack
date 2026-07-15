@@ -51,6 +51,7 @@ export default memo(function AnimeCard({ item, onEdit, updateProgress, isAdmin =
               src={item.coverUrl}
               alt={item.title}
               fill
+              unoptimized
               sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
               className="object-cover transition-transform duration-500 group-hover:scale-110 opacity-70 group-hover:opacity-100"
               onError={(e) => {
@@ -159,7 +160,7 @@ export default memo(function AnimeCard({ item, onEdit, updateProgress, isAdmin =
             ) : (
                <button
                   onClick={() => updateProgress(item.id, item.progress + 1, item.totalEpisodes)}
-                  className="flex-[2] py-1.5 rounded-lg bg-[var(--text-primary)] text-[var(--bg-page)] hover:opacity-90 transition text-[10px] font-bold flex items-center justify-center gap-1 shadow-sm"
+                  className="theme-accent-button flex-[2] py-1.5 rounded-lg transition text-[10px] font-bold flex items-center justify-center gap-1 shadow-sm"
                   aria-label="看一集"
                 >
                   <PlusIcon className="w-3 h-3" /> 看一集

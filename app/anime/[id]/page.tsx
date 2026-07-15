@@ -3,13 +3,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import useSWR, { mutate as globalMutate } from 'swr';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { fetchJson } from '@/lib/client-api';
 import type { AnimeStatus, AnimeDetailItem, SessionUser } from '@/lib/anime-shared';
+import { ANIME_LIST_KEY, HISTORY_KEY, animeDetailKey, swrFetcher } from '@/lib/swr-config';
 import {
-  buildChangedPayload, resolveReturnTo, updateAnimeListCache, removeAnimeFromListCache,
+  buildChangedPayload, resolveReturnTo,
   type AnimeMutationResponse,
 } from './anime-detail-helpers';
 import AnimeDetailSidebar from './AnimeDetailSidebar';
@@ -20,26 +22,35 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
   const router = useRouter();
   const searchParams = useSearchParams();
   const isAdmin = (session?.user as SessionUser | undefined)?.role === 'admin';
-  const [item, setItem] = useState<AnimeDetailItem | null>(null);
-  const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState<Partial<AnimeDetailItem>>({});
   const [isAiEnriching, setIsAiEnriching] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const returnTo = useMemo(() => resolveReturnTo(searchParams.get('returnTo')), [searchParams]);
   const canEdit = isAdmin && isEditing;
 
+  // SWR 加载详情数据
+  const { data: item, isLoading, error, mutate } = useSWR<AnimeDetailItem>(
+    animeDetailKey(params.id),
+    swrFetcher,
+  );
+
+  // 加载失败时跳回列表
+  useEffect(() => {
+    if (error) router.push(returnTo);
+  }, [error, returnTo, router]);
+
+  // 表单编辑副本（与 SWR 缓存分离）
+  const [formData, setFormData] = useState<Partial<AnimeDetailItem>>({});
+
+  // 数据就绪后初始化表单
+  useEffect(() => {
+    if (item) setFormData(item);
+  }, [item]);
+
   useEffect(() => {
     if (!isAdmin) setIsEditing(false);
   }, [isAdmin]);
-
-  useEffect(() => {
-    fetchJson<AnimeDetailItem>(`/api/anime/${params.id}`, undefined, 'Not found')
-      .then((data) => { setItem(data); setFormData(data); })
-      .catch(() => router.push(returnTo))
-      .finally(() => setLoading(false));
-  }, [params.id, returnTo, router]);
 
   const handleChange = (key: keyof AnimeDetailItem, value: unknown) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -59,9 +70,11 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       }, '保存失败');
-      setItem(response.entry);
+      // 更新当前详情缓存
+      mutate(response.entry, { revalidate: false });
       setFormData(response.entry);
-      updateAnimeListCache(response.entry);
+      // 全局刷新番剧列表（侧边栏、Dashboard 等自动同步）
+      globalMutate(ANIME_LIST_KEY);
       setIsEditing(false);
       toast.success('保存成功');
     } catch (error) {
@@ -74,9 +87,9 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
     setIsAiEnriching(true);
     try {
       const response = await fetchJson<AnimeMutationResponse>(`/api/anime/${params.id}/enrich`, { method: 'POST' }, 'AI补充失败');
-      setItem(response.entry);
+      mutate(response.entry, { revalidate: false });
       setFormData(response.entry);
-      updateAnimeListCache(response.entry);
+      globalMutate(ANIME_LIST_KEY);
       const appliedCount = Array.isArray(response.appliedFields) ? response.appliedFields.length : 0;
       if (appliedCount === 0) toast('没有可补充的空缺字段', { icon: 'ℹ️' });
       else toast.success(`已补充 ${appliedCount} 个字段`);
@@ -89,8 +102,10 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
     setShowDeleteConfirm(false);
     try {
       await fetchJson<{ ok: true }>(`/api/anime/${params.id}`, { method: 'DELETE' }, '删除失败');
-      removeAnimeFromListCache(Number(params.id));
       toast.success('已删除');
+      // 全局刷新番剧列表
+      globalMutate(ANIME_LIST_KEY);
+      globalMutate(HISTORY_KEY);
       router.push(returnTo, { scroll: false });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '删除失败');
@@ -109,7 +124,7 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
     ? Math.min(100, (displayProgress / displayTotalEpisodes) * 100)
     : (displayStatus === 'completed' ? 100 : Math.min(displayProgress * 8, 100));
 
-  if (loading) return <div className="p-12 text-center text-[var(--text-muted)]">Loading details...</div>;
+  if (isLoading) return <div className="p-12 text-center text-[var(--text-muted)]">Loading details...</div>;
   if (!item) return null;
 
   return (

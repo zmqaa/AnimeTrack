@@ -86,7 +86,10 @@ function isBlank(value: unknown): boolean {
 }
 
 function hasPlaceholderCover(value: unknown): boolean {
-  return typeof value === 'string' && /placeholder/i.test(value);
+  return typeof value === 'string' && (
+    /placeholder/i.test(value)
+    || /^\/covers\/\d+\.svg(?:[?#].*)?$/i.test(value.trim())
+  );
 }
 
 function parseStringArray(value: unknown): string[] {

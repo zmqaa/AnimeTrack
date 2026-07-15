@@ -1,17 +1,14 @@
 import 'server-only';
+import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-
-// Use runtime require to avoid bundling issues; type via any for simplicity
-// eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-explicit-any
-const BetterSqlite3: any = require('better-sqlite3');
 
 const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'animetrack.db');
 const SCHEMA_PATH = path.join(process.cwd(), 'database', 'schema.sql');
 
-let _db: InstanceType<typeof BetterSqlite3> | null = null;
+let _db: Database.Database | null = null;
 
-function getDb(): InstanceType<typeof BetterSqlite3> {
+function getDb(): Database.Database {
   if (_db) return _db;
 
   const dir = path.dirname(DB_PATH);
@@ -19,7 +16,7 @@ function getDb(): InstanceType<typeof BetterSqlite3> {
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  const db = new BetterSqlite3(DB_PATH);
+  const db = new Database(DB_PATH);
 
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
@@ -53,9 +50,9 @@ export interface DbResult {
 }
 
 /** 预编译语句缓存 —— 避免每次 query() 都重新解析 SQL */
-const stmtCache = new Map<string, InstanceType<typeof BetterSqlite3>['_statements'][number]>();
+const stmtCache = new Map<string, Database.Statement>();
 
-function getCachedStmt(db: InstanceType<typeof BetterSqlite3>, sql: string) {
+function getCachedStmt(db: Database.Database, sql: string) {
   let stmt = stmtCache.get(sql);
   if (!stmt) {
     stmt = db.prepare(sql);
@@ -72,12 +69,10 @@ export async function query<T = unknown>(sql: string, params?: unknown[]): Promi
   const trimmed = sql.trim().toUpperCase();
 
   if (trimmed.startsWith('SELECT') || trimmed.startsWith('PRAGMA') || trimmed.startsWith('WITH') || trimmed.includes('RETURNING')) {
-    // eslint-disable-next-line prefer-spread
-    return (stmt.all as Function).apply(stmt, bound) as T;
+    return stmt.all(...bound) as T;
   }
 
-  // eslint-disable-next-line prefer-spread
-  const info = (stmt.run as Function).apply(stmt, bound) as { lastInsertRowid: number | bigint; changes: number };
+  const info = stmt.run(...bound);
 
   return {
     insertId: Number(info.lastInsertRowid),

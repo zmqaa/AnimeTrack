@@ -14,5 +14,5 @@ export async function GET(request: Request) {
   } else {
     entries = await getWatchHistory(safeLimit);
   }
-  return apiSuccess({ ok: true, entries }, 200, { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' });
+  return apiSuccess({ ok: true, entries }, 200, { 'Cache-Control': 'no-store' });
 }

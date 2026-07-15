@@ -5,7 +5,7 @@ import { parseQuickRecordBatch, type ParsedQuickRecordIntent } from '@/lib/ai';
 import { enrichAnimeInput } from '@/lib/anime-enrichment';
 import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
 import { DEFAULT_METADATA_FIELDS, buildMetadataPatch } from '@/lib/metadata/merge-policy';
-import { resolveCoverImage } from '@/lib/cover-image';
+import { isPlaceholderCoverPath, resolveCoverImage } from '@/lib/cover-image';
 import {
   detectRewatchTag, resolveNextRewatchTag, shouldAutoResolveRewatch,
   normalizeDate, resolveRecordedDateString, resolveIntentStatus, resolveTargetProgress,
@@ -165,7 +165,7 @@ async function processQuickRecordIntent(
   if (parsed.durationMinutes && !anime.durationMinutes) patch.durationMinutes = parsed.durationMinutes;
   if (parsed.notes && !anime.notes) patch.notes = parsed.notes;
   if (parsed.summary && !anime.summary) patch.summary = parsed.summary;
-  if (parsed.coverUrl && !anime.coverUrl) patch.coverUrl = parsed.coverUrl;
+  if (parsed.coverUrl && (!anime.coverUrl || isPlaceholderCoverPath(anime.coverUrl))) patch.coverUrl = parsed.coverUrl;
   if (!sameStringArray(mergedCast, anime.cast)) patch.cast = mergedCast;
   if (!sameStringArray(mergedTags, anime.tags)) patch.tags = mergedTags;
   if (!sameStringArray(mergedCastAliases, anime.castAliases)) patch.castAliases = mergedCastAliases;
@@ -174,6 +174,15 @@ async function processQuickRecordIntent(
 
   const resolvedStatus = parsed.status || ((effectiveTotalEpisodes && targetProgress >= effectiveTotalEpisodes) ? 'completed' : undefined);
   if (resolvedStatus && resolvedStatus !== anime.status) patch.status = resolvedStatus;
+
+  if (patch.coverUrl !== undefined) {
+    patch.coverUrl = await resolveCoverImage(patch.coverUrl, anime.id, {
+      fallbackOnDownloadFailure: anime.coverUrl || null,
+    }) ?? undefined;
+    if (patch.coverUrl === undefined || patch.coverUrl === anime.coverUrl) {
+      delete patch.coverUrl;
+    }
+  }
 
   let entry = anime;
   if (hasPatchChanges(patch)) {

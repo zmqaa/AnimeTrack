@@ -75,7 +75,7 @@ export async function PATCH(
   };
   const allowedKeys = ['title', 'originalTitle', 'status', 'progress', 'score', 'totalEpisodes', 'notes', 'coverUrl', 'durationMinutes', 'tags', 'summary', 'startDate', 'endDate', 'premiereDate', 'cast', 'castAliases', 'isFinished'] as const;
   type AllowedKey = (typeof allowedKeys)[number];
-  const updateData: Partial<AnimeRecord> = {};
+  const updateData: Omit<Partial<AnimeRecord>, 'coverUrl'> & { coverUrl?: string | null } = {};
   const updateRecord = updateData as Partial<Record<AllowedKey, unknown>>;
 
   for (const key of allowedKeys) {
@@ -120,17 +120,20 @@ export async function PATCH(
       }
   }
 
-  const updated = await updateAnimeRecord(id, updateData);
-  if (!updated) return apiError('Not found', 404);
-
   // 如果更新了 coverUrl，同步下载封面到本地
   if (updateData.coverUrl !== undefined) {
-    const resolved = await resolveCoverImage(updateData.coverUrl, id);
-    if (resolved !== (updateData.coverUrl || null)) {
-      await updateAnimeRecord(id, { coverUrl: resolved ?? undefined });
-      updated.coverUrl = resolved ?? undefined;
+    const resolvedCoverUrl = await resolveCoverImage(updateData.coverUrl, id, {
+      fallbackOnDownloadFailure: before.coverUrl || null,
+    });
+    if (resolvedCoverUrl === (before.coverUrl ?? null)) {
+      delete updateData.coverUrl;
+    } else {
+      updateData.coverUrl = resolvedCoverUrl;
     }
   }
+
+  const updated = await updateAnimeRecord(id, updateData);
+  if (!updated) return apiError('Not found', 404);
 
   if (before) {
     const delta = updated.progress - before.progress;

@@ -1,4 +1,4 @@
-import { getRawDb, type DbResult } from './db';
+import { getRawDb } from './db';
 import type { AnimeStatus, CreateAnimeDTO } from './anime';
 import { nowISO } from './date-utils';
 import {
