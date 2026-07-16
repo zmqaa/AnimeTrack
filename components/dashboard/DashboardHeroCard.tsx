@@ -4,6 +4,7 @@ import React from 'react';
 import { AnimeRecord } from '@/lib/dashboard-types';
 import { formatPremiere, formatUpdateDate } from '@/lib/formatters';
 import type { AppThemeDefinition } from '@/lib/theme';
+import StatTile from '@/components/shared/StatTile';
 
 interface HeroCardProps {
   animeStats: { count: number };
@@ -46,22 +47,10 @@ export default React.memo(function DashboardHeroCard({
           </h2>
 
           <div className="grid grid-cols-2 gap-3 pt-1 md:grid-cols-4">
-            <div className="surface-card-muted rounded-[20px] px-4 py-3">
-              <div className="text-[10px] tracking-[0.2em] text-[var(--text-muted)]">番剧总数</div>
-              <div className="theme-accent-text mt-1 text-2xl font-mono">{animeStats.count} <span className="text-xs text-[var(--text-muted)]">部</span></div>
-            </div>
-            <div className="surface-card-muted rounded-[20px] px-4 py-3">
-              <div className="text-[10px] tracking-[0.2em] text-[var(--text-muted)]">完结率</div>
-              <div className="text-completed mt-1 text-2xl font-mono">{animeCompletionRate}%</div>
-            </div>
-            <div className="surface-card-muted rounded-[20px] px-4 py-3">
-              <div className="text-[10px] tracking-[0.2em] text-[var(--text-muted)]">本周观看</div>
-              <div className="text-watching mt-1 text-2xl font-mono">{weeklyEpisodes} <span className="text-xs text-[var(--text-muted)]">集</span></div>
-            </div>
-            <div className="surface-card-muted rounded-[20px] px-4 py-3">
-              <div className="text-[10px] tracking-[0.2em] text-[var(--text-muted)]">看番总时长</div>
-              <div className="theme-warm-text mt-1 text-2xl font-mono">{watchHours} <span className="text-xs text-[var(--text-muted)]">小时</span></div>
-            </div>
+            <StatTile label="番剧总数" value={animeStats.count} unit="部" />
+            <StatTile label="完结率" value={`${animeCompletionRate}%`} />
+            <StatTile label="本周观看" value={weeklyEpisodes} unit="集" />
+            <StatTile label="看番总时长" value={watchHours} unit="小时" />
           </div>
 
           <div>
@@ -71,7 +60,7 @@ export default React.memo(function DashboardHeroCard({
                 <div key={item.label} className="surface-card-muted rounded-[18px] px-4 py-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs text-[var(--text-secondary)]">{item.label}</span>
-                    <span className="font-mono text-sm text-[var(--accent)]">{item.percent}%</span>
+                    <span className="theme-stat-value font-mono text-sm">{item.percent}%</span>
                   </div>
                   <div className="mt-2 h-1 overflow-hidden rounded-full bg-[var(--border)]">
                     <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${item.percent}%` }} />
@@ -91,16 +80,8 @@ export default React.memo(function DashboardHeroCard({
                 <p className="text-sm text-[var(--text-secondary)] mt-1 truncate">{heroAnime.originalTitle ?? '尚未补充原名'}</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="surface-card-muted rounded-2xl p-3">
-                  <div className="text-[10px] uppercase tracking-[0.26em] text-[var(--text-muted)]">评分</div>
-                  <div className="mt-1 text-xl score-text font-mono">
-                    {typeof heroAnime.score === 'number' ? heroAnime.score.toFixed(1) : '未补充'}
-                  </div>
-                </div>
-                <div className="surface-card-muted rounded-2xl p-3">
-                  <div className="text-[10px] uppercase tracking-[0.26em] text-[var(--text-muted)]">首播</div>
-                  <div className="mt-1 text-xl text-airing font-mono">{formatPremiere(heroAnime.premiereDate)}</div>
-                </div>
+                <StatTile label="评分" value={typeof heroAnime.score === 'number' ? heroAnime.score.toFixed(1) : '未补充'} size="compact" />
+                <StatTile label="首播" value={formatPremiere(heroAnime.premiereDate)} size="compact" />
               </div>
               <div className="text-xs text-[var(--text-secondary)] leading-6 line-clamp-3">
                 {heroAnime.summary ?? '这部作品还没有补充摘要。可以在详情页使用 AI 补充，首页会自动展示更丰富信息。'}

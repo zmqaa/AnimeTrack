@@ -13,6 +13,7 @@ import { YearBarChart } from '@/components/dashboard/YearBarChart';
 import { ChordDiagram } from '@/components/dashboard/ChordDiagram';
 import { CastNetwork } from '@/components/dashboard/CastNetwork';
 import { ANIME_STATUS_LABELS } from '@/lib/anime-shared';
+import StatTile from '@/components/shared/StatTile';
 
 function formatStartDate(value?: string) {
   if (!value) return '未补充';
@@ -189,16 +190,8 @@ export default function AnimeAtlasPage() {
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 min-w-full lg:min-w-[320px] lg:max-w-[360px]">
-            <div className="surface-card rounded-[24px] p-4">
-              <div className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)]">Library</div>
-              <div className="mt-2 text-2xl font-mono text-[var(--text-primary)]">{animeList.length}</div>
-              <div className="text-xs text-[var(--text-muted)] mt-1">当前入库作品</div>
-            </div>
-            <div className="surface-card rounded-[24px] p-4">
-              <div className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)]">Richness</div>
-              <div className="theme-accent-text mt-2 text-2xl font-mono">{data.metadataRichness}%</div>
-              <div className="text-xs text-[var(--text-muted)] mt-1">档案完整度</div>
-            </div>
+            <StatTile surface="card" label="入库作品" value={animeList.length} unit="部" detail="当前片库收录总数" />
+            <StatTile surface="card" label="档案完整度" value={`${data.metadataRichness}%`} detail="元数据填写覆盖率" />
           </div>
         </div>
       </section>

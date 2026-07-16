@@ -3,6 +3,7 @@
 import { memo, useMemo, useState, useRef, useEffect } from 'react';
 import { ParsedWatchHistory } from '@/lib/dashboard-types';
 import SegmentedControl from '@/components/shared/SegmentedControl';
+import StatTile from '@/components/shared/StatTile';
 
 /** Inline SVG line chart — adapted from AdvancedActivityStats */
 function ActivityLineChart({ data, maxValue, scale }: { data: { label: string; value: number }[]; maxValue: number; scale: 'week' | 'month' | 'year' }) {
@@ -194,19 +195,13 @@ export default memo(function TimelineChart({ history }: TimelineChartProps) {
       </div>
 
       {/* Callout cards */}
-      <div className="grid grid-cols-3 gap-2 mb-4">
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
         {[
-          ['峰值日', peakDay.label, `${peakDay.value} EP`, 'text-[var(--text-primary)]'],
-          ['活跃度', `${activeDays}`, scale === 'week' ? '天' : scale === 'month' ? '天' : '月', 'text-[var(--color-watching)]'],
-          ['覆盖率', `${coveragePercent}%`, scale === 'week' ? '周' : scale === 'month' ? '月' : '年', 'text-[var(--color-completed)]'],
-        ].map(([label, val, unit, colorClass]) => (
-          <div key={label as string} className="surface-card-muted rounded-xl px-3 py-3 flex flex-col gap-1">
-            <span className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">{label}</span>
-            <div className="flex items-baseline gap-1">
-              <span className={`text-lg font-bold font-mono ${colorClass}`}>{val}</span>
-              <span className="text-[10px] text-[var(--text-muted)]">{unit}</span>
-            </div>
-          </div>
+          { label: '峰值日', value: peakDay.label, unit: `${peakDay.value} EP` },
+          { label: '活跃度', value: activeDays, unit: scale === 'year' ? '月' : '天' },
+          { label: '覆盖率', value: `${coveragePercent}%`, unit: scale === 'week' ? '周' : scale === 'month' ? '月' : '年' },
+        ].map((item) => (
+          <StatTile key={item.label} label={item.label} value={item.value} unit={item.unit} layout="split" />
         ))}
       </div>
 
