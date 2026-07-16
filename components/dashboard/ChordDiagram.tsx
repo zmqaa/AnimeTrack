@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useRef, useState, useEffect } from 'react';
+import { useTheme } from '@/components/theme/ThemeProvider';
+import { getAppThemeDefinition } from '@/lib/theme';
 
 interface ChordNode {
   id: string;
@@ -19,18 +21,6 @@ interface ChordDiagramProps {
   nodes: ChordNode[];
   links: ChordLink[];
 }
-
-/* ── palette ── */
-
-const CAST_COLORS = [
-  '#f97316', '#ef4444', '#8b5cf6', '#3b82f6',
-  '#06b6d4', '#22c55e', '#eab308', '#ec4899',
-];
-
-const TAG_COLORS = [
-  '#6366f1', '#14b8a6', '#f59e0b', '#84cc16',
-  '#a855f7', '#0ea5e9', '#f43f5e', '#10b981',
-];
 
 /* ── helpers ── */
 
@@ -110,6 +100,10 @@ interface RibbonLayout {
 /* ── component ── */
 
 export function ChordDiagram({ nodes, links }: ChordDiagramProps) {
+  const { theme } = useTheme();
+  const graphPalette = getAppThemeDefinition(theme).graphPalette;
+  const castPalette = graphPalette.slice(0, 8);
+  const tagPalette = graphPalette.slice(8, 16);
   const containerRef = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [svgSize, setSvgSize] = useState(600);
@@ -254,8 +248,8 @@ export function ChordDiagram({ nodes, links }: ChordDiagramProps) {
         {ribbons.map((r, i) => {
           const srcArc = arcMap.get(r.source);
           const color = srcArc
-            ? CAST_COLORS[srcArc.colorIndex % CAST_COLORS.length]
-            : '#888';
+            ? castPalette[srcArc.colorIndex % castPalette.length]
+            : 'var(--text-muted)';
           const isHL = highlighted.ribbons.has(i);
           const isDim = hovered && !isHL;
 
@@ -275,7 +269,7 @@ export function ChordDiagram({ nodes, links }: ChordDiagramProps) {
 
         {/* ── outer arcs ── */}
         {arcs.map((a) => {
-          const palette = a.group === 'cast' ? CAST_COLORS : TAG_COLORS;
+          const palette = a.group === 'cast' ? castPalette : tagPalette;
           const color = palette[a.colorIndex % palette.length];
           const isHL = highlighted.arcs.has(a.id);
           const isDim = hovered && !isHL;

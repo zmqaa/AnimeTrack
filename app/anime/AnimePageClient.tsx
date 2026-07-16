@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import useSWR, { mutate as globalMutate } from 'swr';
 import { MagnifyingGlassIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
+import SegmentedControl from '@/components/shared/SegmentedControl';
 import toast from 'react-hot-toast';
 import AnimeHeader from '@/components/anime/AnimeHeader';
 import AnimeFilterBar from '@/components/anime/AnimeFilterBar';
@@ -500,24 +501,20 @@ export default function AnimePageClient() {
                   className="surface-input theme-focus-accent block w-full pl-11 pr-4 py-3 rounded-2xl text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-all shadow-xl"
                 />
               </div>
-              <div className="surface-card-muted flex items-center rounded-2xl overflow-hidden flex-shrink-0">
-                <button
-                  type="button"
-                  onClick={() => toggleViewMode('grid')}
-                  className={`p-3 transition-all ${viewMode === 'grid' ? 'theme-accent-soft' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}
-                  aria-label="网格视图"
-                >
-                  <Squares2X2Icon className="w-5 h-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toggleViewMode('list')}
-                  className={`p-3 transition-all ${viewMode === 'list' ? 'theme-accent-soft' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--color-surface-hover)]'}`}
-                  aria-label="列表视图"
-                >
-                  <ListBulletIcon className="w-5 h-5" />
-                </button>
-              </div>
+              <SegmentedControl
+                value={viewMode}
+                options={[
+                  { value: 'grid', label: '网格视图', icon: Squares2X2Icon },
+                  { value: 'list', label: '列表视图', icon: ListBulletIcon },
+                ]}
+                onChange={toggleViewMode}
+                ariaLabel="番剧展示方式"
+                className="flex-shrink-0 rounded-2xl"
+                buttonClassName="p-3"
+                activeClassName="theme-accent-text"
+                iconClassName="h-5 w-5"
+                iconOnly
+              />
             </div>
 
             <AnimeFilterBar

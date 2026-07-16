@@ -17,7 +17,7 @@ export default function Toast() {
           borderRadius: '16px',
           fontSize: '13px',
           padding: '12px 16px',
-          boxShadow: '0 24px 80px rgba(0, 0, 0, 0.4)',
+          boxShadow: 'var(--shadow-xl)',
           maxWidth: '420px',
         },
         success: {

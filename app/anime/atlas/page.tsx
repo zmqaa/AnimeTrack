@@ -12,11 +12,13 @@ import { getAppThemeDefinition } from '@/lib/theme';
 import { YearBarChart } from '@/components/dashboard/YearBarChart';
 import { ChordDiagram } from '@/components/dashboard/ChordDiagram';
 import { CastNetwork } from '@/components/dashboard/CastNetwork';
-function formatPremiere(value?: string) {
+import { ANIME_STATUS_LABELS } from '@/lib/anime-shared';
+
+function formatStartDate(value?: string) {
   if (!value) return '未补充';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'short' }).format(date);
+  return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }).format(date);
 }
 
 export default function AnimeAtlasPage() {
@@ -46,9 +48,9 @@ export default function AnimeAtlasPage() {
       })
       .slice(0, 9);
 
-    const premiered = animeList
-      .filter((anime) => anime.premiereDate)
-      .sort((left, right) => new Date(right.premiereDate ?? 0).getTime() - new Date(left.premiereDate ?? 0).getTime())
+    const recentlyStarted = animeList
+      .filter((anime) => anime.startDate)
+      .sort((left, right) => new Date(right.startDate ?? 0).getTime() - new Date(left.startDate ?? 0).getTime())
       .slice(0, 6);
 
     // 标签出现次数排行
@@ -157,7 +159,7 @@ export default function AnimeAtlasPage() {
 
     return {
       scored,
-      premiered,
+      recentlyStarted,
       tagRanking,
       metadataRichness,
       leftChord,
@@ -183,7 +185,7 @@ export default function AnimeAtlasPage() {
             </Link>
             <h1 className="text-3xl md:text-4xl font-display font-semibold tracking-tight text-[var(--text-primary)]">作品元数据图谱</h1>
             <p className="text-sm md:text-base text-[var(--text-secondary)] leading-7">
-              这里专门展示你的片库中标签分布、声优×标签关联图谱、作品评分和最近开播作品。
+              这里专门展示你的片库中标签分布、声优×标签关联图谱、作品评分和最近开始追的作品。
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 min-w-full lg:min-w-[320px] lg:max-w-[360px]">
@@ -289,19 +291,21 @@ export default function AnimeAtlasPage() {
           <div className="glass-panel rounded-[32px] p-6 lg:p-8">
             <div className="flex items-center gap-3 mb-6">
               <span className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom, var(--chart-line-start), var(--chart-line-end))' }} />
-              <h2 className="text-xl font-display font-semibold text-[var(--text-primary)]">追番列表中最近开播作品</h2>
+              <h2 className="text-xl font-display font-semibold text-[var(--text-primary)]">最近开始追的作品</h2>
             </div>
             <div className="space-y-3">
-              {data.premiered.map((anime) => (
+              {data.recentlyStarted.map((anime) => (
                 <Link key={anime.id} href={`/anime/${anime.id}`} className="group surface-card-muted flex items-center justify-between gap-3 rounded-[20px] px-4 py-3 hover:border-[var(--color-airing)]/20 transition-all">
                   <div className="min-w-0">
                     <div className="text-sm text-[var(--text-primary)] truncate">{anime.title}</div>
-                    <div className="text-xs text-[var(--text-muted)] truncate">{formatPremiere(anime.premiereDate)} · {anime.totalEpisodes ? `${anime.totalEpisodes} 集` : '集数未补充'}</div>
+                    <div className="text-xs text-[var(--text-muted)] truncate">
+                      {formatStartDate(anime.startDate)}开始 · {anime.totalEpisodes ? `${anime.progress} / ${anime.totalEpisodes} 集` : ANIME_STATUS_LABELS[anime.status]}
+                    </div>
                   </div>
                   <ArrowUpRightIcon className="w-4 h-4 text-[var(--text-muted)] group-hover:text-airing transition-colors" />
                 </Link>
               ))}
-              {!data.premiered.length && <div className="text-sm text-[var(--text-muted)]">首播日期字段暂时较少。</div>}
+              {!data.recentlyStarted.length && <div className="text-sm text-[var(--text-muted)]">开始追番日期暂时还没有记录。</div>}
             </div>
           </div>
         </div>

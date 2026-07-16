@@ -1,48 +1,10 @@
+import 'server-only';
 import { getRawDb } from './db';
 import type { AnimeStatus, CreateAnimeDTO } from './anime';
 import { nowISO } from './date-utils';
-import {
-  toOptionalString, toOptionalNumber, toOptionalBoolean, toStringArray,
-} from './ai-validation';
 
-// --- Type helpers ---
-
-function toOptionalDate(value: unknown): Date | undefined {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
-  if (typeof value !== 'string' || !value.trim()) return undefined;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
-}
-
-// --- Payload normalization ---
-
-export function normalizeAnimePayload(item: Record<string, unknown> & { title: string }): CreateAnimeDTO {
-  return {
-    title: item.title.trim(),
-    originalTitle: toOptionalString(item.originalTitle),
-    coverUrl: toOptionalString(item.coverUrl),
-    status: (toOptionalString(item.status) as AnimeStatus | undefined) || 'plan_to_watch',
-    score: toOptionalNumber(item.score),
-    progress: toOptionalNumber(item.progress) ?? 0,
-    totalEpisodes: toOptionalNumber(item.totalEpisodes),
-    durationMinutes: toOptionalNumber(item.durationMinutes),
-    notes: toOptionalString(item.notes),
-    tags: toStringArray(item.tags),
-    cast: toStringArray(item.cast),
-    castAliases: toStringArray(item.castAliases),
-    summary: toOptionalString(item.summary),
-    startDate: toOptionalString(item.startDate),
-    endDate: toOptionalString(item.endDate),
-    premiereDate: toOptionalString(item.premiereDate),
-    isFinished: toOptionalBoolean(item.isFinished),
-  };
-}
-
-// --- Interfaces ---
-
-interface AnimeLookupRow { id: number; title: string; }
-interface ExistingHistoryRow { animeId: number; episode: number; watchedAt: string; }
-interface ResolvedAnimeRecord { id: number; title: string; }
+const VALID_STATUSES = new Set<AnimeStatus>(['watching', 'completed', 'dropped', 'plan_to_watch']);
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export interface ImportAnimeItem {
   id?: number | string;
@@ -54,7 +16,7 @@ export interface ImportHistoryItem {
   id?: number | string;
   animeId?: number | string;
   animeTitle?: string;
-  episode?: number;
+  episode?: number | string;
   watchedAt?: string;
 }
 
@@ -65,197 +27,230 @@ export interface ImportPayload {
 }
 
 export interface ImportResult {
-  success: boolean;
-  anime: { created: number; updated: number };
-  watchHistory: { imported: number; skipped: number };
+  success: true;
+  mode: 'replace';
+  anime: { replaced: number };
+  watchHistory: { replaced: number; skipped: number };
 }
 
-function findAnimeByTitleInDb(db: ReturnType<typeof getRawDb>, title: string): ResolvedAnimeRecord | null {
-  const row = db.prepare(
-    'SELECT id, title FROM anime WHERE title = ? OR original_title = ? ORDER BY id DESC LIMIT 1'
-  ).get(title, title) as AnimeLookupRow | undefined;
-  return row ? { id: row.id, title: row.title } : null;
+type NormalizedAnime = {
+  sourceId?: number | string;
+  payload: CreateAnimeDTO;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function optionalString(value: unknown, maxLength: number, field: string): string | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  if (typeof value !== 'string') throw new Error(`${field} 必须是字符串`);
+  const normalized = value.trim();
+  if (!normalized) return undefined;
+  if (normalized.length > maxLength) throw new Error(`${field} 不能超过 ${maxLength} 个字符`);
+  return normalized;
 }
 
+function optionalNumber(
+  value: unknown,
+  field: string,
+  options: { min?: number; max?: number; integer?: boolean } = {},
+): number | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(parsed)) throw new Error(`${field} 必须是有效数字`);
+  if (options.integer && !Number.isInteger(parsed)) throw new Error(`${field} 必须是整数`);
+  if (options.min !== undefined && parsed < options.min) throw new Error(`${field} 不能小于 ${options.min}`);
+  if (options.max !== undefined && parsed > options.max) throw new Error(`${field} 不能大于 ${options.max}`);
+  return parsed;
+}
+
+function optionalBoolean(value: unknown, field: string): boolean | undefined {
+  if (value === null || value === undefined || value === '') return undefined;
+  if (value === true || value === 1 || value === '1' || value === 'true') return true;
+  if (value === false || value === 0 || value === '0' || value === 'false') return false;
+  throw new Error(`${field} 必须是布尔值`);
+}
+
+function optionalDate(value: unknown, field: string): string | undefined {
+  const normalized = optionalString(value, 10, field);
+  if (!normalized) return undefined;
+  const parsed = new Date(`${normalized}T00:00:00Z`);
+  if (!DATE_PATTERN.test(normalized) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== normalized) {
+    throw new Error(`${field} 必须是 YYYY-MM-DD 格式`);
+  }
+  return normalized;
+}
+
+function stringArray(value: unknown, field: string): string[] | undefined {
+  if (value === null || value === undefined) return undefined;
+  if (!Array.isArray(value)) throw new Error(`${field} 必须是字符串数组`);
+  if (value.length > 100) throw new Error(`${field} 最多包含 100 项`);
+  const result = Array.from(new Set(value.map((item) => {
+    if (typeof item !== 'string') throw new Error(`${field} 只能包含字符串`);
+    const normalized = item.trim();
+    if (normalized.length > 200) throw new Error(`${field} 的单项不能超过 200 个字符`);
+    return normalized;
+  }).filter(Boolean)));
+  return result.length > 0 ? result : undefined;
+}
+
+function normalizeTimestamp(value: unknown, fallback: string): string {
+  if (typeof value !== 'string' || !value.trim()) return fallback;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? fallback : value.trim();
+}
+
+function normalizeAnime(item: ImportAnimeItem, index: number): NormalizedAnime {
+  if (!item || typeof item !== 'object') throw new Error(`第 ${index + 1} 部番剧格式无效`);
+  const title = optionalString(item.title, 500, `第 ${index + 1} 部番剧的标题`);
+  if (!title) throw new Error(`第 ${index + 1} 部番剧缺少标题`);
+
+  const statusValue = optionalString(item.status, 30, `${title} 的状态`) || 'plan_to_watch';
+  if (!VALID_STATUSES.has(statusValue as AnimeStatus)) throw new Error(`${title} 的状态无效：${statusValue}`);
+
+  const now = nowISO();
+  return {
+    sourceId: item.id,
+    payload: {
+      title,
+      originalTitle: optionalString(item.originalTitle, 500, `${title} 的原标题`),
+      coverUrl: optionalString(item.coverUrl, 2000, `${title} 的封面地址`),
+      status: statusValue as AnimeStatus,
+      score: optionalNumber(item.score, `${title} 的评分`, { min: 0, max: 10 }),
+      progress: optionalNumber(item.progress, `${title} 的进度`, { min: 0, integer: true }) ?? 0,
+      totalEpisodes: optionalNumber(item.totalEpisodes, `${title} 的总集数`, { min: 0, max: 9999, integer: true }),
+      durationMinutes: optionalNumber(item.durationMinutes, `${title} 的时长`, { min: 0, max: 9999, integer: true }),
+      notes: optionalString(item.notes, 5000, `${title} 的备注`),
+      tags: stringArray(item.tags, `${title} 的标签`),
+      cast: stringArray(item.cast, `${title} 的声优`),
+      castAliases: stringArray(item.castAliases, `${title} 的声优别名`),
+      summary: optionalString(item.summary, 10000, `${title} 的简介`),
+      startDate: optionalDate(item.startDate, `${title} 的开始日期`),
+      endDate: optionalDate(item.endDate, `${title} 的结束日期`),
+      premiereDate: optionalDate(item.premiereDate, `${title} 的首播日期`),
+      isFinished: optionalBoolean(item.isFinished, `${title} 的完结状态`),
+    },
+    createdAt: normalizeTimestamp(item.createdAt, now),
+    updatedAt: normalizeTimestamp(item.updatedAt, now),
+  };
+}
+
+function sourceKey(value: number | string | undefined): string | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  return String(value);
+}
+
+/**
+ * 用导入文件完整替换番剧和观看历史。
+ * 校验在事务开始前完成；删除与写入在同一个事务内，任一步失败都会回滚。
+ */
 export async function importAnimeData(body: ImportPayload): Promise<ImportResult> {
-  const db = getRawDb();
-
-  const animeRecords = Array.isArray(body.anime?.records) ? body.anime.records
-    : (Array.isArray(body.records) ? body.records : []);
+  const animeRecords = Array.isArray(body.anime?.records)
+    ? body.anime.records
+    : (Array.isArray(body.records) ? body.records : null);
   const historyRecords = Array.isArray(body.watchHistory?.records) ? body.watchHistory.records : [];
 
-  if (animeRecords.length === 0 && historyRecords.length === 0) {
-    throw new Error('JSON 中没有可导入的数据');
+  if (!animeRecords || animeRecords.length === 0) {
+    throw new Error('覆盖导入必须包含至少一部番剧');
+  }
+  if (animeRecords.length > 10000 || historyRecords.length > 100000) {
+    throw new Error('导入文件过大：番剧最多 10000 部，历史最多 100000 条');
   }
 
-  let createdAnime = 0;
-  let updatedAnime = 0;
-  let importedHistory = 0;
+  const normalizedAnime = animeRecords.map(normalizeAnime);
+  const seenSourceIds = new Set<string>();
+  for (const item of normalizedAnime) {
+    const key = sourceKey(item.sourceId);
+    if (!key) continue;
+    if (seenSourceIds.has(key)) throw new Error(`导入文件包含重复的番剧 ID：${key}`);
+    seenSourceIds.add(key);
+  }
+
+  const db = getRawDb();
   let skippedHistory = 0;
+  let importedHistory = 0;
 
-  const importTransaction = db.transaction(() => {
-    const animeIdMap = new Map<number | string, ResolvedAnimeRecord>();
-    const animeTitleMap = new Map<string, ResolvedAnimeRecord>();
+  const replaceTransaction = db.transaction(() => {
+    db.prepare('DELETE FROM watch_history').run();
+    db.prepare('DELETE FROM anime').run();
+    db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('anime', 'watch_history')").run();
 
-    // ── Batch process anime records ──
-    const validItems: Array<{
-      originalId?: number | string;
-      payload: CreateAnimeDTO;
-      createdAt?: string;
-      updatedAt?: string;
-    }> = [];
-    for (const item of animeRecords) {
-      if (!item || typeof item.title !== 'string' || !item.title.trim()) continue;
-      validItems.push({
-        originalId: item.id,
-        payload: normalizeAnimePayload(item as ImportAnimeItem),
-        createdAt: toOptionalString(item.createdAt),
-        updatedAt: toOptionalString(item.updatedAt),
-      });
+    const insertWithId = db.prepare(`
+      INSERT INTO anime (id, title, original_title, coverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const insertWithoutId = db.prepare(`
+      INSERT INTO anime (title, original_title, coverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const sourceIdMap = new Map<string, number>();
+    const titleMap = new Map<string, number[]>();
+
+    const ordered = [...normalizedAnime].sort((left, right) => {
+      const leftHasNumericId = Number.isInteger(left.sourceId) && Number(left.sourceId) > 0;
+      const rightHasNumericId = Number.isInteger(right.sourceId) && Number(right.sourceId) > 0;
+      return Number(rightHasNumericId) - Number(leftHasNumericId);
+    });
+
+    for (const item of ordered) {
+      const p = item.payload;
+      const values = [
+        p.title, p.originalTitle || null, p.coverUrl || null, p.status, p.score ?? null,
+        p.progress, p.totalEpisodes ?? null, p.durationMinutes ?? null, p.notes || null,
+        JSON.stringify(p.tags || []), p.summary || null, p.startDate || null, p.endDate || null,
+        p.premiereDate || null, JSON.stringify(p.cast || []), JSON.stringify(p.castAliases || []),
+        p.isFinished == null ? null : (p.isFinished ? 1 : 0), item.createdAt, item.updatedAt,
+      ];
+      const numericId = Number.isInteger(item.sourceId) && Number(item.sourceId) > 0 ? Number(item.sourceId) : undefined;
+      const result = numericId
+        ? insertWithId.run(numericId, ...values)
+        : insertWithoutId.run(...values);
+      const newId = numericId ?? Number(result.lastInsertRowid);
+      const key = sourceKey(item.sourceId);
+      if (key) sourceIdMap.set(key, newId);
+      const titleIds = titleMap.get(p.title) || [];
+      titleIds.push(newId);
+      titleMap.set(p.title, titleIds);
     }
 
-    if (validItems.length > 0) {
-      // 1) Batch lookup existing title → id mapping
-      const titles = validItems.map((v) => v.payload.title);
-      const placeholders = titles.map(() => '?').join(',');
-      const existingRows = db.prepare(
-        `SELECT id, title FROM anime WHERE title IN (${placeholders}) OR original_title IN (${placeholders})`
-      ).all(...titles, ...titles) as AnimeLookupRow[];
+    const insertHistory = db.prepare(
+      'INSERT INTO watch_history (animeId, animeTitle, episode, watchedAt) VALUES (?, ?, ?, ?)',
+    );
+    const animeTitleById = db.prepare('SELECT title FROM anime WHERE id = ?');
 
-      const existingByTitle = new Map<string, ResolvedAnimeRecord>();
-      for (const row of existingRows) {
-        existingByTitle.set(row.title, { id: row.id, title: row.title });
+    for (let index = 0; index < historyRecords.length; index++) {
+      const item = historyRecords[index];
+      if (!item || typeof item !== 'object') throw new Error(`第 ${index + 1} 条观看历史格式无效`);
+      const episode = optionalNumber(item.episode, `第 ${index + 1} 条历史的集数`, { min: 1, integer: true });
+      const watchedAt = optionalString(item.watchedAt, 100, `第 ${index + 1} 条历史的时间`);
+      if (!episode || !watchedAt || Number.isNaN(new Date(watchedAt).getTime())) {
+        throw new Error(`第 ${index + 1} 条观看历史缺少有效的集数或时间`);
       }
 
-      // 2) Group: create vs update
-      const toCreate: Array<{ originalId?: number | string; payload: CreateAnimeDTO; createdAt?: string; updatedAt?: string }> = [];
-      const toUpdate: Array<{ id: number; originalId?: number | string; payload: CreateAnimeDTO; updatedAt?: string }> = [];
-
-      for (const item of validItems) {
-        const existing = existingByTitle.get(item.payload.title);
-        if (existing) {
-          toUpdate.push({ id: existing.id, originalId: item.originalId, payload: item.payload, updatedAt: item.updatedAt });
-          animeTitleMap.set(existing.title, existing);
-          if (item.originalId !== undefined) animeIdMap.set(item.originalId, existing);
-        } else {
-          toCreate.push(item);
-        }
+      let animeId = sourceIdMap.get(sourceKey(item.animeId) || '');
+      if (!animeId && typeof item.animeTitle === 'string') {
+        const matches = titleMap.get(item.animeTitle.trim()) || [];
+        if (matches.length === 1) animeId = matches[0];
+      }
+      if (!animeId) {
+        skippedHistory++;
+        continue;
       }
 
-      // 3) Batch INSERT new records
-      const now = nowISO();
-      if (toCreate.length > 0) {
-        const columns = 'title, original_title, coverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt';
-        const rowPlaceholders = toCreate.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
-        const insertStmt = db.prepare(
-          `INSERT INTO anime (${columns}) VALUES ${rowPlaceholders}`
-        );
-        const params: unknown[] = [];
-        for (const { payload, createdAt, updatedAt } of toCreate) {
-          params.push(
-            payload.title, payload.originalTitle || null, payload.coverUrl || null,
-            payload.status, payload.score ?? null, payload.progress,
-            payload.totalEpisodes ?? null, payload.durationMinutes ?? null,
-            payload.notes || null, JSON.stringify(payload.tags || []),
-            payload.summary || null, payload.startDate || null,
-            payload.endDate || null, payload.premiereDate || null,
-            JSON.stringify(payload.cast || []), JSON.stringify(payload.castAliases || []),
-            payload.isFinished != null ? (payload.isFinished ? 1 : 0) : null,
-            createdAt || now,
-            updatedAt || now,
-          );
-        }
-        const result = insertStmt.run(...params);
-        // lastInsertRowid 是多行 INSERT 最后一行的 ID，需要倒推第一行的 ID
-        let nextId = Number(result.lastInsertRowid) - toCreate.length + 1;
-        for (const item of toCreate) {
-          const record = { id: nextId++, title: item.payload.title };
-          animeTitleMap.set(record.title, record);
-          if (item.originalId !== undefined) animeIdMap.set(item.originalId, record);
-          createdAnime++;
-        }
+      const row = animeTitleById.get(animeId) as { title: string } | undefined;
+      if (!row) {
+        skippedHistory++;
+        continue;
       }
-
-      // 4) Batch UPDATE existing records
-      for (const { id, payload, updatedAt } of toUpdate) {
-        db.prepare(
-          `UPDATE anime SET title=?, original_title=?, coverUrl=?, status=?, score=?, progress=?, totalEpisodes=?, durationMinutes=?, notes=?, tags=?, summary=?, start_date=?, end_date=?, premiere_date=?, cast=?, cast_aliases=?, isFinished=?, updatedAt=? WHERE id=?`
-        ).run(
-          payload.title, payload.originalTitle || null, payload.coverUrl || null,
-          payload.status, payload.score ?? null, payload.progress,
-          payload.totalEpisodes ?? null, payload.durationMinutes ?? null,
-          payload.notes || null, JSON.stringify(payload.tags || []),
-          payload.summary || null, payload.startDate || null,
-          payload.endDate || null, payload.premiereDate || null,
-          JSON.stringify(payload.cast || []), JSON.stringify(payload.castAliases || []),
-          payload.isFinished != null ? (payload.isFinished ? 1 : 0) : null,
-          updatedAt || now, id
-        );
-        updatedAnime++;
-      }
-    }
-
-    // ── Batch process history records ──
-    const validHistoryItems: Array<{ anime: ResolvedAnimeRecord; episode: number; watchedAt: Date }> = [];
-
-    for (const item of historyRecords) {
-      const watchedAt = toOptionalDate(item.watchedAt);
-      const episode = toOptionalNumber(item.episode);
-      const historyTitle = toOptionalString(item.animeTitle);
-      if (!watchedAt || episode === undefined) { skippedHistory++; continue; }
-
-      let anime = item.animeId != null ? animeIdMap.get(item.animeId) : undefined;
-      if (!anime && historyTitle) {
-        anime = animeTitleMap.get(historyTitle);
-        if (!anime) {
-          anime = findAnimeByTitleInDb(db, historyTitle) || undefined;
-          if (anime) animeTitleMap.set(anime.title.trim(), anime);
-        }
-      }
-      if (!anime) { skippedHistory++; continue; }
-
-      validHistoryItems.push({ anime, episode, watchedAt });
-    }
-
-    if (validHistoryItems.length > 0) {
-      // Batch dedup: find all existing (animeId, episode, watchedAt) combos
-      const dupConditions = validHistoryItems.map(() => '(animeId = ? AND episode = ? AND watchedAt = ?)');
-      const dupParams: unknown[] = [];
-      for (const item of validHistoryItems) {
-        dupParams.push(item.anime.id, item.episode, item.watchedAt.toISOString());
-      }
-      const dupRows = db.prepare(
-        `SELECT animeId, episode, watchedAt FROM watch_history WHERE ${dupConditions.join(' OR ')}`
-      ).all(...dupParams) as ExistingHistoryRow[];
-
-      const existingKeys = new Set(
-        dupRows.map((r) => `${r.animeId}|${r.episode}|${r.watchedAt}`)
-      );
-
-      const toInsert = validHistoryItems.filter((item) =>
-        !existingKeys.has(`${item.anime.id}|${item.episode}|${item.watchedAt.toISOString()}`)
-      );
-
-      if (toInsert.length > 0) {
-        const rowPlaceholders = toInsert.map(() => '(?, ?, ?, ?)').join(', ');
-        const insertParams: unknown[] = [];
-        for (const item of toInsert) {
-          insertParams.push(item.anime.id, item.anime.title, item.episode, item.watchedAt.toISOString());
-        }
-        db.prepare(
-          `INSERT INTO watch_history (animeId, animeTitle, episode, watchedAt) VALUES ${rowPlaceholders}`
-        ).run(...insertParams);
-        importedHistory = toInsert.length;
-      }
-      skippedHistory += validHistoryItems.length - toInsert.length;
+      insertHistory.run(animeId, row.title, episode, new Date(watchedAt).toISOString());
+      importedHistory++;
     }
   });
 
-  importTransaction();
-
+  replaceTransaction();
   return {
     success: true,
-    anime: { created: createdAnime, updated: updatedAnime },
-    watchHistory: { imported: importedHistory, skipped: skippedHistory },
+    mode: 'replace',
+    anime: { replaced: normalizedAnime.length },
+    watchHistory: { replaced: importedHistory, skipped: skippedHistory },
   };
 }

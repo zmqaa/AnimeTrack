@@ -42,7 +42,7 @@ export default memo(function AnimeCard({ item, onEdit, updateProgress, isAdmin =
   const detailHref = `/anime/${item.id}?returnTo=${encodeURIComponent(detailReturnTo)}`;
 
   return (
-    <div className="group surface-card-muted relative rounded-2xl overflow-hidden hover:border-white/10 transition-all duration-300 hover:shadow-2xl hover:shadow-black/40">
+    <div className="group surface-card-muted theme-hover-elevated relative rounded-2xl overflow-hidden transition-all duration-300">
       {/* 封面部分 */}
       <div className="relative aspect-[3/4] overflow-hidden bg-[var(--tag-bg)]">
         <Link href={detailHref} className="block h-full" onClick={onOpenDetail}>
@@ -103,7 +103,7 @@ export default memo(function AnimeCard({ item, onEdit, updateProgress, isAdmin =
           {/* 标题 & 底部遮罩 */}
           <div className="absolute bottom-3 left-3 right-3 truncate">
              <h3 className="text-sm font-medium text-[var(--text-primary)] group-hover:text-[var(--color-plan)] transition-colors">{item.title}</h3>
-             {item.originalTitle && <p className="text-[10px] text-zinc-500 truncate font-sans">{item.originalTitle}</p>}
+             {item.originalTitle && <p className="text-[10px] text-[var(--text-muted)] truncate font-sans">{item.originalTitle}</p>}
           </div>
         </Link>
 

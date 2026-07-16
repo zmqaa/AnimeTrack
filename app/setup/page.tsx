@@ -183,7 +183,7 @@ export default function SetupPage() {
                   <div>现在你可以直接访问首页公开浏览；如果需要编辑内容，请手动打开 /login 登录管理员账号。</div>
                 </div>
                 <div className="flex flex-col gap-3">
-                  <Link href="/login" className="theme-accent-soft rounded-full px-4 py-3 text-center text-sm transition hover:bg-black/30">
+                  <Link href="/login" className="theme-accent-soft surface-hover rounded-full px-4 py-3 text-center text-sm transition">
                     打开管理员登录页
                   </Link>
                 </div>

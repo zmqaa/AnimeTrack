@@ -1,12 +1,15 @@
 "use client";
 
-import { memo } from 'react';
+import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import {
   Bars3Icon,
+  CheckIcon,
+  ChevronDownIcon,
   ListBulletIcon,
   MagnifyingGlassIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
+import SegmentedControl from '@/components/shared/SegmentedControl';
 
 export type TimelineViewMode = 'timeline' | 'table';
 export type TimelineSortBy = 'newest' | 'oldest' | 'mostEpisodes';
@@ -49,44 +52,86 @@ export default memo(function TimelineControls({
   groupBy,
   onGroupByChange,
 }: TimelineControlsProps) {
+  const [sortOpen, setSortOpen] = useState(false);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+  const sortTriggerRef = useRef<HTMLButtonElement>(null);
+  const selectedSort = SORT_OPTIONS.find((option) => option.value === sortBy) ?? SORT_OPTIONS[0];
+
+  useEffect(() => {
+    if (!sortOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!sortMenuRef.current?.contains(event.target as Node)) setSortOpen(false);
+    };
+    const handleEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSortOpen(false);
+        sortTriggerRef.current?.focus();
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [sortOpen]);
+
+  const focusSortOption = (position: 'selected' | 'first' | 'last') => {
+    requestAnimationFrame(() => {
+      const options = Array.from(sortMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []);
+      if (!options.length) return;
+      const target = position === 'first'
+        ? options[0]
+        : position === 'last'
+          ? options[options.length - 1]
+          : options.find((option) => option.dataset.value === sortBy) ?? options[0];
+      target.focus();
+    });
+  };
+
+  const handleSortTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      setSortOpen(true);
+      focusSortOption(event.key === 'ArrowDown' ? 'first' : 'last');
+    }
+  };
+
+  const handleSortOptionKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const options = Array.from(sortMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []);
+    const currentIndex = options.indexOf(event.currentTarget);
+    if (event.key === 'Home') options[0]?.focus();
+    else if (event.key === 'End') options[options.length - 1]?.focus();
+    else {
+      const offset = event.key === 'ArrowDown' ? 1 : -1;
+      options[(currentIndex + offset + options.length) % options.length]?.focus();
+    }
+  };
+
   return (
     <div className="glass-panel rounded-[28px] p-4 md:p-5 flex flex-col gap-4">
       {/* View mode tabs */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="surface-card-muted flex p-1 rounded-xl">
-          {VIEW_OPTIONS.map(({ mode, label, icon: Icon }) => (
-            <button
-              key={mode}
-              onClick={() => onViewModeChange(mode)}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold uppercase transition-all ${
-                viewMode === mode
-                  ? 'bg-[var(--tag-bg)] text-primary shadow-sm ring-1 ring-[var(--border)]'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          value={viewMode}
+          options={VIEW_OPTIONS.map(({ mode, ...option }) => ({ value: mode, ...option }))}
+          onChange={onViewModeChange}
+          ariaLabel="记录展示方式"
+        />
 
         {/* Group by (only relevant for timeline view) */}
         {viewMode === 'timeline' && (
-          <div className="surface-card-muted flex p-1 rounded-xl">
-            {GROUP_OPTIONS.map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => onGroupByChange(value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all ${
-                  groupBy === value
-                    ? 'bg-[var(--tag-bg)] text-primary shadow-sm ring-1 ring-[var(--border)]'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            value={groupBy}
+            options={GROUP_OPTIONS}
+            onChange={onGroupByChange}
+            ariaLabel="时间线分组方式"
+            buttonClassName="px-3 py-1.5 text-xs font-bold uppercase"
+          />
         )}
 
         <div className="flex-1" />
@@ -112,15 +157,56 @@ export default memo(function TimelineControls({
         </div>
 
         {/* Sort */}
-        <select
-          value={sortBy}
-          onChange={(e) => onSortByChange(e.target.value as TimelineSortBy)}
-          className="surface-input rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-wider outline-none focus:ring-2 focus:ring-primary/30 transition-all appearance-none cursor-pointer"
-        >
-          {SORT_OPTIONS.map(({ value, label }) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
+        <div ref={sortMenuRef} className="relative">
+          <button
+            ref={sortTriggerRef}
+            type="button"
+            aria-haspopup="listbox"
+            aria-expanded={sortOpen}
+            onClick={() => setSortOpen((open) => !open)}
+            onKeyDown={handleSortTriggerKeyDown}
+            className="surface-input flex min-w-[112px] items-center justify-between gap-3 rounded-xl px-3 py-2 text-xs font-bold uppercase tracking-wider outline-none transition-all hover:border-[var(--border-light)] focus:ring-2 focus:ring-primary/30"
+          >
+            <span>{selectedSort.label}</span>
+            <ChevronDownIcon className={`h-3.5 w-3.5 text-[var(--text-muted)] transition-transform ${sortOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {sortOpen && (
+            <div
+              role="listbox"
+              aria-label="记录排序方式"
+              className="surface-pill shadow-theme-lg absolute right-0 top-full z-30 mt-2 min-w-[148px] rounded-2xl p-1.5"
+            >
+              {SORT_OPTIONS.map(({ value, label }) => {
+                const selected = value === sortBy;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="option"
+                    aria-selected={selected}
+                    data-value={value}
+                    onKeyDown={handleSortOptionKeyDown}
+                    onClick={() => {
+                      onSortByChange(value);
+                      setSortOpen(false);
+                      sortTriggerRef.current?.focus();
+                    }}
+                    style={selected ? { backgroundColor: 'var(--color-surface-hover)' } : undefined}
+                    className={`flex w-full items-center justify-between gap-4 rounded-xl px-3 py-2.5 text-left text-xs font-bold transition-colors ${
+                      selected
+                        ? 'text-primary'
+                        : 'text-[var(--text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <CheckIcon className={`h-3.5 w-3.5 ${selected ? 'opacity-100' : 'opacity-0'}`} />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

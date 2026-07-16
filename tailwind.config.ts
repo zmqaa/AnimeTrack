@@ -16,15 +16,15 @@ const config: Config = {
         foreground: "var(--text-primary)",
         primary: {
           DEFAULT: "var(--accent)",
-          foreground: "#fff",
+          foreground: "var(--text-on-accent)",
         },
         secondary: {
           DEFAULT: "var(--text-secondary)",
           foreground: "var(--bg-card)",
         },
         destructive: {
-          DEFAULT: "#7f1d1d",
-          foreground: "#fafafa",
+          DEFAULT: "var(--color-danger)",
+          foreground: "var(--text-on-accent)",
         },
         muted: {
           DEFAULT: "var(--tag-bg)",

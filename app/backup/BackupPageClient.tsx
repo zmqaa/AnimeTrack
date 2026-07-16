@@ -17,15 +17,21 @@ interface BackupFile {
 
 interface ImportResult {
   success: true;
+  mode: 'replace';
   anime: {
-    created: number;
-    updated: number;
+    replaced: number;
   };
   watchHistory: {
-    imported: number;
+    replaced: number;
     skipped: number;
   };
 }
+
+type PendingImport = {
+  payload: unknown;
+  animeCount: number;
+  historyCount: number;
+};
 
 type SessionUser = { role?: string };
 
@@ -41,6 +47,7 @@ export default function BackupPageClient() {
   const [exporting, setExporting] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
 
   useEffect(() => {
     if (status === 'authenticated' && role !== 'admin') {
@@ -136,18 +143,41 @@ export default function BackupPageClient() {
       return;
     }
 
-    setImporting(true);
     try {
       const text = await file.text();
-      const payload = JSON.parse(text);
+      const payload = JSON.parse(text) as {
+        records?: unknown[];
+        anime?: { records?: unknown[] };
+        watchHistory?: { records?: unknown[] };
+      };
+      const animeRecords = Array.isArray(payload?.anime?.records)
+        ? payload.anime.records
+        : (Array.isArray(payload?.records) ? payload.records : []);
+      const historyRecords = Array.isArray(payload?.watchHistory?.records)
+        ? payload.watchHistory.records
+        : [];
+      if (animeRecords.length === 0) {
+        throw new Error('导入文件中没有番剧记录');
+      }
+      setPendingImport({ payload, animeCount: animeRecords.length, historyCount: historyRecords.length });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '读取导入文件失败');
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!pendingImport || importing) return;
+
+    setImporting(true);
+    try {
       const result = await fetchJson<ImportResult>('/api/admin/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(pendingImport.payload),
       }, '导入失败');
 
       toast.success(
-        `导入完成：新增 ${result.anime.created} 部，更新 ${result.anime.updated} 部，导入 ${result.watchHistory.imported} 条历史`
+        `覆盖完成：${result.anime.replaced} 部番剧，${result.watchHistory.replaced} 条历史${result.watchHistory.skipped ? `，跳过 ${result.watchHistory.skipped} 条无法匹配的历史` : ''}`
       );
       // 全局刷新缓存：番剧列表 + Dashboard 数据同步更新
       globalMutate(ANIME_LIST_KEY);
@@ -156,6 +186,7 @@ export default function BackupPageClient() {
       toast.error(error instanceof Error ? error.message : '导入失败');
     } finally {
       setImporting(false);
+      setPendingImport(null);
     }
   };
 
@@ -214,7 +245,7 @@ export default function BackupPageClient() {
           <button
             onClick={handleImportClick}
             disabled={importing}
-            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-[var(--color-score)]/10 border border-[var(--color-score)]/20 text-[var(--color-score)] text-sm font-medium hover:bg-[var(--color-score)]/20 transition-all disabled:opacity-50"
+            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-[var(--color-score)]/10 text-[var(--color-score)] text-sm font-medium hover:bg-[var(--color-score)]/20 transition-all disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20V10m0 0l-4 4m4-4l4 4M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1" />
@@ -230,7 +261,7 @@ export default function BackupPageClient() {
           onChange={handleImportFile}
         />
         <p className="text-xs text-[var(--text-muted)] mt-4">
-          支持导入当前系统导出的 JSON 文件。导入时会按标题合并番剧，观看历史按番剧、集数、时间去重，避免重复导入后无限叠加。
+          支持导入当前系统导出的 JSON 文件。导入会完整覆盖现有番剧与观看历史；写入失败时会自动回滚，不会保留半份数据。
         </p>
       </section>
 
@@ -301,6 +332,16 @@ export default function BackupPageClient() {
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={pendingImport !== null}
+        title="覆盖现有数据"
+        message={pendingImport ? `将用文件中的 ${pendingImport.animeCount} 部番剧和 ${pendingImport.historyCount} 条观看历史替换当前全部数据。此操作不会合并旧数据，建议先导出一份 JSON 备份。` : ''}
+        confirmText={importing ? '导入中...' : '确认覆盖'}
+        variant="danger"
+        onConfirm={handleConfirmImport}
+        onCancel={() => !importing && setPendingImport(null)}
+      />
 
       <ConfirmDialog
         open={deleteConfirm !== null}

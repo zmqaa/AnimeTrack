@@ -27,13 +27,13 @@ export default memo(function ActivityFeed({ history }: { history: WatchHistoryRe
                             <div key={item.id} className="group surface-card-muted rounded-[22px] px-4 py-3 hover:border-[var(--color-completed)]/20 hover:bg-[var(--color-surface-hover)] transition-all duration-300">
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
-                                        <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-muted)]">Watch Log</div>
+                                    <div className="text-[11px] tracking-[0.24em] text-[var(--text-muted)]">观看记录</div>
                                         <span className="mt-1 block text-sm text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors truncate">
                                             观看 <span className="font-semibold text-[var(--accent)]">{item.animeTitle}</span>
                                         </span>
                                     </div>
                                     <span className="surface-pill shrink-0 text-[10px] font-mono text-[var(--text-muted)] px-2 py-1 rounded-full">
-                                        EP {item.episode}
+                                        第 {item.episode} 集
                                     </span>
                                 </div>
                             </div>

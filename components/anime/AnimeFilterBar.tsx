@@ -3,6 +3,7 @@
 import { ArrowsUpDownIcon, ChevronDownIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import type { AnimeStatus, AnimeSortBy } from '@/lib/anime-shared';
+import SegmentedControl from '@/components/shared/SegmentedControl';
 
 interface AnimeFilterBarProps {
   filterStatus: AnimeStatus | 'all';
@@ -64,23 +65,18 @@ export default function AnimeFilterBar({
     <>
             <div className="flex flex-col gap-4 mb-2 animate-in fade-in slide-in-from-top-2">
                 <div className="flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between">
-                    <div className="surface-card-muted flex p-1 rounded-xl shadow-inner overflow-x-auto max-w-full no-scrollbar">
-             {(['all', 'watching', 'completed', 'plan_to_watch', 'dropped'] as const).map((s) => {
-                 const isActive = filterStatus === s;
-                 const activeStyles = "bg-[var(--tag-bg)] text-[var(--text-primary)] shadow-md";
-                 const inactiveStyles = "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--tag-bg)]/50";
-                 
-                 return (
-                     <button
-                         key={s}
-                         onClick={() => setFilterStatus(s)}
-                         className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${isActive ? activeStyles : inactiveStyles}`}
-                     >
-                         {statusLabels[s]}
-                     </button>
-                 );
-             })}
-                    </div>
+                    <SegmentedControl
+                        value={filterStatus}
+                        options={(['all', 'watching', 'completed', 'plan_to_watch', 'dropped'] as const).map((value) => ({
+                            value,
+                            label: statusLabels[value],
+                        }))}
+                        onChange={setFilterStatus}
+                        ariaLabel="番剧状态筛选"
+                        className="max-w-full overflow-x-auto shadow-inner no-scrollbar"
+                        buttonClassName="px-4 py-1.5 text-sm font-medium"
+                        activeClassName="text-[var(--text-primary)]"
+                    />
 
                     <div className="flex items-center gap-3 w-full xl:w-auto">
                         <div className="relative flex-1 xl:flex-none xl:w-[220px]">

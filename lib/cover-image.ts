@@ -7,6 +7,43 @@ const COVERS_DIR = join(process.cwd(), 'public', 'covers');
 
 /** 封面存放的公开路径前缀 */
 const COVERS_PUBLIC_PREFIX = '/covers';
+const MAX_COVER_BYTES = 8 * 1024 * 1024;
+const DEFAULT_ALLOWED_COVER_HOSTS = ['lain.bgm.tv', 'cdn.myanimelist.net'];
+
+function allowedCoverHosts(): Set<string> {
+  const configured = (process.env.COVER_ALLOWED_HOSTS || '')
+    .split(',')
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean);
+  return new Set([...DEFAULT_ALLOWED_COVER_HOSTS, ...configured]);
+}
+
+function isAllowedRemoteCoverUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && allowedCoverHosts().has(url.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+async function readBodyWithLimit(response: Response): Promise<Buffer> {
+  if (!response.body) throw new Error('封面响应没有内容');
+  const reader = response.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_COVER_BYTES) {
+      await reader.cancel();
+      throw new Error(`封面超过 ${MAX_COVER_BYTES / 1024 / 1024} MB 限制`);
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks, total);
+}
 
 // 懒初始化目录（首次写入时自动创建）
 let dirReady = false;
@@ -58,10 +95,14 @@ export async function downloadCoverImage(
   const url = remoteUrl.trim();
   if (!url) return null;
 
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
+  if (!isAllowedRemoteCoverUrl(url)) {
+    console.warn(`[cover] 已阻止不受信任的封面地址: ${url}`);
+    return null;
+  }
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
     const response = await fetch(url, {
       signal: controller.signal,
       headers: {
@@ -69,14 +110,23 @@ export async function downloadCoverImage(
       },
     });
 
-    clearTimeout(timer);
-
     if (!response.ok) {
       console.warn(`[cover] 下载失败 HTTP ${response.status}: ${url}`);
       return null;
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer());
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+    if (!contentType.startsWith('image/')) {
+      console.warn(`[cover] 响应不是图片 (${contentType || 'unknown'}): ${url}`);
+      return null;
+    }
+    const contentLength = Number(response.headers.get('content-length'));
+    if (Number.isFinite(contentLength) && contentLength > MAX_COVER_BYTES) {
+      console.warn(`[cover] 文件过大 (${contentLength} bytes): ${url}`);
+      return null;
+    }
+
+    const buffer = await readBodyWithLimit(response);
     if (buffer.length < 512) {
       // 太小，不是有效图片
       console.warn(`[cover] 文件过小 (${buffer.length} bytes): ${url}`);
@@ -90,6 +140,8 @@ export async function downloadCoverImage(
   } catch (error) {
     console.warn(`[cover] 下载异常: ${url}`, (error as Error)?.message);
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

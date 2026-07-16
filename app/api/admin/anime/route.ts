@@ -1,6 +1,6 @@
 import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
 import { listAnimeRecordsWithLastWatched } from '@/lib/anime';
-import { query, type DbResult } from '@/lib/db';
+import { getRawDb, query } from '@/lib/db';
 import { deleteCoverImage } from '@/lib/cover-image';
 
 export async function GET(request: Request) {
@@ -49,13 +49,16 @@ export async function DELETE(request: Request) {
 
   try {
     const placeholders = ids.map(() => '?').join(',');
-    await query<DbResult>(`DELETE FROM watch_history WHERE animeId IN (${placeholders})`, ids);
-    const result = await query<DbResult>(`DELETE FROM anime WHERE id IN (${placeholders})`, ids);
+    const db = getRawDb();
+    const deleteRecords = db.transaction(() => db.prepare(
+      `DELETE FROM anime WHERE id IN (${placeholders})`,
+    ).run(...ids));
+    const result = deleteRecords();
     // 清理已删除番剧的本地封面文件
     for (const id of ids) {
       await deleteCoverImage(id);
     }
-    return apiSuccess({ deleted: result.affectedRows });
+    return apiSuccess({ deleted: result.changes });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '删除失败';
     return apiError(message);

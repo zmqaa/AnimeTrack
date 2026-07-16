@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { CalendarDaysIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { AnimeRecord } from '@/lib/dashboard-types';
 import { formatPremiere } from '@/lib/formatters';
 
@@ -22,7 +21,7 @@ export default React.memo(function DashboardRightPanel({
       {/* Metadata Coverage */}
       <div className="glass-panel p-5 rounded-[28px] space-y-4">
         <div className="flex items-center gap-2">
-          <SparklesIcon className="theme-accent-text w-4 h-4" />
+          <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
           <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)]">元数据完整度</h2>
         </div>
         <div className="space-y-2.5">
@@ -48,10 +47,10 @@ export default React.memo(function DashboardRightPanel({
       {/* Tag Distribution */}
       <div className="glass-panel p-6 lg:p-7 rounded-[32px]">
         <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)] flex items-center gap-2 mb-5">
-          <span className="theme-switch-dot h-2 w-2 rounded-full" />
+          <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
           观看统计与偏好
         </h2>
-        <div className="surface-card-muted rounded-[24px] p-5">
+        <div>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">标签分布</h3>
             <span className="text-[10px] text-[var(--text-muted)]">条形图</span>
@@ -76,7 +75,7 @@ export default React.memo(function DashboardRightPanel({
       {/* Recent Premiered */}
       <div className="glass-panel p-7 rounded-[32px] flex-shrink-0">
         <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)] flex items-center gap-2 mb-5">
-          <CalendarDaysIcon className="w-4 h-4 text-airing" />
+          <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
           最近开播作品
         </h2>
         <div className="space-y-3">

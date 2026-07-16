@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import useSWR, { mutate as globalMutate } from 'swr';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
+import SegmentedControl from '@/components/shared/SegmentedControl';
 import { fetchJson } from '@/lib/client-api';
 import { adminAnimeKey, adminHistoryKey, ANIME_LIST_KEY, HISTORY_KEY, swrFetcher } from '@/lib/swr-config';
 import {
@@ -446,24 +447,18 @@ export default function AdminPageClient() {
       </div>
 
       {/* Tabs */}
-      <div className="surface-card-muted flex gap-1 p-1 rounded-2xl w-fit">
-        {([
-          { key: 'anime' as TabKey, label: '番剧记录', count: null },
-          { key: 'history' as TabKey, label: '观看历史', count: null },
-        ]).map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-              activeTab === tab.key
-                ? 'bg-[var(--color-surface-hover)] text-[var(--text-primary)]'
-                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--color-surface-hover)]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        value={activeTab}
+        options={[
+          { value: 'anime', label: '番剧记录' },
+          { value: 'history', label: '观看历史' },
+        ]}
+        onChange={setActiveTab}
+        ariaLabel="数据管理类型"
+        className="w-fit rounded-2xl"
+        buttonClassName="px-5 py-2.5 text-sm font-medium"
+        activeClassName="text-[var(--text-primary)]"
+      />
 
       {/* Tab Content */}
       {activeTab === 'anime' ? <AnimeTab /> : <HistoryTab />}
