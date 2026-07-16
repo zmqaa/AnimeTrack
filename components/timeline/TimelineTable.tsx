@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { ChevronUpDownIcon } from '@heroicons/react/24/outline';
 import { EnrichedEntry } from './TimelineEnhancedList';
 import { TimelineSortBy } from './TimelineControls';
+import ProgressBar from '@/components/shared/ProgressBar';
+import EmptyState from '@/components/shared/EmptyState';
 
 interface TimelineTableProps {
   entries: EnrichedEntry[];
@@ -75,10 +77,11 @@ export default memo(function TimelineTable({ entries, searchQuery, sortBy, onSor
 
   if (filtered.length === 0) {
     return (
-      <div className="text-center py-20 text-[var(--text-muted)] border border-dashed border-[var(--border)] rounded-3xl">
-        <span className="text-4xl mb-4 block">📋</span>
-        <p>{searchQuery ? '没有匹配的记录' : '暂无观看记录'}</p>
-      </div>
+      <EmptyState
+        title={searchQuery ? '没有匹配的记录' : '暂无观看记录'}
+        description={searchQuery ? '试试缩短关键词，或清除搜索条件。' : '更新番剧进度后，这里会生成可排序的记录表格。'}
+        surface="panel"
+      />
     );
   }
 
@@ -138,15 +141,12 @@ export default memo(function TimelineTable({ entries, searchQuery, sortBy, onSor
                 <td className="px-4 py-3">
                   {anime?.totalEpisodes && anime.totalEpisodes > 0 ? (
                     <div className="flex items-center gap-2 min-w-[120px] max-w-[180px]">
-                      <div className="flex-1 h-1.5 rounded-full bg-[var(--bg-card)] overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${Math.min(100, (h.episode / anime.totalEpisodes) * 100)}%`,
-                            background: 'linear-gradient(to right, var(--chart-line-start), var(--chart-line-end))',
-                          }}
-                        />
-                      </div>
+                      <ProgressBar
+                        className="flex-1"
+                        value={(h.episode / anime.totalEpisodes) * 100}
+                        size="sm"
+                        label={`${anime.title} 观看进度`}
+                      />
                       <span className="text-[10px] text-[var(--text-muted)] font-mono shrink-0">
                         {h.episode}/{anime.totalEpisodes}
                       </span>

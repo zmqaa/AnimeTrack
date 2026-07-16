@@ -117,7 +117,7 @@ export default function AnimeSidebar({
                 {item.coverUrl ? (
                   <Image src={item.coverUrl} fill unoptimized sizes="40px" className="object-cover transition-transform group-hover/item:scale-110" alt="" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[10px] text-[var(--text-muted)] uppercase">IMG</div>
+                  <div className="flex h-full w-full items-center justify-center text-[9px] text-[var(--text-muted)]">无封面</div>
                 )}
               </div>
               <div className="flex-1 min-w-0">

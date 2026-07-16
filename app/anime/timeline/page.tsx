@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { ChevronLeftIcon } from '@heroicons/react/24/outline';
 import { useAnimeData } from '@/hooks/useAnimeData';
 import { useHistoryData } from '@/hooks/useHistoryData';
 import { AnimeRecord } from '@/lib/dashboard-types';
@@ -15,6 +13,8 @@ import TimelineControls from '@/components/timeline/TimelineControls';
 import TimelineAnimeSummary from '@/components/timeline/TimelineAnimeSummary';
 import TimelineEnhancedList from '@/components/timeline/TimelineEnhancedList';
 import TimelineHeatmap from '@/components/timeline/TimelineHeatmap';
+import { PanelSkeleton } from '@/components/shared/Skeleton';
+import PageContainer from '@/components/shared/PageContainer';
 
 const TimelineChart = dynamic(() => import('@/components/timeline/TimelineChart'), { ssr: false });
 const TimelineTable = dynamic(() => import('@/components/timeline/TimelineTable'), { ssr: false });
@@ -85,54 +85,31 @@ export default function AnimeTimelinePage() {
 
   if (isLoading) {
     return (
-      <main className="mx-auto w-full max-w-[1660px] space-y-8 px-4 md:px-6 xl:px-8 2xl:px-10 py-8">
-        <div className="space-y-1">
-          <div className="h-4 w-28 bg-[var(--tag-bg)] rounded animate-pulse mb-4" />
-          <div className="h-8 w-48 bg-[var(--tag-bg)] rounded animate-pulse" />
-        </div>
-        <div className="glass-panel rounded-[28px] h-28 animate-pulse" />
+      <PageContainer as="main" width="wide" spacing="roomy" animation="none">
+        <PanelSkeleton surface="strong" size="large" height="medium" className="rounded-[36px]" />
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_420px] gap-5">
-          <div className="glass-panel rounded-[28px] h-80 animate-pulse" />
-          <div className="glass-panel rounded-[28px] h-80 animate-pulse" />
+          <PanelSkeleton height="large" />
+          <PanelSkeleton height="large" />
         </div>
-        <div className="glass-panel rounded-[28px] h-64 animate-pulse" />
-      </main>
+        <PanelSkeleton height="medium" />
+      </PageContainer>
     );
   }
 
   return (
-    <main className="mx-auto w-full max-w-[1660px] space-y-6 px-4 md:px-6 xl:px-8 2xl:px-10 py-8 animate-fade-in">
-      {/* Header */}
-      <header className="flex items-center justify-between">
-        <div className="space-y-1">
-          <Link
-            href="/anime"
-            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center gap-1 text-sm mb-4 transition-colors"
-          >
-            <ChevronLeftIcon className="w-4 h-4" /> 返回番剧管理
-          </Link>
-          <h1 className="text-3xl font-bold tracking-tight">详细记录</h1>
-          <p className="text-[var(--text-muted)] font-mono text-xs uppercase tracking-widest">
-            Watch History &amp; Analytics
-          </p>
-        </div>
-        <div className="hidden sm:block text-right">
-          <span className="text-4xl font-black text-[var(--color-surface-raised)] italic select-none">TIMELINE</span>
-        </div>
-      </header>
-
-      {/* Stats Bar */}
-      <LazyRender fallback={<div className="glass-panel rounded-[28px] h-28 animate-pulse" />}>
+    <PageContainer as="main" width="wide" spacing="compact">
+      {/* Page hero + stats */}
+      <LazyRender fallback={<PanelSkeleton surface="strong" size="large" height="medium" className="rounded-[36px]" />}>
         <TimelineStats history={parsedHistory} animeMap={animeMap} />
       </LazyRender>
 
       {/* Chart — full width */}
-      <LazyRender fallback={<div className="glass-panel rounded-[28px] h-80 animate-pulse" />}>
+      <LazyRender fallback={<PanelSkeleton height="large" />}>
         <TimelineChart history={parsedHistory} />
       </LazyRender>
 
       {/* Heatmap — full width, 12 months */}
-      <LazyRender fallback={<div className="glass-panel rounded-[28px] h-52 animate-pulse" />}>
+      <LazyRender fallback={<PanelSkeleton height="small" />}>
         <TimelineHeatmap history={parsedHistory} months={12} />
       </LazyRender>
 
@@ -152,7 +129,7 @@ export default function AnimeTimelinePage() {
           />
 
           {viewMode === 'timeline' ? (
-            <LazyRender fallback={<div className="glass-panel rounded-[28px] h-96 animate-pulse" />}>
+            <LazyRender fallback={<PanelSkeleton height="xlarge" />}>
               <TimelineEnhancedList
                 entries={sortedEntries}
                 groupBy={groupBy}
@@ -163,7 +140,7 @@ export default function AnimeTimelinePage() {
               />
             </LazyRender>
           ) : (
-            <LazyRender fallback={<div className="glass-panel rounded-[28px] h-96 animate-pulse" />}>
+            <LazyRender fallback={<PanelSkeleton height="xlarge" />}>
               <TimelineTable
                 entries={sortedEntries}
                 searchQuery={searchQuery}
@@ -176,7 +153,7 @@ export default function AnimeTimelinePage() {
 
         {/* Right: Anime Summary */}
         <div>
-          <LazyRender fallback={<div className="glass-panel rounded-[28px] h-64 animate-pulse" />}>
+          <LazyRender fallback={<PanelSkeleton height="medium" />}>
             <TimelineAnimeSummary
               entries={sortedEntries}
               searchQuery={searchQuery}
@@ -191,6 +168,6 @@ export default function AnimeTimelinePage() {
           &ldquo;Every episode is a page in your story.&rdquo;
         </p>
       </footer>
-    </main>
+    </PageContainer>
   );
 }

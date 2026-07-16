@@ -2,8 +2,10 @@
 
 import { memo, useMemo } from 'react';
 import Link from 'next/link';
-import { CalendarIcon, PlayIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { ParsedWatchHistory, AnimeRecord } from '@/lib/dashboard-types';
+import ProgressBar from '@/components/shared/ProgressBar';
+import EmptyState from '@/components/shared/EmptyState';
 
 export interface EnrichedEntry {
   history: ParsedWatchHistory;
@@ -167,12 +169,11 @@ export default memo(function TimelineEnhancedList({ entries, groupBy, searchQuer
 
   if (filtered.length === 0) {
     return (
-      <div className="glass-panel rounded-[28px] p-5 md:p-6">
-        <div className="text-center py-16 text-[var(--text-muted)] border border-dashed border-[var(--border)] rounded-3xl">
-          <span className="text-4xl mb-4 block">🎬</span>
-          <p>{searchQuery ? '没有匹配的记录' : '暂无观看记录，去更新一下进度吧！'}</p>
-        </div>
-      </div>
+      <EmptyState
+        title={searchQuery ? '没有匹配的记录' : '暂无观看记录'}
+        description={searchQuery ? '试试缩短关键词，或清除搜索条件。' : '去更新一下番剧进度，观看记录会自动出现在这里。'}
+        surface="panel"
+      />
     );
   }
 
@@ -220,8 +221,8 @@ export default memo(function TimelineEnhancedList({ entries, groupBy, searchQuer
                         style={anime?.coverUrl ? { backgroundImage: `url(${anime.coverUrl})` } : undefined}
                       >
                         {!anime?.coverUrl && (
-                          <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]">
-                            <PlayIcon className="w-4 h-4" />
+                          <div className="flex h-full w-full items-center justify-center text-[8px] text-[var(--text-muted)]">
+                            无封面
                           </div>
                         )}
                       </div>
@@ -240,15 +241,12 @@ export default memo(function TimelineEnhancedList({ entries, groupBy, searchQuer
                         {/* Progress info */}
                         {anime && anime.totalEpisodes && anime.totalEpisodes > 0 && (
                           <div className="mt-1.5 flex items-center gap-2">
-                            <div className="flex-1 h-1 rounded-full bg-[var(--bg-card)] overflow-hidden">
-                              <div
-                                className="h-full rounded-full transition-all"
-                                style={{
-                                  width: `${Math.min(100, (h.episode / anime.totalEpisodes) * 100)}%`,
-                                  background: 'linear-gradient(to right, var(--chart-line-start), var(--chart-line-end))',
-                                }}
-                              />
-                            </div>
+                            <ProgressBar
+                              className="flex-1"
+                              value={(h.episode / anime.totalEpisodes) * 100}
+                              size="xs"
+                              label={`${anime.title} 观看进度`}
+                            />
                             <span className="text-[10px] text-[var(--text-muted)] font-mono shrink-0">
                               {h.episode}/{anime.totalEpisodes}
                             </span>

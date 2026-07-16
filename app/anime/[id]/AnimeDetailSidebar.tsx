@@ -1,5 +1,7 @@
 import type { AnimeDetailItem, AnimeStatus } from '@/lib/anime-shared';
 import { statusMap, statusBadgeStyles } from './anime-detail-helpers';
+import FormField from '@/components/shared/FormField';
+import StatTile from '@/components/shared/StatTile';
 
 type Props = {
   item: AnimeDetailItem;
@@ -38,7 +40,7 @@ export default function AnimeDetailSidebar({
               onError={(event) => { event.currentTarget.style.display = 'none'; }}
             />
           ) : (
-            <div className="flex h-full items-center justify-center text-sm text-[var(--text-muted)]">No Image</div>
+            <div className="flex h-full items-center justify-center text-sm text-[var(--text-muted)]">无封面</div>
           )}
         </div>
         <div className="border-t border-[var(--border)] bg-[var(--color-surface-raised)] p-4">
@@ -52,8 +54,7 @@ export default function AnimeDetailSidebar({
       <div className="surface-card rounded-[24px] p-5 2xl:p-6 backdrop-blur-xl">
         {canEdit ? (
           <div className="space-y-4">
-            <div>
-              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">状态</label>
+            <FormField label="状态">
               <select
                 value={formData.status || item.status}
                 onChange={(event) => onChange('status', event.target.value as AnimeStatus)}
@@ -63,50 +64,38 @@ export default function AnimeDetailSidebar({
                   <option key={status} value={status}>{statusMap[status as AnimeStatus]}</option>
                 ))}
               </select>
-            </div>
+            </FormField>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">评分</label>
+              <FormField label="评分">
                 <input
                   type="number"
                   value={formData.score ?? ''}
                   onChange={(event) => onChange('score', event.target.value)}
                   className="surface-input theme-focus-accent w-full rounded-xl px-3 py-2.5 text-sm text-[var(--text-primary)] transition"
                 />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">单集时长</label>
+              </FormField>
+              <FormField label="单集时长">
                 <input
                   type="number"
                   value={formData.durationMinutes ?? ''}
                   onChange={(event) => onChange('durationMinutes', event.target.value)}
                   className="surface-input theme-focus-accent w-full rounded-xl px-3 py-2.5 text-sm text-[var(--text-primary)] transition"
                 />
-              </div>
+              </FormField>
             </div>
-            <div>
-              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">封面链接</label>
+            <FormField label="封面链接">
               <input
                 value={formData.coverUrl || ''}
                 onChange={(event) => onChange('coverUrl', event.target.value)}
                 className="surface-input theme-focus-accent w-full rounded-xl px-3 py-2.5 text-sm text-[var(--text-primary)] transition"
               />
-            </div>
+            </FormField>
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-3">
-            <div className="surface-card-muted rounded-2xl p-3">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">评分</div>
-              <div className="mt-2 text-lg font-semibold score-text">{displayScore ? `★ ${displayScore}` : '-'}</div>
-            </div>
-            <div className="surface-card-muted rounded-2xl p-3">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">集数</div>
-              <div className="mt-2 text-lg font-semibold text-[var(--text-primary)]">{displayTotalEpisodes || '?'}</div>
-            </div>
-            <div className="surface-card-muted rounded-2xl p-3">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">时长</div>
-              <div className="mt-2 text-lg font-semibold text-[var(--text-primary)]">{displayDuration ? `${displayDuration}m` : '-'}</div>
-            </div>
+            <StatTile size="compact" valueTone="score" label="评分" value={displayScore ? `★ ${displayScore}` : '-'} />
+            <StatTile size="compact" valueTone="primary" label="集数" value={displayTotalEpisodes || '?'} />
+            <StatTile size="compact" valueTone="primary" label="时长" value={displayDuration ? `${displayDuration}m` : '-'} />
           </div>
         )}
       </div>

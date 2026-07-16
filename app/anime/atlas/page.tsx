@@ -2,10 +2,6 @@
 
 import Link from 'next/link';
 import { useMemo } from 'react';
-import {
-  ArrowUpRightIcon,
-  ChevronLeftIcon,
-} from '@heroicons/react/24/outline';
 import { useAnimeData } from '@/hooks/useAnimeData';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { getAppThemeDefinition } from '@/lib/theme';
@@ -14,6 +10,13 @@ import { ChordDiagram } from '@/components/dashboard/ChordDiagram';
 import { CastNetwork } from '@/components/dashboard/CastNetwork';
 import { ANIME_STATUS_LABELS } from '@/lib/anime-shared';
 import StatTile from '@/components/shared/StatTile';
+import SectionTitle from '@/components/shared/SectionTitle';
+import PageHero from '@/components/shared/PageHero';
+import Panel from '@/components/shared/Panel';
+import { CompactListSkeleton, ContentSkeleton } from '@/components/shared/Skeleton';
+import PageContainer from '@/components/shared/PageContainer';
+import CompactMediaItem from '@/components/shared/CompactMediaItem';
+import EmptyState from '@/components/shared/EmptyState';
 
 function formatStartDate(value?: string) {
   if (!value) return '未补充';
@@ -174,34 +177,28 @@ export default function AnimeAtlasPage() {
   const loading = animeLoading;
 
   return (
-    <main className="p-4 lg:p-8 pb-24 space-y-6 lg:space-y-8 animate-fade-in relative">
+    <PageContainer as="main" width="wide" spacing="default">
       <div className="theme-atlas-aura absolute inset-0 pointer-events-none opacity-40" />
 
-      <section className="glass-panel-strong rounded-[36px] p-8 lg:p-10 relative overflow-hidden">
-        <div className="theme-atlas-hero-aura absolute inset-0" />
-        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-4 max-w-3xl">
-            <Link href="/" className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm transition-colors">
-              <ChevronLeftIcon className="w-4 h-4" /> 返回总览
-            </Link>
-            <h1 className="text-3xl md:text-4xl font-display font-semibold tracking-tight text-[var(--text-primary)]">作品元数据图谱</h1>
-            <p className="text-sm md:text-base text-[var(--text-secondary)] leading-7">
-              这里专门展示你的片库中标签分布、声优×标签关联图谱、作品评分和最近开始追的作品。
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 min-w-full lg:min-w-[320px] lg:max-w-[360px]">
+      <PageHero
+        className="glass-panel-strong"
+        spacing="roomy"
+        title="作品元数据图谱"
+        description="这里专门展示你的片库中标签分布、声优×标签关联图谱、作品评分和最近开始追的作品。"
+        backHref="/"
+        backLabel="返回总览"
+        backdrop={<div className="theme-atlas-hero-aura absolute inset-0" />}
+        statsClassName="grid min-w-full grid-cols-2 gap-3 lg:min-w-[320px] lg:max-w-[360px]"
+        stats={(
+          <>
             <StatTile surface="card" label="入库作品" value={animeList.length} unit="部" detail="当前片库收录总数" />
             <StatTile surface="card" label="档案完整度" value={`${data.metadataRichness}%`} detail="元数据填写覆盖率" />
-          </div>
-        </div>
-      </section>
+          </>
+        )}
+      />
 
       {data.tagRanking.length > 0 && (
-        <section className="glass-panel rounded-[32px] p-6 lg:p-8 relative z-10">
-          <div className="flex items-center gap-3 mb-6">
-            <span className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom, var(--chart-line-start), var(--chart-line-end))' }} />
-            <h2 className="text-xl font-display font-semibold text-[var(--text-primary)]">标签排行 Top 10</h2>
-          </div>
+        <Panel title="标签排行 Top 10" size="large" className="relative z-10">
           <YearBarChart
             data={data.tagRanking.map((item, i) => ({
               label: item.tag,
@@ -212,15 +209,14 @@ export default function AnimeAtlasPage() {
             sortBy="value"
             labelFontSize={12}
           />
-        </section>
+        </Panel>
       )}
 
       {/* ── 声优 × 标签 和弦图 双列 ── */}
       {(data.leftChord.hasData || data.rightChord.hasData) && (
         <section className="glass-panel rounded-[32px] p-6 lg:p-8 relative z-10">
           <div className="flex items-center gap-3 mb-2">
-            <span className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom, var(--chart-line-start), var(--chart-line-end))' }} />
-            <h2 className="text-xl font-display font-semibold text-[var(--text-primary)]">声优 × 标签 关联图谱</h2>
+            <SectionTitle>声优 × 标签 关联图谱</SectionTitle>
             <span className="text-[10px] text-[var(--text-muted)] ml-auto">悬停查看关联</span>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -244,69 +240,78 @@ export default function AnimeAtlasPage() {
       {data.hasNetworkData && (
         <section className="glass-panel rounded-[32px] p-6 lg:p-8 relative z-10">
           <div className="flex items-center gap-3 mb-2">
-            <span className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom, var(--chart-line-start), var(--chart-line-end))' }} />
-            <h2 className="text-xl font-display font-semibold text-[var(--text-primary)]">声优共演网络</h2>
+            <SectionTitle>声优共演网络</SectionTitle>
             <span className="text-[10px] text-[var(--text-muted)] ml-auto">拖拽节点 · 悬停高亮</span>
           </div>
           <CastNetwork nodes={data.networkNodes} links={data.networkLinks} height={500} />
         </section>
       )}
 
-      <section className="grid grid-cols-1 xl:grid-cols-12 gap-6 relative z-10">
-        <div className="xl:col-span-7 glass-panel rounded-[32px] p-6 lg:p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <span className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom, var(--chart-line-start), var(--chart-line-end))' }} />
-            <h2 className="text-xl font-display font-semibold text-[var(--text-primary)]">作品评分</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {data.scored.map((anime, index) => (
-              <Link key={anime.id} href={`/anime/${anime.id}`} className="group surface-card-muted rounded-[28px] overflow-hidden hover:border-[var(--color-score)]/20 transition-all duration-300">
-                <div className="h-40 bg-[var(--bg-card)] bg-cover bg-center" style={anime.coverUrl ? { backgroundImage: `linear-gradient(180deg, var(--color-cover-gradient-start), var(--color-cover-gradient-end)), url(${anime.coverUrl})` } : undefined} />
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--text-muted)]">Rank #{index + 1}</div>
-                      <div className="mt-1 text-lg text-[var(--text-primary)] truncate">{anime.title}</div>
-                      <div className="text-xs text-[var(--text-muted)] truncate">{anime.originalTitle ?? '未补充原名'}</div>
-                    </div>
-                    <div className="shrink-0 rounded-full border score-soft px-2.5 py-1 text-sm">
-                      {anime.score?.toFixed(1)}
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-            {!data.scored.length && <div className="text-sm text-[var(--text-muted)]">评分字段还不够丰富，之后可以继续补齐。</div>}
-          </div>
+      {loading ? (
+        <div className="relative z-10 grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <Panel size="large">
+            <ContentSkeleton lines={5} />
+          </Panel>
+          <Panel size="large">
+            <CompactListSkeleton count={5} />
+          </Panel>
         </div>
-
-        <div className="xl:col-span-5 space-y-6">
-          <div className="glass-panel rounded-[32px] p-6 lg:p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <span className="w-1 h-5 rounded-full" style={{ background: 'linear-gradient(to bottom, var(--chart-line-start), var(--chart-line-end))' }} />
-              <h2 className="text-xl font-display font-semibold text-[var(--text-primary)]">最近开始追的作品</h2>
-            </div>
-            <div className="space-y-3">
-              {data.recentlyStarted.map((anime) => (
-                <Link key={anime.id} href={`/anime/${anime.id}`} className="group surface-card-muted flex items-center justify-between gap-3 rounded-[20px] px-4 py-3 hover:border-[var(--color-airing)]/20 transition-all">
-                  <div className="min-w-0">
-                    <div className="text-sm text-[var(--text-primary)] truncate">{anime.title}</div>
-                    <div className="text-xs text-[var(--text-muted)] truncate">
-                      {formatStartDate(anime.startDate)}开始 · {anime.totalEpisodes ? `${anime.progress} / ${anime.totalEpisodes} 集` : ANIME_STATUS_LABELS[anime.status]}
+      ) : (
+        <section className="grid grid-cols-1 xl:grid-cols-12 gap-6 relative z-10">
+          <Panel title="作品评分" size="large" className="xl:col-span-7">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {data.scored.map((anime, index) => (
+                <Link key={anime.id} href={`/anime/${anime.id}`} className="group surface-card-muted rounded-[28px] overflow-hidden hover:border-[var(--color-score)]/20 transition-all duration-300">
+                  <div className="h-40 bg-[var(--bg-card)] bg-cover bg-center" style={anime.coverUrl ? { backgroundImage: `linear-gradient(180deg, var(--color-cover-gradient-start), var(--color-cover-gradient-end)), url(${anime.coverUrl})` } : undefined} />
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-[10px] uppercase tracking-[0.24em] text-[var(--text-muted)]">Rank #{index + 1}</div>
+                        <div className="mt-1 text-lg text-[var(--text-primary)] truncate">{anime.title}</div>
+                        <div className="text-xs text-[var(--text-muted)] truncate">{anime.originalTitle ?? '未补充原名'}</div>
+                      </div>
+                      <div className="shrink-0 rounded-full border score-soft px-2.5 py-1 text-sm">
+                        {anime.score?.toFixed(1)}
+                      </div>
                     </div>
                   </div>
-                  <ArrowUpRightIcon className="w-4 h-4 text-[var(--text-muted)] group-hover:text-airing transition-colors" />
                 </Link>
               ))}
-              {!data.recentlyStarted.length && <div className="text-sm text-[var(--text-muted)]">开始追番日期暂时还没有记录。</div>}
+              {!data.scored.length && (
+                <div className="md:col-span-2 xl:col-span-3">
+                  <EmptyState
+                    title="暂无评分作品"
+                    description="为作品补充评分后，这里会自动生成评分排行。"
+                    size="compact"
+                  />
+                </div>
+              )}
             </div>
-          </div>
-        </div>
-      </section>
+          </Panel>
 
-      {loading && (
-        <div className="text-sm text-[var(--text-muted)] font-mono px-2">ATLAS_LOADING...</div>
+          <div className="xl:col-span-5 space-y-6">
+            <Panel title="最近开始追的作品" size="large">
+              <div className="space-y-3">
+                {data.recentlyStarted.map((anime) => (
+                  <CompactMediaItem
+                    key={anime.id}
+                    href={`/anime/${anime.id}`}
+                    title={anime.title}
+                    description={`${formatStartDate(anime.startDate)}开始 · ${anime.totalEpisodes ? `${anime.progress} / ${anime.totalEpisodes} 集` : ANIME_STATUS_LABELS[anime.status]}`}
+                  />
+                ))}
+                {!data.recentlyStarted.length && (
+                  <EmptyState
+                    title="暂无开始追番记录"
+                    description="补充开始观看日期后，最近开始追的作品会显示在这里。"
+                    size="compact"
+                  />
+                )}
+              </div>
+            </Panel>
+          </div>
+        </section>
       )}
-    </main>
+    </PageContainer>
   );
 }

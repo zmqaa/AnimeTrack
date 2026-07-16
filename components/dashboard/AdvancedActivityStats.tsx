@@ -1,118 +1,11 @@
 "use client";
 
-import { memo, useMemo, useState, useRef, useEffect } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { AnimeRecord, ParsedWatchHistory } from '@/lib/dashboard-types';
 import SegmentedControl from '@/components/shared/SegmentedControl';
 import StatTile from '@/components/shared/StatTile';
-
-/** Inline SVG line chart — replacing echarts for ~800KB bundle savings */
-function ActivityLineChart({ data, maxValue, scale }: { data: { label: string; value: number }[]; maxValue: number; scale: 'week' | 'month' | 'year' }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [svgWidth, setSvgWidth] = useState(600);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setSvgWidth(entry.contentRect.width);
-      }
-    });
-    observer.observe(el);
-    setSvgWidth(el.getBoundingClientRect().width);
-    return () => observer.disconnect();
-  }, []);
-
-  const H = 250;
-  const padLeft = 40;
-  const padRight = 16;
-  const padTop = 16;
-  const padBottom = scale === 'month' ? 30 : 18;
-  const chartW = Math.max(svgWidth - padLeft - padRight, 200);
-  const chartH = H - padTop - padBottom;
-  const yMax = maxValue < 4 ? 4 : maxValue;
-
-  if (data.length === 0) {
-    return <div className="flex h-[250px] items-center justify-center text-sm text-[var(--text-muted)]">暂无数据</div>;
-  }
-
-  // Build path and points
-  const points = data.map((d, i) => {
-    const x = padLeft + (i / Math.max(data.length - 1, 1)) * chartW;
-    const y = padTop + chartH - (d.value / yMax) * chartH;
-    return { x, y, ...d };
-  });
-
-  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-  const areaPath = `${linePath} L ${points[points.length - 1].x} ${padTop + chartH} L ${points[0].x} ${padTop + chartH} Z`;
-
-  const yTicks = 3;
-  const xLabelInterval = scale === 'month' ? 4 : 1;
-
-  return (
-    <div ref={containerRef} style={{ width: '100%' }}>
-      <svg width="100%" height={H} className="select-none block">
-        <defs>
-          <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--chart-area-top)" />
-            <stop offset="55%" stopColor="var(--chart-area-mid)" />
-            <stop offset="100%" stopColor="var(--chart-area-bottom)" />
-          </linearGradient>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="2" result="blur" />
-            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-        </defs>
-
-        {/* Grid lines — span full chart width */}
-        {Array.from({ length: yTicks }, (_, i) => {
-          const y = padTop + (chartH / (yTicks - 1)) * i;
-          const val = Math.round(yMax - (yMax / (yTicks - 1)) * i);
-          return (
-            <g key={i}>
-              <line x1={padLeft} x2={svgWidth - padRight} y1={y} y2={y} stroke="var(--chart-grid)" strokeDasharray="4,4" />
-              <text x={padLeft - 6} y={y + 3} textAnchor="end" fill="var(--chart-axis-y)" fontSize={10}>{val}</text>
-            </g>
-          );
-        })}
-
-        {/* Area fill */}
-        <path d={areaPath} fill="url(#lineGrad)" />
-
-        {/* Line */}
-        <path d={linePath} fill="none" stroke="url(#lineStrokeGrad)" strokeWidth={2.5} filter="url(#glow)" />
-
-        {/* Line gradient stroke (defined inline because it needs x coordinates) */}
-        <defs>
-          <linearGradient id="lineStrokeGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="var(--chart-line-start)" />
-            <stop offset="100%" stopColor="var(--chart-line-end)" />
-          </linearGradient>
-        </defs>
-
-        {/* Dots */}
-        {points.map((p, i) => (
-          <g key={i} className="group">
-            <circle cx={p.x} cy={p.y} r={6} fill="var(--chart-dot)" stroke="var(--chart-dot-stroke)" strokeWidth={2}
-              className="chart-dot-base" />
-            {/* Tooltip on hover */}
-            <g className="pointer-events-none opacity-0 transition-opacity group-hover:opacity-100">
-              <rect x={p.x - 36} y={p.y - 40} width={72} height={36} rx={10}
-                fill="var(--chart-tooltip-bg)" stroke="var(--chart-tooltip-border)" strokeWidth={1} />
-              <text x={p.x} y={p.y - 22} textAnchor="middle" fill="var(--chart-tooltip-text)" fontSize={16} fontWeight={600}>{p.value} 集</text>
-              <text x={p.x} y={p.y - 10} textAnchor="middle" fill="var(--chart-tooltip-sub)" fontSize={10}>{p.label}</text>
-            </g>
-          </g>
-        ))}
-
-        {/* X-axis labels */}
-        {points.filter((_, i) => i % xLabelInterval === 0).map((p) => (
-          <text key={p.label} x={p.x} y={H - 4} textAnchor="middle" fill="var(--chart-axis-x)" fontSize={10}>{p.label}</text>
-        ))}
-      </svg>
-    </div>
-  );
-}
+import ActivityLineChart from '@/components/shared/ActivityLineChart';
+import SectionTitle from '@/components/shared/SectionTitle';
 
 export default memo(function AdvancedActivityStats({ history, animeList }: { history: ParsedWatchHistory[]; animeList: AnimeRecord[] }) {
   const [scale, setScale] = useState<'week' | 'month' | 'year'>('week');
@@ -193,10 +86,7 @@ export default memo(function AdvancedActivityStats({ history, animeList }: { his
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)]">
-            <span className="h-5 w-1 rounded-full bg-[var(--accent)]" />
-            观影趋势分析
-          </h2>
+          <SectionTitle>观影趋势分析</SectionTitle>
           <p className="text-sm text-[var(--text-secondary)] mt-2 leading-6">{statsData.title}，现在会额外给出高频观看时段和这一段时间对整库的推进占比。</p>
         </div>
 
@@ -242,7 +132,7 @@ export default memo(function AdvancedActivityStats({ history, animeList }: { his
             {scale === 'week' ? '近 7 日' : scale === 'month' ? '本月' : '本年'}
           </div>
         </div>
-        <ActivityLineChart data={statsData.data} maxValue={maxValue} scale={scale} />
+        <ActivityLineChart data={statsData.data} maxValue={maxValue} scale={scale} idPrefix="dashboard-activity" />
       </div>
     </div>
   );

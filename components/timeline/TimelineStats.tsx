@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react';
 import { ParsedWatchHistory, AnimeRecord } from '@/lib/dashboard-types';
 import StatTile from '@/components/shared/StatTile';
+import PageHero from '@/components/shared/PageHero';
 
 interface TimelineStatsProps {
   history: ParsedWatchHistory[];
@@ -57,18 +58,29 @@ export default memo(function TimelineStats({ history, animeMap }: TimelineStatsP
   ];
 
   return (
-    <div className="glass-panel rounded-[28px] p-5 md:p-6">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {cards.map((card) => (
-          <StatTile
-            key={card.label}
-            label={card.label}
-            value={card.value}
-            unit={card.unit}
-            className="transition-colors hover:border-[var(--accent)]"
-          />
-        ))}
-      </div>
-    </div>
+    <PageHero
+      className="glass-panel-strong"
+      title="观看时间轴"
+      description="回顾每一次观看记录，了解自己的观看节奏与时间分布。"
+      backHref="/anime"
+      backLabel="返回番剧列表"
+      align="start"
+      layout="stacked"
+      statsClassName="grid w-full grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
+      stats={(
+        <>
+          {cards.map((card) => (
+            <StatTile
+              key={card.label}
+              label={card.label}
+              value={card.value}
+              unit={card.unit}
+              surface="card"
+              className="transition-colors hover:border-[var(--accent)]"
+            />
+          ))}
+        </>
+      )}
+    />
   );
 });

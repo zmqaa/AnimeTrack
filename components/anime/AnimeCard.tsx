@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { CheckIcon, PlusIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
 import type { AnimeCardItem, AnimeStatus } from '@/lib/anime-shared';
 import { statusLabels } from '@/lib/dashboard-types';
+import ProgressBar from '@/components/shared/ProgressBar';
 
 const statusSoftClass: Record<AnimeStatus, string> = {
   watching: 'status-watching-soft',
@@ -62,8 +63,7 @@ export default memo(function AnimeCard({ item, onEdit, updateProgress, isAdmin =
             />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center bg-[var(--tag-bg)]">
-              <span className="text-3xl mb-2 opacity-40">🎬</span>
-              <span className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">No Cover</span>
+              <span className="text-[11px] text-[var(--text-muted)] tracking-wider">无封面</span>
             </div>
           )}
           <div className="absolute inset-0 cover-gradient-overlay opacity-60" />
@@ -127,12 +127,12 @@ export default memo(function AnimeCard({ item, onEdit, updateProgress, isAdmin =
             <span className="text-[var(--text-muted)]">剧集进度</span>
             <span className="text-[var(--text-secondary)]">{item.progress} / {item.totalEpisodes || '?'}</span>
           </div>
-          <div className="h-1.5 w-full bg-[var(--tag-bg)] rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-1000 ${isCompleted ? 'progress-completed' : 'progress-gradient'}`}
-              style={{ width: `${Math.min(progressPercent || 0, 100)}%` }}
-            />
-          </div>
+          <ProgressBar
+            value={progressPercent || 0}
+            size="sm"
+            variant={isCompleted ? 'completed' : 'progress'}
+            label={`${item.title} 观看进度`}
+          />
         </div>
 
         {/* 内容 */}

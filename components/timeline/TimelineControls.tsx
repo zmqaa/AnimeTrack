@@ -10,6 +10,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import SegmentedControl from '@/components/shared/SegmentedControl';
+import Panel from '@/components/shared/Panel';
 
 export type TimelineViewMode = 'timeline' | 'table';
 export type TimelineSortBy = 'newest' | 'oldest' | 'mostEpisodes';
@@ -113,7 +114,7 @@ export default memo(function TimelineControls({
   };
 
   return (
-    <div className="glass-panel rounded-[28px] p-4 md:p-5 flex flex-col gap-4">
+    <Panel size="compact" contentClassName="flex flex-col gap-4">
       {/* View mode tabs */}
       <div className="flex flex-wrap items-center gap-3">
         <SegmentedControl
@@ -208,6 +209,6 @@ export default memo(function TimelineControls({
           )}
         </div>
       </div>
-    </div>
+    </Panel>
   );
 });

@@ -1,5 +1,7 @@
 "use client";
 
+import Panel from './Panel';
+
 interface SkeletonProps {
   className?: string;
 }
@@ -7,6 +9,70 @@ interface SkeletonProps {
 export function Skeleton({ className = '' }: SkeletonProps) {
   return (
     <div className={`skeleton-shimmer rounded-2xl ${className}`} />
+  );
+}
+
+type PanelSkeletonProps = {
+  className?: string;
+  height?: 'small' | 'medium' | 'large' | 'xlarge' | 'hero';
+  size?: 'compact' | 'default' | 'large';
+  surface?: 'glass' | 'strong' | 'card';
+};
+
+const panelSkeletonHeights: Record<NonNullable<PanelSkeletonProps['height']>, string> = {
+  small: 'h-52',
+  medium: 'h-64',
+  large: 'h-80',
+  xlarge: 'h-96',
+  hero: 'h-[280px]',
+};
+
+export function PanelSkeleton({
+  className = '',
+  height = 'medium',
+  size = 'default',
+  surface = 'glass',
+}: PanelSkeletonProps) {
+  return (
+    <Panel
+      surface={surface}
+      size={size}
+      overflow="hidden"
+      className={`${panelSkeletonHeights[height]} ${className}`}
+      contentClassName="h-full"
+    >
+      <div className="skeleton-shimmer h-full w-full rounded-2xl opacity-60" />
+    </Panel>
+  );
+}
+
+export function ContentSkeleton({ lines = 3, className = '' }: { lines?: number; className?: string }) {
+  return (
+    <div className={`space-y-3 ${className}`} aria-hidden="true">
+      <Skeleton className="h-5 w-2/5" />
+      {Array.from({ length: lines }).map((_, index) => (
+        <Skeleton
+          key={index}
+          className={`h-3 ${index === lines - 1 ? 'w-3/5' : 'w-full'}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+export function CompactListSkeleton({ count = 4, className = '' }: { count?: number; className?: string }) {
+  return (
+    <div className={`space-y-3 ${className}`} aria-hidden="true">
+      {Array.from({ length: count }).map((_, index) => (
+        <div key={index} className="surface-card-muted flex items-center justify-between gap-4 rounded-[20px] px-4 py-3">
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-4 w-2/3" />
+            <Skeleton className="h-3 w-1/2" />
+          </div>
+          <Skeleton className="h-4 w-4 shrink-0 rounded-md" />
+        </div>
+      ))}
+    </div>
   );
 }
 

@@ -3,9 +3,18 @@
 
 import { memo } from 'react';
 import { WatchHistoryRecord } from '@/lib/dashboard-types';
+import EmptyState from '@/components/shared/EmptyState';
 
 export default memo(function ActivityFeed({ history }: { history: WatchHistoryRecord[] }) {
-    if (history.length === 0) return <div className="text-[var(--text-muted)] text-sm text-center py-10">暂无活动记录</div>;
+    if (history.length === 0) {
+        return (
+            <EmptyState
+                title="暂无活动记录"
+                description="更新一次观看进度后，最近记录会显示在这里。"
+                size="compact"
+            />
+        );
+    }
 
     const grouped: Record<string, WatchHistoryRecord[]> = {};
     history.slice(0, 15).forEach(item => {
