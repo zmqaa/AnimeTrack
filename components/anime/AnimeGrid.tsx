@@ -17,22 +17,33 @@ interface AnimeGridProps {
   viewMode?: ViewMode;
   detailReturnTo: string;
   onOpenDetail: () => void;
+  emptyTitle?: string;
+  emptyDescription?: string;
 }
 
-export default function AnimeGrid({ items, onEdit, updateProgress, loading, isAdmin = false, viewMode = 'grid', detailReturnTo, onOpenDetail }: AnimeGridProps) {
+export default function AnimeGrid({
+  items,
+  onEdit,
+  updateProgress,
+  loading,
+  isAdmin = false,
+  viewMode = 'grid',
+  detailReturnTo,
+  onOpenDetail,
+  emptyTitle = '暂无番剧记录',
+  emptyDescription = '添加第一部番剧后，它会显示在这里。',
+}: AnimeGridProps) {
   if (loading) {
     return viewMode === 'list' ? <AnimeListSkeleton /> : <AnimeGridSkeleton />;
   }
 
   if (items.length === 0) {
     return (
-      <div className="surface-card rounded-3xl">
-        <EmptyState
-          icon="📺"
-          title="暂无番剧记录"
-          description="你的片库还是空的，快去添加第一部番剧吧"
-        />
-      </div>
+      <EmptyState
+        title={emptyTitle}
+        description={emptyDescription}
+        surface="card"
+      />
     );
   }
 

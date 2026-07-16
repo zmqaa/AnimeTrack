@@ -5,22 +5,19 @@ import dynamic from 'next/dynamic';
 import { useMemo } from 'react';
 import { useAnimeData } from '@/hooks/useAnimeData';
 import { useHistoryData } from '@/hooks/useHistoryData';
-import { useTheme } from '@/components/theme/ThemeProvider';
 import { AnimeRecord } from '@/lib/dashboard-types';
 import { formatWatchMoment } from '@/lib/formatters';
-import { getAppThemeDefinition } from '@/lib/theme';
-import DashboardHeader from './dashboard/DashboardHeader';
 import DashboardHeroCard from './dashboard/DashboardHeroCard';
 import DashboardRightPanel from './dashboard/DashboardRightPanel';
 import LazyRender from './shared/LazyRender';
+import Panel from './shared/Panel';
+import { PanelSkeleton } from './shared/Skeleton';
 
 const YearBarChart = dynamic(() => import('./dashboard/YearBarChart').then(mod => mod.YearBarChart), { ssr: false });
 const ActivityFeed = dynamic(() => import('./dashboard/ActivityFeed'), { ssr: false });
 const AdvancedActivityStats = dynamic(() => import('./dashboard/AdvancedActivityStats'), { ssr: false });
 
 export default function Dashboard() {
-  const { theme } = useTheme();
-  const themeDefinition = getAppThemeDefinition(theme);
   const { parsedHistory, isLoading: hLoading, isRefreshing: hRefreshing } = useHistoryData();
   const { animeList, animeStats, animeTagStats, animeCompletionRate,
     isLoading: aLoading, isRefreshing: aRefreshing } = useAnimeData(parsedHistory);
@@ -146,15 +143,13 @@ export default function Dashboard() {
   return (
     <div className="p-4 lg:p-8 space-y-4 lg:space-y-6 animate-fade-in pb-20 relative">
       <div className="theme-dashboard-aura absolute inset-0 pointer-events-none opacity-40" />
-      <DashboardHeader isLoading={isLoading} isRefreshing={isRefreshing} />
-
       {/* Hero */}
-      <LazyRender fallback={<div className="glass-panel-strong rounded-[34px] h-[330px] animate-pulse" />}>
+      <LazyRender fallback={<PanelSkeleton surface="strong" size="large" height="hero" className="rounded-[36px]" />}>
         <DashboardHeroCard
-          animeStats={animeStats} metadataCoverage={dashboardStats.metadataCoverage}
-          animeCompletionRate={animeCompletionRate} weeklyEpisodes={weeklyEpisodes}
+          animeStats={animeStats} animeCompletionRate={animeCompletionRate} weeklyEpisodes={weeklyEpisodes}
           watchHours={Math.round(animeStats.minutesWatched / 60)}
-          heroAnime={heroAnime} themeDefinition={themeDefinition}
+          heroAnime={heroAnime}
+          isLoading={isLoading} isRefreshing={isRefreshing}
         />
       </LazyRender>
 
@@ -162,19 +157,21 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 relative z-10">
         {/* Left (main) column */}
         <div className="lg:col-span-8 flex flex-col gap-4 lg:gap-5">
-          <LazyRender fallback={<div className="glass-panel rounded-[32px] h-96 animate-pulse" />}>
-            <div className="glass-panel p-6 lg:p-7 rounded-[32px] bg-gradient-to-br from-[var(--bg-card)]/40 via-transparent to-transparent min-h-[420px]">
+          <LazyRender fallback={<PanelSkeleton size="large" height="xlarge" />}>
+            <Panel size="large" className="min-h-[420px] bg-gradient-to-br from-[var(--bg-card)]/40 via-transparent to-transparent">
               <AdvancedActivityStats history={parsedHistory} animeList={animeList} />
-            </div>
+            </Panel>
           </LazyRender>
 
-          <LazyRender fallback={<div className="glass-panel rounded-[32px] h-[300px] animate-pulse" />}>
-            <div className="glass-panel p-6 lg:p-7 rounded-[32px] flex flex-col overflow-visible">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="h-5 w-1 rounded-full bg-[var(--accent)]" />
-                <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)]">作品开播时间分布</h2>
-              </div>
-              <p className="text-[10px] text-[var(--text-muted)] mb-2">基于每部作品的开播日期字段统计</p>
+          <LazyRender fallback={<PanelSkeleton size="large" height="large" className="h-[300px]" />}>
+            <Panel
+              title="作品开播时间分布"
+              description="基于每部作品的开播日期字段统计"
+              size="large"
+              className="flex flex-col"
+              headerClassName="mb-2"
+              contentClassName="flex flex-1 flex-col"
+            >
               {premierePieData.length > 0 ? (
                 <div className="flex-1 w-full min-h-[220px] mt-2 pb-2">
                   <YearBarChart data={premierePieData} height={220} />
@@ -182,17 +179,16 @@ export default function Dashboard() {
               ) : (
                 <div className="flex-1 flex items-center"><div className="text-sm text-[var(--text-muted)]">开播日期字段还不够多，先在详情页补全几部作品即可生成分布。</div></div>
               )}
-            </div>
+            </Panel>
           </LazyRender>
 
           {/* Recent Watching */}
-          <div className="glass-panel p-6 lg:p-7 rounded-[32px] flex flex-col">
-            <div className="flex items-center justify-between gap-4 mb-5">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)] flex items-center gap-2">
-                <span className="h-5 w-1 rounded-full bg-[var(--accent)]" />最近在看作品
-              </h2>
-              <Link href="/anime/timeline" className="text-[10px] font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors uppercase tracking-widest">查看时间线</Link>
-            </div>
+          <Panel
+            title="最近在看作品"
+            action={<Link href="/anime/timeline" className="text-[10px] font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors uppercase tracking-widest">查看时间线</Link>}
+            size="large"
+            className="flex flex-col"
+          >
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 lg:gap-4 auto-rows-max content-start pr-1">
               {recentWatching.map(({ record, anime }) => (
                 <Link key={`recent-${record.id}`} href={`/anime/${record.animeId}`}
@@ -216,12 +212,12 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-          </div>
+          </Panel>
         </div>
 
         {/* Right column */}
         <div className="lg:col-span-4 flex flex-col gap-4 lg:gap-5">
-          <LazyRender fallback={<div className="glass-panel rounded-[32px] h-64 animate-pulse" />}>
+          <LazyRender fallback={<PanelSkeleton size="large" height="medium" />}>
             <DashboardRightPanel
               metadataCoverage={dashboardStats.metadataCoverage} metadataRichness={dashboardStats.metadataRichness}
               tagBarData={tagBarData} tagBarMax={tagBarMax}
@@ -230,17 +226,17 @@ export default function Dashboard() {
           </LazyRender>
 
           {/* Activity Feed */}
-          <div className="glass-panel p-6 lg:p-7 rounded-[32px] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between mb-5 flex-shrink-0">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)] flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />最近记录
-              </h2>
-              <Link href="/anime/timeline" className="text-[10px] font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">查看全部</Link>
-            </div>
+          <Panel
+            title="最近记录"
+            action={<Link href="/anime/timeline" className="text-[10px] font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">查看全部</Link>}
+            size="large"
+            overflow="hidden"
+            className="flex flex-col"
+          >
             <div className="max-h-[480px] lg:max-h-[430px] xl:max-h-[380px] overflow-y-auto pr-2 overscroll-contain">
               <ActivityFeed history={parsedHistory} />
             </div>
-          </div>
+          </Panel>
         </div>
       </div>
     </div>

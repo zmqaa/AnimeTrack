@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 
 type StatTileSurface = 'muted' | 'card' | 'inset' | 'plain';
-type StatTileSize = 'compact' | 'default';
+type StatTileSize = 'small' | 'compact' | 'default';
 type StatTileLayout = 'stacked' | 'split';
+type StatTileValueTone = 'accent' | 'primary' | 'secondary' | 'score';
 
 type StatTileProps = {
   label: ReactNode;
@@ -12,6 +13,7 @@ type StatTileProps = {
   surface?: StatTileSurface;
   size?: StatTileSize;
   layout?: StatTileLayout;
+  valueTone?: StatTileValueTone;
   className?: string;
 };
 
@@ -30,6 +32,7 @@ export default function StatTile({
   surface = 'muted',
   size = 'default',
   layout = 'stacked',
+  valueTone = 'accent',
   className = '',
 }: StatTileProps) {
   return (
@@ -37,6 +40,7 @@ export default function StatTile({
       className={`stat-tile ${surfaceClasses[surface]} ${className}`}
       data-layout={layout}
       data-size={size}
+      data-value-tone={valueTone}
     >
       <div className="stat-tile-label">{label}</div>
       <div className="stat-tile-value-row">

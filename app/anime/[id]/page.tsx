@@ -16,6 +16,7 @@ import {
 } from './anime-detail-helpers';
 import AnimeDetailSidebar from './AnimeDetailSidebar';
 import AnimeDetailMain from './AnimeDetailMain';
+import PageContainer from '@/components/shared/PageContainer';
 
 export default function AnimeDetailPage({ params }: { params: { id: string } }) {
   const { data: session } = useSession();
@@ -124,11 +125,17 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
     ? Math.min(100, (displayProgress / displayTotalEpisodes) * 100)
     : (displayStatus === 'completed' ? 100 : Math.min(displayProgress * 8, 100));
 
-  if (isLoading) return <div className="p-12 text-center text-[var(--text-muted)]">Loading details...</div>;
+  if (isLoading) {
+    return (
+      <PageContainer width="wide" spacing="compact" animation="none">
+        <div className="text-center text-[var(--text-muted)]">Loading details...</div>
+      </PageContainer>
+    );
+  }
   if (!item) return null;
 
   return (
-    <div className="mx-auto w-full max-w-[1660px] px-4 md:px-6 xl:px-8 2xl:px-10 pb-20 animate-in fade-in zoom-in-95 duration-300">
+    <PageContainer width="wide" spacing="detail" animation="zoom">
       <div className="shadow-theme-xl relative overflow-hidden rounded-[32px] border border-[var(--border)]" style={{ backgroundColor: 'var(--bg-card)' }}>
         {/* Background blur from cover */}
         {(typeof formData.coverUrl === 'string' ? formData.coverUrl : item.coverUrl) && (
@@ -190,6 +197,6 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
         onConfirm={confirmDelete}
         onCancel={() => setShowDeleteConfirm(false)}
       />
-    </div>
+    </PageContainer>
   );
 }

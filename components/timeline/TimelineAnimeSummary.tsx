@@ -2,8 +2,11 @@
 
 import { memo, useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { PlayIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import type { EnrichedEntry } from './TimelineEnhancedList';
+import ProgressBar from '@/components/shared/ProgressBar';
+import Panel from '@/components/shared/Panel';
+import EmptyState from '@/components/shared/EmptyState';
 
 const SUMMARY_PAGE_SIZE = 10;
 
@@ -83,9 +86,13 @@ export default memo(function TimelineAnimeSummary({ entries, searchQuery }: Time
 
   if (summaries.length === 0) {
     return (
-      <div className="glass-panel rounded-[28px] p-6 flex items-center justify-center min-h-[200px]">
-        <p className="text-sm text-[var(--text-muted)]">暂无数据</p>
-      </div>
+      <EmptyState
+        title={searchQuery ? '没有可汇总的作品' : '暂无汇总数据'}
+        description={searchQuery ? '当前搜索条件没有匹配到观看记录。' : '产生观看记录后，这里会按番剧统计集数与进度。'}
+        size="compact"
+        surface="panel"
+        className="min-h-[200px]"
+      />
     );
   }
 
@@ -93,18 +100,20 @@ export default memo(function TimelineAnimeSummary({ entries, searchQuery }: Time
   const totalAnime = summaries.length;
 
   return (
-    <div className="glass-panel rounded-[28px] overflow-hidden flex flex-col h-full">
-      {/* Header */}
-      <div className="p-5 md:p-6 border-b border-[var(--border)]">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)] flex items-center gap-2">
-          <span className="w-1.5 h-4 rounded-full" style={{ background: 'linear-gradient(to bottom, var(--chart-line-start), var(--chart-line-end))' }} />
-          按番剧汇总
-        </h2>
-        <p className="text-[11px] text-[var(--text-muted)] mt-1.5">
+    <Panel
+      title="按番剧汇总"
+      description={(
+        <>
           {totalAnime} 部番剧 · 共 {totalWatchedAll} 集记录
           {totalPages > 1 && <span> · 第 {safePage}/{totalPages} 页</span>}
-        </p>
-      </div>
+        </>
+      )}
+      size="flush"
+      overflow="hidden"
+      className="flex h-full flex-col"
+      headerClassName="mb-0 border-b border-[var(--border)] p-5 md:p-6"
+      contentClassName="flex min-h-0 flex-1 flex-col"
+    >
 
       {/* List */}
       <div className="flex-1 overflow-y-auto overscroll-contain divide-y divide-[var(--border-light)]">
@@ -128,8 +137,8 @@ export default memo(function TimelineAnimeSummary({ entries, searchQuery }: Time
                 style={s.coverUrl ? { backgroundImage: `url(${s.coverUrl})` } : undefined}
               >
                 {!s.coverUrl && (
-                  <div className="w-full h-full flex items-center justify-center text-[var(--text-muted)]">
-                    <PlayIcon className="w-4 h-4" />
+                  <div className="flex h-full w-full items-center justify-center text-[8px] text-[var(--text-muted)]">
+                    无封面
                   </div>
                 )}
               </div>
@@ -152,17 +161,13 @@ export default memo(function TimelineAnimeSummary({ entries, searchQuery }: Time
                 {/* Progress bar */}
                 {s.totalEpisodes && s.totalEpisodes > 0 && (
                   <div className="mt-2 flex items-center gap-2">
-                    <div className="flex-1 h-1 rounded-full bg-[var(--bg-card)] overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${progressPercent}%`,
-                          background: progressPercent >= 100
-                            ? 'var(--color-completed)'
-                            : 'linear-gradient(to right, var(--chart-line-start), var(--chart-line-end))',
-                        }}
-                      />
-                    </div>
+                    <ProgressBar
+                      className="flex-1"
+                      value={progressPercent}
+                      size="xs"
+                      variant={progressPercent >= 100 ? 'completed' : 'progress'}
+                      label={`${s.title} 观看进度`}
+                    />
                     <span className="text-[10px] text-[var(--text-muted)] font-mono shrink-0">
                       {s.latestEpisode}/{s.totalEpisodes}
                     </span>
@@ -228,6 +233,6 @@ export default memo(function TimelineAnimeSummary({ entries, searchQuery }: Time
           </div>
         </div>
       )}
-    </div>
+    </Panel>
   );
 });

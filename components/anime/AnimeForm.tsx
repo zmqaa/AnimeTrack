@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { fetchJson } from '@/lib/client-api';
 import type { AnimeStatus, AnimeFormInitialData } from '@/lib/anime-shared';
 import { statusLabels } from '@/lib/dashboard-types';
+import FormField from '@/components/shared/FormField';
 
 interface AnimeFormProps {
   editingId: number | null;
@@ -103,29 +104,28 @@ export default function AnimeForm({
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 mb-6">
         <div className="lg:col-span-6 space-y-4">
-            <div>
-                <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">番剧名称 <span className="text-danger">*</span></label>
+            <FormField label="番剧名称" required>
                 <input 
                     value={title} onChange={e => setTitle(e.target.value)}
                     onBlur={() => { if (title && !coverUrl) fetchCover(true); }}
                     className="surface-input w-full rounded-lg px-3 py-2.5 focus-theme focus:outline-none transition text-[var(--text-primary)]"
                     placeholder="例如：葬送的芙莉莲"
                 />
-            </div>
-            <div>
-                 <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">原名 (可选)</label>
+            </FormField>
+            <FormField label="原名 (可选)">
                  <input 
                      value={originalTitle} onChange={e => setOriginalTitle(e.target.value)}
                      className="surface-input w-full rounded-lg px-3 py-2.5 focus-theme focus:outline-none transition font-sans text-sm text-[var(--text-primary)]"
                  />
-            </div>
-            <div>
-               <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 uppercase tracking-wider flex justify-between items-center">
-                   <span>封面链接 (可选)</span>
+            </FormField>
+            <FormField
+              label="封面链接 (可选)"
+              action={(
                    <button type="button" onClick={() => fetchCover(false)} disabled={isFetchingCover} className="text-[10px] text-[var(--color-watching)] hover:text-[var(--color-watching)]/80">
                        {isFetchingCover ? '搜索中...' : '自动获取封面'}
                    </button>
-               </label>
+              )}
+            >
                <div className="flex gap-2">
                    <input 
                        value={coverUrl} onChange={e => setCoverUrl(e.target.value)}
@@ -138,45 +138,40 @@ export default function AnimeForm({
                        </div>
                    )}
                </div>
-            </div>
-            <div>
-                <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">标签 (逗号分隔)</label>
+            </FormField>
+            <FormField label="标签 (逗号分隔)">
                 <input 
                     value={tagsInput} onChange={e => setTagsInput(e.target.value)}
                     className="surface-input w-full rounded-lg px-3 py-2.5 focus-theme focus:outline-none transition text-[var(--text-primary)]"
                 />
-            </div>
+            </FormField>
         </div>
 
         <div className="lg:col-span-6 space-y-4">
             <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">当前进度</label>
+                <FormField label="当前进度">
                     <input 
                         type="number" value={progress} onChange={e => setProgress(e.target.value)}
                         className="surface-input w-full rounded-lg px-3 py-2.5 focus-theme focus:outline-none transition text-[var(--text-primary)]"
                     />
-                </div>
-                <div>
-                    <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">总集数</label>
+                </FormField>
+                <FormField label="总集数">
                     <input 
                         type="number" value={totalEpisodes} onChange={e => setTotalEpisodes(e.target.value)}
                         placeholder="未知"
                         className="surface-input w-full rounded-lg px-3 py-2.5 focus-theme focus:outline-none transition text-[var(--text-primary)]"
                     />
-                </div>
+                </FormField>
             </div>
              <div className="grid grid-cols-2 gap-4">
-                <div>
-                     <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">单集时长 (分)</label>
+                <FormField label="单集时长 (分)">
                      <input 
                          type="number" value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)}
                          placeholder="24"
                          className="surface-input w-full rounded-lg px-3 py-2.5 focus-theme focus:outline-none transition text-[var(--text-primary)]"
                      />
-                </div>
-                 <div>
-                    <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">状态</label>
+                </FormField>
+                 <FormField label="状态">
                     <select 
                         value={status} onChange={e => setStatus(e.target.value as AnimeStatus)}
                         className="surface-input w-full rounded-lg px-3 py-2.5 focus-theme focus:outline-none transition appearance-none text-[var(--text-primary)]"
@@ -185,24 +180,22 @@ export default function AnimeForm({
                         <option key={k} value={k}>{v}</option>
                         ))}
                     </select>
-                </div>
+                </FormField>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-                <div>
-                     <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">开始观看日期</label>
+                <FormField label="开始观看日期">
                      <input 
                          type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
                          className="surface-input w-full rounded-lg px-3 py-2.5 focus-theme focus:outline-none transition text-[var(--text-primary)]"
                      />
-                </div>
-                <div>
-                     <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">看完日期</label>
+                </FormField>
+                <FormField label="看完日期">
                      <input 
                          type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
                          className="surface-input w-full rounded-lg px-3 py-2.5 focus-theme focus:outline-none transition text-[var(--text-primary)]"
                      />
-                </div>
+                </FormField>
             </div>
 
             <div className="flex items-center gap-3 py-2">
@@ -216,14 +209,13 @@ export default function AnimeForm({
                 <span className="text-xs font-medium text-[var(--text-muted)]">番剧已完结 (不再更新)</span>
             </div>
 
-            <div>
-                <label className="block text-xs font-medium text-[var(--text-muted)] mb-1.5 uppercase tracking-wider">备注 (AI自动补全简介)</label>
+            <FormField label="备注 (AI自动补全简介)">
                 <textarea 
                     value={notes} onChange={e => setNotes(e.target.value)}
                     className="surface-input w-full rounded-lg px-3 py-2.5 focus-theme focus:outline-none transition min-h-[80px] text-[var(--text-primary)]"
                     rows={3}
                 />
-            </div>
+            </FormField>
         </div>
       </div>
 

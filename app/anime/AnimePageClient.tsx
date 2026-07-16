@@ -12,6 +12,7 @@ import AnimeFilterBar from '@/components/anime/AnimeFilterBar';
 import AnimeForm from '@/components/anime/AnimeForm';
 import AnimeGrid, { type ViewMode } from '@/components/anime/AnimeGrid';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
+import PageContainer from '@/components/shared/PageContainer';
 import { fetchJson } from '@/lib/client-api';
 import type { AnimeStatus, AnimeSortBy, SessionUser, AnimeListItem, AnimeCardItem } from '@/lib/anime-shared';
 import { ANIME_LIST_KEY, HISTORY_KEY, animePageKey, swrFetcher } from '@/lib/swr-config';
@@ -458,6 +459,17 @@ export default function AnimePageClient() {
   }, [useServerPagination, paginatedRecords, filteredItems, safePage, pageSize]);
 
   const displayTotal = useServerPagination ? totalCount : filteredItems.length;
+  const hasActiveFilters = Boolean(
+    searchQuery.trim() ||
+    castQuery.trim() ||
+    tagFilter ||
+    filterStatus !== 'all'
+  );
+  const libraryStats = useMemo(() => ({
+    total: allItems.length,
+    watching: allItems.filter((item) => item.status === 'watching').length,
+    completed: allItems.filter((item) => item.status === 'completed').length,
+  }), [allItems]);
 
   const rememberListScroll = useCallback(() => {
     sessionStorage.setItem(ANIME_LIST_SCROLL_KEY, String(window.scrollY));
@@ -465,13 +477,17 @@ export default function AnimePageClient() {
 
   // ── 渲染 ─────────────────────────────────────────────────────────────
   return (
-    <main className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8 pb-20">
+    <PageContainer as="main" width="wide" spacing="roomy">
       <AnimeHeader
         showForm={showForm}
         editingId={editingId}
         setShowForm={setShowForm}
         resetForm={resetForm}
         isAdmin={isAdmin}
+        totalCount={libraryStats.total}
+        watchingCount={libraryStats.watching}
+        completedCount={libraryStats.completed}
+        loading={listLoading}
       />
 
       {isAdmin && (
@@ -564,6 +580,10 @@ export default function AnimePageClient() {
             viewMode={viewMode}
             detailReturnTo={returnTo}
             onOpenDetail={rememberListScroll}
+            emptyTitle={hasActiveFilters ? '没有找到匹配的番剧' : '暂无番剧记录'}
+            emptyDescription={hasActiveFilters
+              ? '试试缩短关键词、切换状态，或清除当前筛选条件。'
+              : '添加第一部番剧后，它会显示在这里。'}
           />
 
           <AnimePagination
@@ -596,6 +616,6 @@ export default function AnimePageClient() {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteConfirm(null)}
       />
-    </main>
+    </PageContainer>
   );
 }

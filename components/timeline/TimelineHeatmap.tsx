@@ -1,7 +1,10 @@
 "use client";
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { ParsedWatchHistory } from '@/lib/dashboard-types';
+import ChartTooltip from '@/components/shared/ChartTooltip';
+import Panel from '@/components/shared/Panel';
+import { getBoundedTooltipPosition } from '@/components/shared/chart-utils';
 
 interface TimelineHeatmapProps {
   history: ParsedWatchHistory[];
@@ -33,6 +36,7 @@ const CELL_GAP = 6;
 const CELL_STEP = CELL_SIZE + CELL_GAP;
 
 export default memo(function TimelineHeatmap({ history, months = 12 }: TimelineHeatmapProps) {
+  const [activeDate, setActiveDate] = useState<string | null>(null);
 
   const { cells, monthMarkers, totalDays, activeDays, maxInDay, totalWeeks } = useMemo(() => {
     const countMap: Record<string, number> = {};
@@ -102,29 +106,46 @@ export default memo(function TimelineHeatmap({ history, months = 12 }: TimelineH
   const chartH = 7 * cellStep - cellGap;
   const totalW = dayLabelWidth + chartW + rightPad;
   const totalH = topPad + chartH + bottomPad;
+  const activeCell = activeDate ? cells.find((cell) => cell.dateStr === activeDate) ?? null : null;
+  const tooltipWidth = 138;
+  const tooltipHeight = 58;
+  const activeCellY = activeCell ? topPad + activeCell.dayIdx * cellStep : 0;
+  const tooltipPosition = activeCell
+    ? getBoundedTooltipPosition({
+        anchorX: dayLabelWidth + activeCell.weekIdx * cellStep + cellSize / 2,
+        anchorY: activeCellY,
+        containerWidth: totalW,
+        containerHeight: totalH,
+        tooltipWidth,
+        tooltipHeight,
+        gap: 8,
+      })
+    : { left: 0, top: 0 };
 
   return (
-    <div className="glass-panel rounded-[28px] p-5 md:p-6 overflow-x-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">观看热力图</h2>
-          <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            过去 {months} 个月 · {activeDays} / {totalDays} 天有记录 · 单日最多 {maxInDay} 集
-          </p>
-        </div>
+    <Panel
+      title="观看热力图"
+      description={`过去 ${months} 个月 · ${activeDays} / ${totalDays} 天有记录 · 单日最多 ${maxInDay} 集`}
+      action={(
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-[var(--text-muted)]">少</span>
-          {LEVEL_COLORS.map((color, li) => (
-            <div key={li} className="w-3.5 h-3.5 rounded-sm" style={{ backgroundColor: color }} />
+          {LEVEL_COLORS.map((color, level) => (
+            <div key={level} className="w-3.5 h-3.5 rounded-sm" style={{ backgroundColor: color }} />
           ))}
           <span className="text-[10px] text-[var(--text-muted)]">多</span>
         </div>
-      </div>
+      )}
+      headerClassName="mb-2"
+    >
 
       {/* SVG */}
-      <div style={{ minWidth: totalW }}>
-        <svg width={totalW} height={totalH} className="select-none" viewBox={`0 0 ${totalW} ${totalH}`}>
+      <div className="overflow-x-auto">
+        <div
+          className="relative"
+          style={{ minWidth: totalW, width: totalW, height: totalH }}
+          onMouseLeave={() => setActiveDate(null)}
+        >
+        <svg width={totalW} height={totalH} className="select-none" viewBox={`0 0 ${totalW} ${totalH}`} role="img" aria-label="观看热力图">
           {/* Month labels */}
           {monthMarkers.map((m, mi) => {
             const nextMarker = monthMarkers[mi + 1];
@@ -186,42 +207,10 @@ export default memo(function TimelineHeatmap({ history, months = 12 }: TimelineH
                   height={cellSize}
                   rx={cellSize >= 12 ? 3 : 2}
                   fill={color}
-                  stroke={cell.isToday ? 'var(--chart-line-start)' : 'transparent'}
-                  strokeWidth={cell.isToday ? 1.5 : 0}
+                  stroke={activeDate === cell.dateStr || cell.isToday ? 'var(--chart-line-start)' : 'transparent'}
+                  strokeWidth={activeDate === cell.dateStr ? 2.5 : cell.isToday ? 1.5 : 0}
                   className="transition-colors duration-150"
                 />
-                {/* Tooltip */}
-                <g className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
-                  <rect
-                    x={Math.max(0, x - 52)}
-                    y={Math.max(0, y - 44)}
-                    width={112}
-                    height={40}
-                    rx={10}
-                    fill="var(--chart-tooltip-bg)"
-                    stroke="var(--chart-tooltip-border)"
-                    strokeWidth={1}
-                  />
-                  <text
-                    x={Math.max(0, x - 52) + 56}
-                    y={Math.max(0, y - 44) + 16}
-                    textAnchor="middle"
-                    fill="var(--chart-tooltip-text)"
-                    fontSize={14}
-                    fontWeight={700}
-                  >
-                    {cell.count} 集
-                  </text>
-                  <text
-                    x={Math.max(0, x - 52) + 56}
-                    y={Math.max(0, y - 44) + 30}
-                    textAnchor="middle"
-                    fill="var(--chart-tooltip-sub)"
-                    fontSize={10}
-                  >
-                    {cell.dateStr} {DAY_LABELS[cell.dayIdx]}
-                  </text>
-                </g>
                 {/* Wider hit area */}
                 <rect
                   x={x - 2}
@@ -229,12 +218,30 @@ export default memo(function TimelineHeatmap({ history, months = 12 }: TimelineH
                   width={cellSize + 4}
                   height={cellSize + 4}
                   fill="transparent"
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`${cell.dateStr} ${DAY_LABELS[cell.dayIdx]}，观看 ${cell.count} 集`}
+                  onMouseEnter={() => setActiveDate(cell.dateStr)}
+                  onFocus={() => setActiveDate(cell.dateStr)}
+                  onBlur={() => setActiveDate(null)}
+                  onPointerDown={() => setActiveDate(cell.dateStr)}
+                  style={{ cursor: 'pointer', outline: 'none' }}
                 />
               </g>
             );
           })}
         </svg>
+        {activeCell ? (
+          <ChartTooltip
+            label={`${activeCell.dateStr} ${DAY_LABELS[activeCell.dayIdx]}`}
+            value={activeCell.count}
+            unit="集"
+            className="left-0 top-0"
+            style={{ left: tooltipPosition.left, right: 'auto', top: tooltipPosition.top, width: tooltipWidth }}
+          />
+        ) : null}
+        </div>
       </div>
-    </div>
+    </Panel>
   );
 });

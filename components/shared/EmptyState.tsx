@@ -1,24 +1,47 @@
 "use client";
 
 interface EmptyStateProps {
-  icon?: string;
   title: string;
   description?: string;
+  size?: 'compact' | 'default';
+  surface?: 'none' | 'panel' | 'card';
+  className?: string;
   action?: {
     label: string;
     onClick: () => void;
   };
 }
 
-export default function EmptyState({ icon = '📺', title, description, action }: EmptyStateProps) {
+const surfaceClasses = {
+  none: '',
+  panel: 'glass-panel rounded-[28px]',
+  card: 'surface-card rounded-3xl',
+};
+
+const sizeClasses = {
+  compact: {
+    root: 'px-5 py-10',
+  },
+  default: {
+    root: 'px-8 py-20',
+  },
+};
+
+export default function EmptyState({
+  title,
+  description,
+  size = 'default',
+  surface = 'none',
+  className = '',
+  action,
+}: EmptyStateProps) {
+  const sizing = sizeClasses[size];
+
   return (
-    <div className="flex flex-col items-center justify-center py-20 px-8">
-      <div className="surface-card-muted w-20 h-20 rounded-[24px] flex items-center justify-center mb-5">
-        <span className="text-3xl">{icon}</span>
-      </div>
+    <div className={`flex flex-col items-center justify-center text-center ${surfaceClasses[surface]} ${sizing.root} ${className}`}>
       <h3 className="text-base font-display font-semibold text-[var(--text-primary)] mb-2">{title}</h3>
       {description && (
-        <p className="text-sm text-[var(--text-muted)] text-center max-w-xs leading-relaxed">{description}</p>
+        <p className="max-w-md text-sm leading-relaxed text-[var(--text-muted)]">{description}</p>
       )}
       {action && (
         <button

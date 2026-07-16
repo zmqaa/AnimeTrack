@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState, useEffect } from 'react';
+import { useMemo } from 'react';
+import ChartTooltip from '@/components/shared/ChartTooltip';
+import { getBoundedTooltipPosition } from '@/components/shared/chart-utils';
+import { useActiveChartItem, useElementSize } from '@/components/shared/useResponsiveChart';
 
 interface ChartItem {
   label: string;
@@ -18,21 +21,7 @@ interface YearBarChartProps {
 }
 
 export function YearBarChart({ data, height = 220, sortBy = 'label', labelFontSize }: YearBarChartProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
-      }
-    });
-    observer.observe(el);
-    setContainerWidth(el.getBoundingClientRect().width);
-    return () => observer.disconnect();
-  }, []);
+  const { ref: containerRef, width: containerWidth } = useElementSize<HTMLDivElement>();
 
   const chartData = useMemo(() => {
     if (sortBy === 'none') return data;
@@ -45,6 +34,12 @@ export function YearBarChart({ data, height = 220, sortBy = 'label', labelFontSi
       return a.label.localeCompare(b.label);
     });
   }, [data, sortBy]);
+  const {
+    activeIndex,
+    activeItem,
+    activate: setActiveIndex,
+    clear: clearActiveIndex,
+  } = useActiveChartItem(chartData);
 
   const maxVal = Math.max(...chartData.map((d) => d.value), 1);
   const denseLabels = chartData.length > 15;
@@ -60,10 +55,28 @@ export function YearBarChart({ data, height = 220, sortBy = 'label', labelFontSi
   const barWidth = Math.max(6, Math.min(40, barSpacing - 8));
   const baselineY = topPad + chartAreaHeight;
   const labelY = baselineY + (denseLabels ? 13 : 16);
+  const activeBarHeight = activeItem ? Math.max(2, (activeItem.value / maxVal) * chartAreaHeight) : 0;
+  const activeBarCenterX = activeIndex === null ? 0 : leftPad + activeIndex * barSpacing + barSpacing / 2;
+  const activeBarTop = baselineY - activeBarHeight;
+  const tooltipWidth = 144;
+  const tooltipHeight = 68;
+  const tooltipPosition = getBoundedTooltipPosition({
+    anchorX: activeBarCenterX,
+    anchorY: activeBarTop,
+    containerWidth,
+    containerHeight: height,
+    tooltipWidth,
+    tooltipHeight,
+  });
 
   return (
-    <div ref={containerRef} style={{ height: `${height}px`, width: '100%' }}>
-      <svg width="100%" height={height} className="select-none">
+    <div
+      ref={containerRef}
+      className="relative w-full"
+      style={{ height: `${height}px` }}
+      onMouseLeave={clearActiveIndex}
+    >
+      <svg width="100%" height={height} className="select-none" role="img" aria-label="作品分布柱状图">
         {/* Y-axis grid lines */}
         {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
           const y = topPad + chartAreaHeight * (1 - ratio);
@@ -79,6 +92,19 @@ export function YearBarChart({ data, height = 220, sortBy = 'label', labelFontSi
 
         {/* Baseline */}
         <line x1={leftPad} x2={leftPad + chartW} y1={baselineY} y2={baselineY} stroke="var(--barchart-baseline)" />
+
+        {activeIndex !== null ? (
+          <rect
+            x={leftPad + activeIndex * barSpacing}
+            y={topPad}
+            width={barSpacing}
+            height={chartAreaHeight}
+            rx={8}
+            fill="var(--chart-area-top)"
+            opacity={0.32}
+            className="pointer-events-none"
+          />
+        ) : null}
 
         {/* Bars */}
         {chartData.map((d, i) => {
@@ -104,7 +130,8 @@ export function YearBarChart({ data, height = 220, sortBy = 'label', labelFontSi
                 height={barH}
                 rx={3}
                 fill={`url(#${barId})`}
-                className="transition-all duration-200 hover:brightness-125"
+                className="transition-all duration-200"
+                style={{ filter: activeIndex === i ? 'brightness(1.3)' : undefined }}
               />
               {/* X-axis label */}
               <text
@@ -119,32 +146,34 @@ export function YearBarChart({ data, height = 220, sortBy = 'label', labelFontSi
               </text>
               {/* Hover area (wider than the bar for easier targeting) */}
               <rect
-                x={barX - 4}
-                y={0}
-                width={barWidth + 8}
-                height={baselineY}
+                x={leftPad + i * barSpacing}
+                y={topPad}
+                width={barSpacing}
+                height={chartAreaHeight}
                 fill="transparent"
-                className="peer"
+                tabIndex={0}
+                role="button"
+                aria-label={`${labelText}，${d.value} 部`}
+                onMouseEnter={() => setActiveIndex(i)}
+                onFocus={() => setActiveIndex(i)}
+                onBlur={clearActiveIndex}
+                onPointerDown={() => setActiveIndex(i)}
+                style={{ cursor: 'pointer', outline: 'none' }}
               />
-              {/* Tooltip on hover */}
-              <foreignObject
-                x={Math.max(0, barX + barWidth / 2 - 60)}
-                y={Math.max(0, barY - 60)}
-                width={120}
-                height={56}
-                className="pointer-events-none opacity-0 transition-opacity group-hover:opacity-100"
-                style={{ overflow: 'visible' }}
-              >
-                <div className="shadow-theme-lg rounded-xl px-3 py-2.5 text-center"
-                  style={{ backgroundColor: 'var(--barchart-tooltip-bg)', border: '1px solid var(--barchart-tooltip-border)' }}>
-                  <div className="text-[10px] uppercase" style={{ color: 'var(--barchart-tooltip-sub)' }}>{labelText}</div>
-                  <div className="mt-0.5 text-sm font-semibold" style={{ color: 'var(--barchart-tooltip-text)' }}>{d.value} 部</div>
-                </div>
-              </foreignObject>
             </g>
           );
         })}
       </svg>
+      {activeItem ? (
+        <ChartTooltip
+          label={activeItem.label.replace(' 年', '')}
+          value={activeItem.value}
+          unit="部"
+          emphasis
+          className="left-0 top-0"
+          style={{ left: tooltipPosition.left, right: 'auto', top: tooltipPosition.top, width: tooltipWidth }}
+        />
+      ) : null}
     </div>
   );
 }

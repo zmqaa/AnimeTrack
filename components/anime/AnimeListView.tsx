@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { CheckIcon, PlusIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
 import type { AnimeCardItem, AnimeStatus } from '@/lib/anime-shared';
 import { statusLabels } from '@/lib/dashboard-types';
+import ProgressBar from '@/components/shared/ProgressBar';
 
 const statusDotClass: Record<AnimeStatus, string> = {
   watching: 'status-watching-dot',
@@ -54,7 +55,6 @@ export default memo(function AnimeListView({ items, onEdit, updateProgress, isAd
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center anime-cover-fallback">
-                  <span className="text-lg">🎬</span>
                 </div>
               )}
             </Link>
@@ -86,12 +86,13 @@ export default memo(function AnimeListView({ items, onEdit, updateProgress, isAd
               <span className="text-xs text-[var(--text-secondary)] font-mono">
                 {item.progress} / {item.totalEpisodes || '?'}
               </span>
-              <div className="h-1.5 w-24 bg-[var(--tag-bg)] rounded-full overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-500 ${isCompleted ? 'progress-completed' : 'progress-gradient'}`}
-                  style={{ width: `${Math.min(progressPercent || 0, 100)}%` }}
-                />
-              </div>
+              <ProgressBar
+                className="w-24"
+                value={progressPercent || 0}
+                size="sm"
+                variant={isCompleted ? 'completed' : 'progress'}
+                label={`${item.title} 观看进度`}
+              />
             </div>
 
             {/* 操作按钮 */}

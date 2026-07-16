@@ -5,6 +5,9 @@ import {
 } from '@heroicons/react/24/outline';
 import type { AnimeDetailItem, AnimeStatus } from '@/lib/anime-shared';
 import { statusMap, toTagInputValue, formatDateLabel, formatTimestampLabel } from './anime-detail-helpers';
+import ProgressBar from '@/components/shared/ProgressBar';
+import StatTile from '@/components/shared/StatTile';
+import SectionTitle from '@/components/shared/SectionTitle';
 
 type Props = {
   item: AnimeDetailItem;
@@ -106,21 +109,9 @@ export default function AnimeDetailMain({
 
         {/* Quick stats */}
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <div className="surface-card-muted rounded-2xl p-4">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">观看状态</div>
-            <div className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{statusMap[displayStatus]}</div>
-            <div className="mt-1 text-xs text-[var(--text-muted)]">{item.isFinished ? '片源已完结' : '仍可能继续更新'}</div>
-          </div>
-          <div className="surface-card-muted rounded-2xl p-4">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">当前进度</div>
-            <div className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{displayProgress} / {displayTotalEpisodes || '?'} EP</div>
-            <div className="mt-1 text-xs text-[var(--text-muted)]">完成度 {Math.round(progressPercent)}%</div>
-          </div>
-          <div className="surface-card-muted rounded-2xl p-4">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">最近编辑</div>
-            <div className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{formatTimestampLabel(item.updatedAt)}</div>
-            <div className="mt-1 text-xs text-[var(--text-muted)]">创建于 {formatDateLabel(item.createdAt?.slice(0, 10))}</div>
-          </div>
+          <StatTile size="small" valueTone="primary" label="观看状态" value={statusMap[displayStatus]} detail={item.isFinished ? '片源已完结' : '仍可能继续更新'} />
+          <StatTile size="small" valueTone="primary" label="当前进度" value={`${displayProgress} / ${displayTotalEpisodes || '?'} EP`} detail={`完成度 ${Math.round(progressPercent)}%`} />
+          <StatTile size="small" valueTone="primary" label="最近编辑" value={formatTimestampLabel(item.updatedAt)} detail={`创建于 ${formatDateLabel(item.createdAt?.slice(0, 10))}`} />
         </div>
       </div>
 
@@ -130,11 +121,11 @@ export default function AnimeDetailMain({
         <div className="space-y-6">
           {/* Progress */}
           <div className="surface-card rounded-[24px] p-6 backdrop-blur-xl">
-            <div className="flex items-center justify-between gap-4">
-              <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-                <CheckCircleIcon className="h-4 w-4" />观看进度
-              </h3>
-              <span className="font-mono text-sm text-[var(--text-secondary)]">
+            <SectionTitle
+              size="small"
+              icon={<CheckCircleIcon className="h-4 w-4" />}
+              action={(
+                <span className="font-mono text-sm text-[var(--text-secondary)]">
                 {canEdit ? (
                   <div className="flex items-center gap-2">
                     <input type="number" value={formData.progress ?? item.progress}
@@ -148,34 +139,22 @@ export default function AnimeDetailMain({
                 ) : (
                   <><span className="text-2xl text-[var(--text-primary)]">{displayProgress}</span><span className="mx-1 text-[var(--text-muted)]">/</span><span>{displayTotalEpisodes || '?'}</span><span className="ml-1 text-xs text-[var(--text-muted)]">EP</span></>
                 )}
-              </span>
-            </div>
-            <div className="mt-4 h-3 overflow-hidden rounded-full bg-[var(--bg-card)]">
-              <div className="theme-spectrum-gradient h-full rounded-full transition-all duration-700" style={{ width: `${progressPercent}%` }} />
-            </div>
+                </span>
+              )}
+            >
+              观看进度
+            </SectionTitle>
+            <ProgressBar className="mt-4" value={progressPercent} variant="accent" size="md" label="观看进度" />
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="surface-card-muted rounded-2xl p-4">
-                <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">首播</div>
-                <div className="mt-2 text-sm text-[var(--text-primary)]">{formatDateLabel(item.premiereDate)}</div>
-              </div>
-              <div className="surface-card-muted rounded-2xl p-4">
-                <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">单集时长</div>
-                <div className="mt-2 text-sm text-[var(--text-primary)]">{displayDuration ? `${displayDuration} min` : '未知'}</div>
-              </div>
-              <div className="surface-card-muted rounded-2xl p-4">
-                <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">片源状态</div>
-                <div className={`mt-2 text-sm font-medium ${item.isFinished ? 'theme-accent-text' : 'theme-secondary-text'}`}>
-                  {item.isFinished ? '已完结' : '连载中'}
-                </div>
-              </div>
+              <StatTile size="small" valueTone="primary" label="首播" value={formatDateLabel(item.premiereDate)} />
+              <StatTile size="small" valueTone="primary" label="单集时长" value={displayDuration ? `${displayDuration} min` : '未知'} />
+              <StatTile size="small" valueTone={item.isFinished ? 'accent' : 'secondary'} label="片源状态" value={item.isFinished ? '已完结' : '连载中'} />
             </div>
           </div>
 
           {/* Summary */}
           <div className="surface-card rounded-[24px] p-6 backdrop-blur-xl">
-            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-              <SparklesIcon className="h-4 w-4" />简介 / 剧情
-            </div>
+            <SectionTitle size="small" icon={<SparklesIcon className="h-4 w-4" />}>简介 / 剧情</SectionTitle>
             {canEdit ? (
               <textarea rows={8} value={formData.summary || ''}
                 onChange={(event) => onChange('summary', event.target.value)}
@@ -187,9 +166,7 @@ export default function AnimeDetailMain({
 
           {/* Notes */}
           <div className="surface-card rounded-[24px] p-6 backdrop-blur-xl">
-            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-              <ClockIcon className="h-4 w-4" />个人备注
-            </div>
+            <SectionTitle size="small" icon={<ClockIcon className="h-4 w-4" />}>个人备注</SectionTitle>
             {canEdit ? (
               <textarea rows={4} value={formData.notes || ''}
                 onChange={(event) => onChange('notes', event.target.value)}
@@ -204,9 +181,7 @@ export default function AnimeDetailMain({
         <div className="space-y-6">
           {/* Timeline */}
           <div className="surface-card rounded-[24px] p-6 backdrop-blur-xl">
-            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-              <CalendarIcon className="h-4 w-4" />时间轴
-            </div>
+            <SectionTitle size="small" icon={<CalendarIcon className="h-4 w-4" />}>时间轴</SectionTitle>
             <div className="mt-4 space-y-3 text-sm">
               {([
                 ['开始观看', 'startDate'],
@@ -244,14 +219,15 @@ export default function AnimeDetailMain({
 
           {/* Cast */}
           <div className="surface-card rounded-[24px] p-6 backdrop-blur-xl">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-                <SparklesIcon className="h-4 w-4" />声优阵容
-              </div>
-              {!canEdit && item.cast && item.cast.length > 0 && (
+            <SectionTitle
+              size="small"
+              icon={<SparklesIcon className="h-4 w-4" />}
+              action={!canEdit && item.cast && item.cast.length > 0 ? (
                 <span className="text-xs text-[var(--text-muted)]">{item.cast.length} 名</span>
-              )}
-            </div>
+              ) : undefined}
+            >
+              声优阵容
+            </SectionTitle>
             {canEdit ? (
               <textarea rows={5}
                 value={Array.isArray(formData.cast) ? formData.cast.join(', ') : (formData.cast || '')}

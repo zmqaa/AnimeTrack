@@ -3,10 +3,14 @@
 import Link from 'next/link';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { CheckIcon, ChevronLeftIcon, ChevronUpDownIcon } from '@heroicons/react/24/outline';
+import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/24/outline';
 import { useAnimeData } from '@/hooks/useAnimeData';
 import { AnimeRecord, statusLabels } from '@/lib/dashboard-types';
 import StatTile from '@/components/shared/StatTile';
+import PageHero from '@/components/shared/PageHero';
+import PageContainer from '@/components/shared/PageContainer';
+import EmptyState from '@/components/shared/EmptyState';
+import { PanelSkeleton } from '@/components/shared/Skeleton';
 import AnimePagination from '../AnimePagination';
 import {
   type SeasonName,
@@ -265,29 +269,27 @@ function AnimeSeasonsPageContent() {
   }, [isYearMenuOpen]);
 
   return (
-    <main className="p-4 lg:p-8 pb-24 space-y-6 lg:space-y-8 animate-fade-in relative">
+    <PageContainer as="main" width="wide" spacing="default">
       <div className="absolute inset-0 pointer-events-none opacity-40" style={{ background: 'radial-gradient(circle at top left, var(--secondary-light), transparent 32%), radial-gradient(circle at bottom right, var(--warm-light), transparent 30%)' }} />
 
-      <section className="glass-panel-strong relative overflow-hidden rounded-[36px] p-7 lg:p-8">
-        <div className="absolute inset-0" style={{ background: 'radial-gradient(circle at top, var(--color-surface-raised), transparent 35%), linear-gradient(135deg, var(--secondary-light), transparent 42%, var(--warm-light))' }} />
-        <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-3xl space-y-3">
-            <Link href="/" className="inline-flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-sm transition-colors">
-              <ChevronLeftIcon className="w-4 h-4" /> 返回总览
-            </Link>
-            <h1 className="text-3xl font-display font-semibold tracking-tight text-[var(--text-primary)] md:text-4xl">开播季度回顾</h1>
-            <p className="text-sm leading-7 text-[var(--text-secondary)] md:text-base">
-              按作品真正已经开播的季度回看你的片库：这个季度你收了什么、开始追了什么、追到哪儿。这里只看 premiereDate 已填写且已经到过首播日的作品。
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 min-w-full lg:min-w-[360px] lg:max-w-[380px]">
+      <PageHero
+        className="glass-panel-strong"
+        title="开播季度回顾"
+        description="按作品真正已经开播的季度回看你的片库：这个季度你收了什么、开始追了什么、追到哪儿。这里只看 premiereDate 已填写且已经到过首播日的作品。"
+        backHref="/"
+        backLabel="返回总览"
+        align="start"
+        backdrop={<div className="absolute inset-0" style={{ background: 'radial-gradient(circle at top, var(--color-surface-raised), transparent 35%), linear-gradient(135deg, var(--secondary-light), transparent 42%, var(--warm-light))' }} />}
+        statsClassName="grid min-w-full grid-cols-2 gap-3 lg:min-w-[360px] lg:max-w-[380px]"
+        stats={(
+          <>
             <StatTile surface="card" label="范围作品" value={loading ? '—' : withPremiereCount} detail="当前范围内的开播作品" />
             <StatTile surface="card" label="已经开追" value={loading ? '—' : startedCount} detail="当前范围内已经开始追过" />
             <StatTile surface="card" label="已经看完" value={loading ? '—' : completedCount} detail="当前范围内已经看完" />
             <StatTile surface="card" label="累计进度" value={loading ? '—' : totalProgressEpisodes} unit="集" detail="当前范围内的累计进度" />
-          </div>
-        </div>
-      </section>
+          </>
+        )}
+      />
 
       <section className="relative z-20 flex flex-col gap-4 rounded-[30px] border border-[var(--border)] bg-[var(--color-surface-raised)] px-5 py-5 lg:flex-row lg:items-center lg:justify-between lg:px-6">
         <div className="space-y-1">
@@ -399,15 +401,7 @@ function AnimeSeasonsPageContent() {
         )}
 
         {loading && Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} className="glass-panel animate-pulse rounded-[34px] p-7 lg:p-8">
-            <div className="h-8 w-52 rounded-full bg-[var(--color-surface-hover)]" />
-            <div className="mt-5 h-16 rounded-[22px] bg-[var(--color-surface-hover)]" />
-            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {Array.from({ length: 3 }).map((__, cardIndex) => (
-                <div key={cardIndex} className="h-24 rounded-[22px] bg-[var(--color-surface-hover)]" />
-              ))}
-            </div>
-          </div>
+          <PanelSkeleton key={index} size="large" height="large" className="rounded-[34px]" />
         ))}
 
         {!loading && paginatedSeasonBuckets.map(({ bucket, visibleItems }) => {
@@ -498,11 +492,14 @@ function AnimeSeasonsPageContent() {
         })}
 
         {!loading && !visibleSeasonBuckets.length && (
-          <div className="glass-panel rounded-[34px] p-8 text-base text-[var(--text-muted)]">
-            {seasonBuckets.length
-              ? '当前筛选下没有符合条件的开播作品。'
-              : '暂时还没有可用的首播季度数据。只有 premiereDate 已填写且已经开播的作品，才会出现在这里。'}
-          </div>
+          <EmptyState
+            title={seasonBuckets.length ? '当前筛选没有结果' : '暂无首播季度数据'}
+            description={seasonBuckets.length
+              ? '可以切换年份、排序方式或关闭“只看已开始追番”。'
+              : '补充已经开播作品的 premiereDate 后，它们会按季度整理在这里。'}
+            surface="panel"
+            className="rounded-[34px]"
+          />
         )}
 
         {!loading && totalPages > 1 && (
@@ -515,13 +512,13 @@ function AnimeSeasonsPageContent() {
           />
         )}
       </section>
-    </main>
+    </PageContainer>
   );
 }
 
 export default function AnimeSeasonsPage() {
   return (
-    <Suspense fallback={<main className="p-8 text-[var(--text-muted)]">正在打开档期簿...</main>}>
+    <Suspense fallback={<PageContainer as="main" width="wide" spacing="compact" animation="none"><div className="text-[var(--text-muted)]">正在打开档期簿...</div></PageContainer>}>
       <AnimeSeasonsPageContent />
     </Suspense>
   );
