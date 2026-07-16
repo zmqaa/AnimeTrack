@@ -13,24 +13,34 @@ interface StatItem {
 
 export default React.memo(function DashboardStatCards({ stats }: { stats: StatItem[] }) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 relative z-10">
+    <div className="glass-panel relative z-10 grid grid-cols-2 overflow-hidden rounded-[24px] lg:grid-cols-4">
       {stats.map((stat, i) => {
         const content = (
-          <div className="flex items-center justify-between w-full">
-            <span className="text-base font-bold text-[var(--text-secondary)] tracking-wide">
+          <div className="w-full">
+            <div className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+              <span className="text-xs font-bold tracking-wide text-[var(--text-secondary)]">
               {stat.label}
-            </span>
-            <div className="flex items-baseline gap-1.5 shrink-0">
+              </span>
+            </div>
+            <div className="mt-2 flex items-baseline gap-1.5">
               {stat.prefix ? (
-                <span className="text-sm font-semibold text-[var(--text-muted)]">{stat.prefix}</span>
+                <span className="text-xs font-semibold text-[var(--text-muted)]">{stat.prefix}</span>
               ) : null}
-              <span className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">{stat.value}</span>
-              <span className="text-sm text-[var(--text-muted)] font-bold">{stat.unit}</span>
+              <span className="text-3xl font-bold tracking-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent)]">{stat.value}</span>
+              <span className="text-xs font-bold text-[var(--text-muted)]">{stat.unit}</span>
             </div>
           </div>
         );
 
-        const className = "glass-panel surface-card-muted px-5 py-4 rounded-[24px] transition-all duration-300 hover:-translate-y-0.5 group relative overflow-hidden flex items-center";
+        const dividerClass = i === 0
+          ? 'border-b border-r border-[var(--border)] lg:border-b-0'
+          : i === 1
+            ? 'border-b border-[var(--border)] lg:border-b-0 lg:border-r'
+            : i === 2
+              ? 'border-r border-[var(--border)]'
+              : '';
+        const className = `group relative flex min-w-0 items-center px-5 py-4 transition-colors hover:bg-[var(--color-surface-hover)] lg:px-6 ${dividerClass}`;
 
         return stat.href ? (
           <Link key={i} href={stat.href} className={className}>{content}</Link>

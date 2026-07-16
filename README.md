@@ -13,18 +13,24 @@
 
 ## 快速开始
 
-需要 Node.js 20+ 和 MySQL。
+需要 Node.js 20+。数据默认保存在本地 SQLite 文件 `data/animetrack.db`，不需要单独安装数据库服务。
 
 ```bash
 git clone https://github.com/zmqqqa/AnimeTrack.git
 cd AnimeTrack
 npm install
 cp .env.example .env.local
-# 编辑 .env.local，填上 MySQL 密码
+# 编辑 .env.local，至少设置 NEXTAUTH_URL 和随机的 NEXTAUTH_SECRET
 npm run dev
 ```
 
-然后浏览器打开 `http://localhost:3000/setup`，点一键初始化，再用 `guest / guest` 登录即可。
+然后浏览器打开 `http://localhost:3000/setup`，点一键初始化。初始化完成后，在另一个终端创建管理员账号：
+
+```bash
+npm run user:create-admin -- admin 你的强密码 "管理员"
+```
+
+再打开 `http://localhost:3000/login` 登录。
 
 
 ## 说明
@@ -34,4 +40,4 @@ npm run dev
 
 ## 技术栈
 
-Next.js 14 / React 18 / TypeScript / Tailwind CSS / MySQL / NextAuth.js
+Next.js 14 / React 18 / TypeScript / Tailwind CSS / SQLite / NextAuth.js

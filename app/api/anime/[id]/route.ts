@@ -1,10 +1,9 @@
-import { deleteAnimeRecord, getAnimeRecord, updateAnimeRecord, AnimeRecord, parseAnimeId } from '@/lib/anime';
+import { deleteAnimeRecord, getAnimeRecord, updateAnimeRecordWithHistory, AnimeRecord, parseAnimeId } from '@/lib/anime';
 import { buildVoiceActorAliases } from '@/lib/ai';
 import { normalizeStringArray, areStringArraysEqual } from '@/lib/anime-cast';
-import { addBatchWatchHistory, deleteWatchHistoryByAnime } from '@/lib/history';
-import { query } from '@/lib/db';
 import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
 import { resolveCoverImage, deleteCoverImage } from '@/lib/cover-image';
+import { patchAnimeBodySchema } from '@/lib/validations';
 
 function areAllowedFieldValuesEqual(key: string, nextValue: unknown, currentValue: unknown) {
   if (key === 'tags' || key === 'cast' || key === 'castAliases') {
@@ -46,8 +45,7 @@ export async function DELETE(
   if (!id) return apiError('Invalid ID', 400);
 
   await deleteAnimeRecord(id);
-  // Also clean up history and cover when anime is deleted
-  await deleteWatchHistoryByAnime(id);
+  // watch_history 由外键级联删除；封面属于文件系统，单独清理。
   await deleteCoverImage(id);
   
   return apiSuccess({ ok: true });
@@ -66,7 +64,12 @@ export async function PATCH(
   const before = await getAnimeRecord(id);
   if (!before) return apiError('Not found', 404);
 
-  const body = await request.json();
+  const rawBody = await request.json();
+  const parsedBody = patchAnimeBodySchema.safeParse(rawBody);
+  if (!parsedBody.success) {
+    return apiError(parsedBody.error.issues[0]?.message || '参数校验失败', 400);
+  }
+  const body = parsedBody.data;
   const normalizedBody = {
     ...body,
     tags: normalizeStringArray(body.tags) ?? body.tags,
@@ -132,22 +135,8 @@ export async function PATCH(
     }
   }
 
-  const updated = await updateAnimeRecord(id, updateData);
+  const updated = updateAnimeRecordWithHistory(id, updateData, Boolean(body.recordHistory));
   if (!updated) return apiError('Not found', 404);
-
-  if (before) {
-    const delta = updated.progress - before.progress;
-    // Only record history if explicitly requested (usually from the +1 button)
-    if (delta > 0 && body.recordHistory) {
-        await addBatchWatchHistory(updated.id, updated.title, before.progress + 1, updated.progress);
-    } else if (delta < 0) {
-        // If progress decreased, remove history entries beyond new progress to keep it consistent
-        await query(
-            'DELETE FROM watch_history WHERE animeId = ? AND episode > ?', 
-            [updated.id, updated.progress]
-        );
-    }
-  }
 
   return apiSuccess({ ok: true, entry: updated });
 }

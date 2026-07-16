@@ -2,6 +2,7 @@
 
 import { memo, useMemo, useState, useRef, useEffect } from 'react';
 import { AnimeRecord, ParsedWatchHistory } from '@/lib/dashboard-types';
+import SegmentedControl from '@/components/shared/SegmentedControl';
 
 /** Inline SVG line chart — replacing echarts for ~800KB bundle savings */
 function ActivityLineChart({ data, maxValue, scale }: { data: { label: string; value: number }[]; maxValue: number; scale: 'week' | 'month' | 'year' }) {
@@ -97,7 +98,7 @@ function ActivityLineChart({ data, maxValue, scale }: { data: { label: string; v
             <g className="pointer-events-none opacity-0 transition-opacity group-hover:opacity-100">
               <rect x={p.x - 36} y={p.y - 40} width={72} height={36} rx={10}
                 fill="var(--chart-tooltip-bg)" stroke="var(--chart-tooltip-border)" strokeWidth={1} />
-              <text x={p.x} y={p.y - 22} textAnchor="middle" fill="var(--chart-tooltip-text)" fontSize={16} fontWeight={600}>{p.value} EP</text>
+              <text x={p.x} y={p.y - 22} textAnchor="middle" fill="var(--chart-tooltip-text)" fontSize={16} fontWeight={600}>{p.value} 集</text>
               <text x={p.x} y={p.y - 10} textAnchor="middle" fill="var(--chart-tooltip-sub)" fontSize={10}>{p.label}</text>
             </g>
           </g>
@@ -191,71 +192,55 @@ export default memo(function AdvancedActivityStats({ history, animeList }: { his
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-display font-semibold flex items-center gap-3 text-[var(--text-primary)]">
-            <span className="w-1.5 h-8 rounded-full shadow-[0_0_12px_var(--color-watching)]" style={{ background: 'linear-gradient(to bottom, var(--chart-line-start), var(--chart-line-end))' }}></span>
+          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)]">
+            <span className="h-5 w-1 rounded-full bg-[var(--accent)]" />
             观影趋势分析
           </h2>
           <p className="text-sm text-[var(--text-secondary)] mt-2 leading-6">{statsData.title}，现在会额外给出高频观看时段和这一段时间对整库的推进占比。</p>
         </div>
 
-        <div className="surface-card-muted flex p-1.5 rounded-2xl shadow-xl self-start lg:self-auto">
-          {(['week', 'month', 'year'] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setScale(s)}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold uppercase transition-all ${scale === s ? 'bg-[var(--tag-bg)] text-[var(--accent)] shadow-lg ring-1 ring-[var(--border)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'}`}
-            >
-              {s === 'week' ? '周' : s === 'month' ? '月' : '年'}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          value={scale}
+          options={[
+            { value: 'week', label: '周' },
+            { value: 'month', label: '月' },
+            { value: 'year', label: '年' },
+          ]}
+          onChange={setScale}
+          ariaLabel="观影趋势时间范围"
+          className="self-start rounded-2xl p-1.5 shadow-xl lg:self-auto"
+          activeClassName="text-[var(--accent)]"
+        />
       </div>
 
       {/* Stat cards */}
-      <div className="surface-card-muted grid grid-cols-2 xl:grid-cols-4 divide-x divide-[var(--border)] rounded-2xl px-1 py-3">
+      <div className="surface-card-muted grid grid-cols-1 gap-2 rounded-2xl p-2 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          ['总看番集数', statsData.totalEpisodes, 'EP', 'text-[var(--text-primary)]'],
-          ['预估时长', Math.round(statsData.totalMinutes / 60), 'HRS', 'text-[var(--color-watching)]'],
-          ['活跃效率', (statsData.totalEpisodes / averagePerUnit).toFixed(1), 'EP/D', 'text-[var(--color-completed)]'],
-          ['高频时段', statsData.mostActiveWindow[0], `× ${statsData.mostActiveWindow[1]}`, 'score-text'],
-        ].map(([label, val, unit, colorClass]) => (
-          <div key={label as string} className="flex items-center justify-between gap-3 px-5 first:pl-0">
-            <span className="text-sm font-bold text-[var(--text-secondary)] tracking-wide">{label}</span>
-            <div className="flex items-baseline gap-1.5 shrink-0">
-              <span className={`text-2xl font-bold font-mono tracking-tighter ${colorClass}`}>{val}</span>
-              <span className="text-xs text-[var(--text-muted)] font-bold">{unit}</span>
+          { label: '总看番集数', value: statsData.totalEpisodes, unit: '集', detail: `峰值 ${statsData.peakPoint.label} · ${statsData.peakPoint.value} 集`, colorClass: 'text-[var(--text-primary)]' },
+          { label: '时长', value: Math.round(statsData.totalMinutes / 60), unit: '小时', detail: '按每集 24 分钟估算', colorClass: 'text-[var(--color-watching)]' },
+          { label: '活跃效率', value: (statsData.totalEpisodes / averagePerUnit).toFixed(1), unit: '集/日', detail: `${statsData.activeDays} 个活跃日`, colorClass: 'text-[var(--color-completed)]' },
+          { label: '高频时段', value: statsData.mostActiveWindow[0], unit: `× ${statsData.mostActiveWindow[1]}`, detail: `整库推进 ${statsData.libraryCoverage}%`, colorClass: 'score-text' },
+        ].map((item) => (
+          <div key={item.label} className="rounded-xl bg-[var(--color-surface-hover)] px-4 py-3.5 lg:px-5">
+            <div className="text-xs font-bold tracking-wide text-[var(--text-secondary)]">{item.label}</div>
+            <div className="mt-2 flex items-baseline gap-1.5">
+              <span className={`font-mono text-2xl font-bold tracking-tighter ${item.colorClass}`}>{item.value}</span>
+              <span className="text-[10px] font-bold text-[var(--text-muted)]">{item.unit}</span>
             </div>
+            <div className="mt-1.5 truncate text-[10px] text-[var(--text-muted)]">{item.detail}</div>
           </div>
         ))}
       </div>
 
-      {/* Chart + side panels */}
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_260px] gap-5">
-        <div className="surface-card h-[320px] rounded-[28px] bg-[linear-gradient(180deg,var(--bg-card),transparent)] p-4 md:p-5">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)]">Viewer Activity</div>
-            <div className="status-plan-soft hidden md:flex rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.28em]">
-              {scale === 'week' ? '7 Day Window' : scale === 'month' ? 'Monthly Timeline' : 'Yearly Timeline'}
-            </div>
+      {/* Chart */}
+      <div className="surface-card-muted h-[320px] rounded-[28px] bg-[linear-gradient(180deg,var(--tag-bg),transparent)] p-4 md:p-5">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="text-[10px] tracking-[0.28em] text-[var(--text-muted)]">观看趋势</div>
+          <div className="status-plan-soft hidden rounded-full px-3 py-1 text-[10px] tracking-[0.2em] md:flex">
+            {scale === 'week' ? '近 7 日' : scale === 'month' ? '本月' : '本年'}
           </div>
-          <ActivityLineChart data={statsData.data} maxValue={maxValue} scale={scale} />
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 xl:flex xl:flex-col gap-2 xl:h-64">
-          {[
-            ['Peak Point', statsData.peakPoint.label, `max ${statsData.peakPoint.value} EP`, 'text-[var(--text-primary)]'],
-            ['Active Days', statsData.activeDays, '有记录天', 'text-[var(--color-completed)]'],
-            ['Library Cov.', `${statsData.libraryCoverage}%`, '整库占比', 'text-[var(--color-info)]'],
-          ].map(([label, val, sub, colorClass]) => (
-            <div key={label as string} className="surface-card-muted flex-1 px-4 py-3 flex flex-col justify-between border-l border-[var(--border)] rounded-xl">
-              <div className="text-[9px] uppercase tracking-[0.3em] text-[var(--text-muted)]">{label}</div>
-              <div className="flex items-end justify-between gap-2">
-                <span className={`text-xl font-mono leading-tight ${colorClass}`}>{val}</span>
-                <span className="text-[10px] text-[var(--text-muted)] font-mono pb-0.5">{sub}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        <ActivityLineChart data={statsData.data} maxValue={maxValue} scale={scale} />
       </div>
     </div>
   );

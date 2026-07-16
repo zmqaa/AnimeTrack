@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createAnimeRecord, findAnimeByTitle, updateAnimeRecord, CreateAnimeDTO, listAnimeRecordsByExactTitle, AnimeRecord, animeRecordToDTO } from '@/lib/anime';
-import { addBatchWatchHistory, addWatchHistory } from '@/lib/history';
+import { createAnimeRecordWithHistory, findAnimeByTitle, updateAnimeRecord, updateAnimeRecordWithHistory, CreateAnimeDTO, listAnimeRecordsByExactTitle, AnimeRecord, animeRecordToDTO } from '@/lib/anime';
 import { parseQuickRecordBatch, type ParsedQuickRecordIntent } from '@/lib/ai';
 import { enrichAnimeInput } from '@/lib/anime-enrichment';
 import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
@@ -102,7 +101,10 @@ async function processQuickRecordIntent(
       input.progress = 1;
     }
 
-    const created = await createAnimeRecord(input);
+    const shouldWriteHistory = Boolean(recordedDateString) && input.progress > 0 && input.status !== 'plan_to_watch';
+    const created = createAnimeRecordWithHistory(input, shouldWriteHistory
+      ? { episode: input.progress, watchedAt }
+      : undefined);
     // 下载封面图到本地
     if (created.coverUrl) {
       const resolved = await resolveCoverImage(created.coverUrl, created.id);
@@ -111,11 +113,6 @@ async function processQuickRecordIntent(
         created.coverUrl = resolved ?? undefined;
       }
     }
-    const shouldWriteHistory = Boolean(recordedDateString) && created.progress > 0 && created.status !== 'plan_to_watch';
-    if (shouldWriteHistory) {
-      await addWatchHistory(created.id, created.title, created.progress, watchedAt);
-    }
-
     const entry = created;
     return {
       created: true, replay: false, rewatchTag, historyWritten: shouldWriteHistory, parsed,
@@ -184,31 +181,20 @@ async function processQuickRecordIntent(
     }
   }
 
+  const shouldWriteHistory = Boolean(recordedDateString) && targetProgress > 0;
+  const shouldWriteReplay = shouldWriteHistory
+    && targetProgress <= anime.progress
+    && (parsed.episode !== undefined || parsed.progress !== undefined || parsed.status === 'watching' || parsed.status === 'completed');
+  const historyWritten = shouldWriteHistory && (targetProgress > anime.progress || shouldWriteReplay);
   let entry = anime;
-  if (hasPatchChanges(patch)) {
-    const updated = await updateAnimeRecord(anime.id, patch);
+  if (hasPatchChanges(patch) || historyWritten) {
+    const updated = updateAnimeRecordWithHistory(anime.id, patch, {
+      recordHistory: historyWritten,
+      watchedAt,
+      replayEpisode: shouldWriteReplay ? targetProgress : undefined,
+    });
     if (!updated) throw new Error('更新失败');
     entry = updated;
-    // 如果更新了 coverUrl，同步下载封面到本地
-    if (patch.coverUrl !== undefined) {
-      const resolved = await resolveCoverImage(patch.coverUrl, anime.id);
-      if (resolved !== (patch.coverUrl || null)) {
-        const reUpdated = await updateAnimeRecord(anime.id, { coverUrl: resolved ?? undefined });
-        if (reUpdated) entry = reUpdated;
-      }
-    }
-  }
-
-  let historyWritten = false;
-  const shouldWriteHistory = Boolean(recordedDateString) && targetProgress > 0;
-  if (shouldWriteHistory) {
-    if (targetProgress > anime.progress) {
-      await addBatchWatchHistory(entry.id, entry.title, anime.progress + 1, targetProgress, watchedAt);
-      historyWritten = true;
-    } else if (parsed.episode !== undefined || parsed.progress !== undefined || parsed.status === 'watching' || parsed.status === 'completed') {
-      await addWatchHistory(entry.id, entry.title, targetProgress, watchedAt);
-      historyWritten = true;
-    }
   }
 
   const finalEntry = entry;

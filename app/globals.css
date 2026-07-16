@@ -38,6 +38,10 @@
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.35);
+  --shadow-xl: 0 30px 80px rgba(0, 0, 0, 0.45);
+  --overlay-backdrop: rgba(0, 0, 0, 0.6);
+  --text-on-accent: #07110f;
 
   /* Chart colors — line chart (AdvancedActivityStats) */
   --chart-line-start: #56d39c;
@@ -67,7 +71,7 @@
   --barchart-tooltip-border: rgba(255, 255, 255, 0.1);
   --barchart-tooltip-text: #f1f5f9;
   --barchart-tooltip-sub: #94a3b8;
-  --barchart-bar-default: #5dd6f2;
+  --barchart-bar-default: #56d39c;
 
   /* Chart colors — heatmap (TimelineHeatmap) */
   --heatmap-0: rgba(255, 255, 255, 0.03);
@@ -180,6 +184,10 @@
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.42);
+  --shadow-xl: 0 30px 80px rgba(0, 0, 0, 0.52);
+  --overlay-backdrop: rgba(10, 3, 2, 0.68);
+  --text-on-accent: #1d0f0c;
 
   /* Chart colors — line chart (AdvancedActivityStats) */
   --chart-line-start: #f2a65a;
@@ -322,6 +330,10 @@
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 18px 50px rgba(0, 0, 0, 0.68);
+  --shadow-xl: 0 30px 80px rgba(0, 0, 0, 0.76);
+  --overlay-backdrop: rgba(0, 0, 0, 0.74);
+  --text-on-accent: #000000;
 
   /* Chart colors — line chart (AdvancedActivityStats) */
   --chart-line-start: #a0aec0;
@@ -434,10 +446,12 @@
    ======================================================== */
 
 [data-theme='lumen'] {
-  --bg-page: #efe2cd;       /* warm parchment — distinctly warm, not white */
-  --bg-card: #f9f1e4;       /* warm cream — visible lift from page */
-  --border: #dbccb4;
-  --border-light: #e8dcc8;
+  --bg-page: #d8c3a3;       /* level 0: warm parchment canvas */
+  --bg-card: #ead9c0;       /* level 1: primary cards / large panels */
+  --tag-bg: #f6ecdd;        /* level 2: nested cards / content groups */
+  --bg-control: #fff9f0;    /* level 3: inputs / pills / floating controls */
+  --border: #cbb28e;
+  --border-light: #ddcdb6;
 
   --text-primary: #2a1808;
   --text-secondary: #4a3422;
@@ -455,15 +469,18 @@
   --warm-light: rgba(201, 120, 44, 0.1);
   --warm-hover: #b0681e;
 
-  --tag-bg: #e6d7c0;
   --tag-text: #4a3422;
 
-  --divider: #dbccb4;
+  --divider: #cfb99b;
 
-  --scrollbar-thumb: #bfae96;
+  --scrollbar-thumb: #ad9270;
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.10);
+  --shadow-lg: 0 18px 50px rgba(73, 50, 27, 0.14);
+  --shadow-xl: 0 30px 80px rgba(73, 50, 27, 0.18);
+  --overlay-backdrop: rgba(61, 44, 28, 0.42);
+  --text-on-accent: #fff9f0;
 
   /* Chart colors — line chart (AdvancedActivityStats) */
   --chart-line-start: #c9782c;
@@ -472,13 +489,13 @@
   --chart-area-mid: rgba(90, 138, 111, 0.05);
   --chart-area-bottom: rgba(201, 120, 44, 0);
   --chart-dot: #c9782c;
-  --chart-dot-stroke: #f9f1e4;
+  --chart-dot-stroke: #fff9f0;
   --chart-dot-hover: #e0a858;
   --chart-dot-hover-stroke: #3d2c1c;
   --chart-grid: rgba(0, 0, 0, 0.07);
   --chart-axis-y: #68543c;
   --chart-axis-x: #786048;
-  --chart-tooltip-bg: rgba(249, 241, 228, 0.97);
+  --chart-tooltip-bg: rgba(255, 249, 240, 0.97);
   --chart-tooltip-border: rgba(201, 120, 44, 0.22);
   --chart-tooltip-text: #2a1808;
   --chart-tooltip-sub: #4a3422;
@@ -489,7 +506,7 @@
   --barchart-axis-y: #68543c;
   --barchart-baseline: rgba(0, 0, 0, 0.1);
   --barchart-axis-x: #68543c;
-  --barchart-tooltip-bg: rgba(249, 241, 228, 0.97);
+  --barchart-tooltip-bg: rgba(255, 249, 240, 0.97);
   --barchart-tooltip-border: rgba(201, 120, 44, 0.2);
   --barchart-tooltip-text: #2a1808;
   --barchart-tooltip-sub: #4a3422;
@@ -555,118 +572,21 @@
   --color-focus-ring: rgba(201, 120, 44, 0.3);
 
   /* ── Surface overlays (light theme – use dark transparency) ── */
-  --color-surface-hover: rgba(0, 0, 0, 0.03);
-  --color-surface-raised: rgba(0, 0, 0, 0.04);
+  --color-surface-hover: rgba(255, 249, 240, 0.58);
+  --color-surface-raised: #f6ecdd;
 
   /* ── Cover gradient (light theme – use bg-page color) ── */
-  --color-cover-gradient-start: rgba(239, 226, 205, 0.1);
-  --color-cover-gradient-end: rgba(239, 226, 205, 0.9);
+  --color-cover-gradient-start: rgba(216, 195, 163, 0.1);
+  --color-cover-gradient-end: rgba(216, 195, 163, 0.9);
 
   /* ── Toast ── */
-  --color-toast-bg: rgba(255, 247, 235, 0.97);
+  --color-toast-bg: rgba(255, 249, 240, 0.97);
   --color-toast-border: rgba(0, 0, 0, 0.1);
   --color-toast-text: #2a1808;
   --color-toast-success-icon: #5a8a50;
   --color-toast-error-icon: #c05050;
-  --color-toast-icon-bg: #efe2cd;
+  --color-toast-icon-bg: #d8c3a3;
 }
-
-/* ========================================================
-   Lumen overrides — remap hardcoded Tailwind dark classes
-   to semantic CSS variables so the light theme is readable
-   without touching component files.
-   ======================================================== */
-
-/* ── Text: light-on-dark classes → dark-on-light ── */
-[data-theme='lumen'] .text-white,
-[data-theme='lumen'] .text-zinc-100,
-[data-theme='lumen'] .text-zinc-200 { color: var(--text-primary); }
-
-[data-theme='lumen'] .text-white\/70 { color: var(--text-secondary); }
-
-[data-theme='lumen'] .text-white\/50 { color: var(--text-muted); }
-
-[data-theme='lumen'] .text-zinc-300,
-[data-theme='lumen'] .text-zinc-400 { color: var(--text-secondary); }
-
-[data-theme='lumen'] .text-zinc-500,
-[data-theme='lumen'] .text-zinc-600 { color: var(--text-muted); }
-
-[data-theme='lumen'] .hover\:text-white:hover,
-[data-theme='lumen'] .hover\:text-zinc-200:hover,
-[data-theme='lumen'] .hover\:text-zinc-300:hover { color: var(--text-primary); }
-
-/* ── Placeholder ── */
-[data-theme='lumen'] .placeholder-zinc-500::placeholder { color: var(--text-muted); }
-
-/* ── Background: dark surfaces → light surfaces ── */
-[data-theme='lumen'] .bg-zinc-800,
-[data-theme='lumen'] .bg-zinc-800\/50 { background-color: var(--tag-bg); }
-
-[data-theme='lumen'] .bg-zinc-900,
-[data-theme='lumen'] .bg-zinc-900\/70,
-[data-theme='lumen'] .bg-zinc-900\/95 { background-color: var(--bg-card); }
-
-[data-theme='lumen'] .bg-\[\#080e0d\],
-[data-theme='lumen'] .bg-\[\#080e0d\]\/95,
-[data-theme='lumen'] .bg-\[\#07110f\] { background-color: var(--bg-card); }
-
-[data-theme='lumen'] .bg-\[\#09090b\] { background-color: var(--bg-page); }
-
-[data-theme='lumen'] .bg-black\/30,
-[data-theme='lumen'] .bg-black\/40 { background-color: rgb(0 0 0 / 0.06); }
-
-[data-theme='lumen'] .hover\:bg-zinc-800:hover,
-[data-theme='lumen'] .hover\:bg-zinc-800\/50:hover { background-color: var(--tag-bg); }
-
-[data-theme='lumen'] .hover\:bg-white\/\[0\.02\]:hover { background-color: var(--accent-light); }
-
-/* ── Borders: white-translucent → theme borders ── */
-[data-theme='lumen'] .border-white\/5,
-[data-theme='lumen'] .border-white\/6,
-[data-theme='lumen'] .border-white\/8,
-[data-theme='lumen'] .border-white\/10,
-[data-theme='lumen'] .border-white\/15,
-[data-theme='lumen'] .border-white\/\[0\.03\],
-[data-theme='lumen'] .border-white\/\[0\.06\] { border-color: var(--border); }
-
-[data-theme='lumen'] .border-white\/20 { border-color: var(--border-light); }
-
-[data-theme='lumen'] .hover\:border-white\/10:hover,
-[data-theme='lumen'] .hover\:border-white\/15:hover { border-color: var(--border-light); }
-
-[data-theme='lumen'] .border-zinc-800,
-[data-theme='lumen'] .border-zinc-900,
-[data-theme='lumen'] .border-zinc-950 { border-color: var(--border); }
-
-/* ── Shadows: heavy black → subtle gray ── */
-[data-theme='lumen'] .shadow-black\/40 { --tw-shadow-color: rgb(0 0 0 / 0.1); }
-
-[data-theme='lumen'] .hover\:shadow-black\/40:hover { --tw-shadow-color: rgb(0 0 0 / 0.1); }
-
-/* ── Group hover text (safety net for any remaining hardcoded classes) ── */
-[data-theme='lumen'] .group:hover .group-hover\:text-white { color: var(--text-primary); }
-
-/* ── Generic white-transparency & border safety net ── */
-
-/* ── bg-white/opacity → subtle dark overlay (light bg doesn't benefit from white transparency) ── */
-[data-theme='lumen'] .bg-white\/5,
-[data-theme='lumen'] .bg-white\/6,
-[data-theme='lumen'] .bg-white\/10 { background-color: rgb(0 0 0 / 0.05); }
-
-[data-theme='lumen'] .bg-white\/\[0\.02\] { background-color: rgb(0 0 0 / 0.02); }
-[data-theme='lumen'] .bg-white\/\[0\.04\] { background-color: rgb(0 0 0 / 0.04); }
-[data-theme='lumen'] .bg-white\/\[0\.06\] { background-color: rgb(0 0 0 / 0.06); }
-
-[data-theme='lumen'] .hover\:bg-white\/\[0\.02\]:hover { background-color: rgb(0 0 0 / 0.03); }
-[data-theme='lumen'] .hover\:bg-white\/\[0\.04\]:hover { background-color: rgb(0 0 0 / 0.05); }
-[data-theme='lumen'] .hover\:bg-white\/\[0\.07\]:hover { background-color: rgb(0 0 0 / 0.07); }
-[data-theme='lumen'] .hover\:bg-white\/\[0\.08\]:hover { background-color: rgb(0 0 0 / 0.07); }
-[data-theme='lumen'] .hover\:bg-white\/5:hover { background-color: rgb(0 0 0 / 0.05); }
-[data-theme='lumen'] .hover\:bg-white\/10:hover { background-color: rgb(0 0 0 / 0.08); }
-
-/* ── divide-x (divider lines in stat card grids) ── */
-[data-theme='lumen'] .divide-white\/\[0\.06\] > :not([hidden]) ~ :not([hidden]) { border-color: var(--border); }
 
 /* ── Chart dot hover glow (replaces Tailwind arbitrary values in SVG) ── */
 .chart-dot-base {
@@ -710,13 +630,13 @@ body {
 }
 
 .surface-pill {
-  background: var(--tag-bg);
+  background: var(--bg-control, var(--tag-bg));
   border: 1px solid var(--border-light);
   color: var(--tag-text);
 }
 
 .surface-input {
-  background: var(--bg-card);
+  background: var(--bg-control, var(--bg-card));
   border: 1px solid var(--border);
   color: var(--text-primary);
 }
@@ -767,7 +687,7 @@ body {
 
 .theme-accent-button {
   background: var(--accent);
-  color: var(--bg-page);
+  color: var(--text-on-accent);
 }
 .theme-accent-button:hover {
   background: var(--accent-hover);
@@ -836,6 +756,19 @@ body {
 .soft-divider {
   height: 1px;
   background: var(--divider);
+}
+
+.theme-modal-backdrop {
+  background: var(--overlay-backdrop);
+}
+
+.shadow-theme-md { box-shadow: var(--shadow-md); }
+.shadow-theme-lg { box-shadow: var(--shadow-lg); }
+.shadow-theme-xl { box-shadow: var(--shadow-xl); }
+
+.theme-hover-elevated:hover {
+  border-color: var(--border-light);
+  box-shadow: var(--shadow-lg);
 }
 
 /* ===== Route loading bar ===== */

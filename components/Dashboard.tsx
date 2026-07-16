@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useMemo } from 'react';
-import { CalendarDaysIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { useAnimeData } from '@/hooks/useAnimeData';
 import { useHistoryData } from '@/hooks/useHistoryData';
 import { useTheme } from '@/components/theme/ThemeProvider';
@@ -12,7 +11,6 @@ import { formatWatchMoment } from '@/lib/formatters';
 import { getAppThemeDefinition } from '@/lib/theme';
 import DashboardHeader from './dashboard/DashboardHeader';
 import DashboardHeroCard from './dashboard/DashboardHeroCard';
-import DashboardStatCards from './dashboard/DashboardStatCards';
 import DashboardRightPanel from './dashboard/DashboardRightPanel';
 import LazyRender from './shared/LazyRender';
 
@@ -136,22 +134,14 @@ export default function Dashboard() {
   }, [animeList]);
 
   const premierePieData = useMemo(
-    () => dashboardStats.premiereByYear.map((item, i) => ({
+    () => dashboardStats.premiereByYear.map((item) => ({
       label: `${item.year} 年`, value: item.count,
-      color: themeDefinition.premierePalette[i % themeDefinition.premierePalette.length],
     })),
-    [dashboardStats.premiereByYear, themeDefinition]
+    [dashboardStats.premiereByYear]
   );
 
   const tagBarData = useMemo(() => animeTagStats.slice(0, 8), [animeTagStats]);
   const tagBarMax = tagBarData.reduce((max, item) => Math.max(max, item.count), 1);
-
-  const stats = [
-    { label: '追番总数', value: animeStats.count.toString(), unit: '部', href: '/anime' },
-    { label: '当前追番', value: (animeStats.byStatus.watching || 0).toString(), unit: '部', href: '/anime?status=watching' },
-    { label: '本周观看', value: weeklyEpisodes.toString(), unit: '集', href: '/anime/timeline' },
-    { label: '看番总时长', value: Math.round(animeStats.minutesWatched / 60).toString(), unit: '小时', prefix: '约' },
-  ];
 
   return (
     <div className="p-4 lg:p-8 space-y-4 lg:space-y-6 animate-fade-in pb-20 relative">
@@ -161,15 +151,11 @@ export default function Dashboard() {
       {/* Hero */}
       <LazyRender fallback={<div className="glass-panel-strong rounded-[34px] h-[330px] animate-pulse" />}>
         <DashboardHeroCard
-          animeStats={animeStats} metadataRichness={dashboardStats.metadataRichness}
+          animeStats={animeStats} metadataCoverage={dashboardStats.metadataCoverage}
           animeCompletionRate={animeCompletionRate} weeklyEpisodes={weeklyEpisodes}
+          watchHours={Math.round(animeStats.minutesWatched / 60)}
           heroAnime={heroAnime} themeDefinition={themeDefinition}
         />
-      </LazyRender>
-
-      {/* Stat Cards */}
-      <LazyRender fallback={<div className="grid grid-cols-2 lg:grid-cols-4 gap-4 relative z-10">{Array.from({ length: 4 }).map((_, i) => (<div key={i} className="glass-panel rounded-[24px] h-28 animate-pulse" />))}</div>}>
-        <DashboardStatCards stats={stats} />
       </LazyRender>
 
       {/* Main Content Grid */}
@@ -185,7 +171,7 @@ export default function Dashboard() {
           <LazyRender fallback={<div className="glass-panel rounded-[32px] h-[300px] animate-pulse" />}>
             <div className="glass-panel p-6 lg:p-7 rounded-[32px] flex flex-col overflow-visible">
               <div className="flex items-center gap-2 mb-1">
-                <CalendarDaysIcon className="w-4 h-4 text-[var(--color-airing)]" />
+                <span className="h-5 w-1 rounded-full bg-[var(--accent)]" />
                 <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)]">作品开播时间分布</h2>
               </div>
               <p className="text-[10px] text-[var(--text-muted)] mb-2">基于每部作品的开播日期字段统计</p>
@@ -203,21 +189,21 @@ export default function Dashboard() {
           <div className="glass-panel p-6 lg:p-7 rounded-[32px] flex flex-col">
             <div className="flex items-center justify-between gap-4 mb-5">
               <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)] flex items-center gap-2">
-                <ClockIcon className="w-4 h-4 text-[var(--color-airing)]" />最近在看作品
+                <span className="h-5 w-1 rounded-full bg-[var(--accent)]" />最近在看作品
               </h2>
               <Link href="/anime/timeline" className="text-[10px] font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors uppercase tracking-widest">查看时间线</Link>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 lg:gap-4 auto-rows-max content-start pr-1">
               {recentWatching.map(({ record, anime }) => (
                 <Link key={`recent-${record.id}`} href={`/anime/${record.animeId}`}
-                  className="group surface-card-muted rounded-[22px] overflow-hidden hover:border-[var(--color-airing-border)] transition-all duration-300 hover:-translate-y-0.5 hover:scale-[1.01]">
+                  className="group surface-card-muted rounded-[22px] overflow-hidden hover:border-[var(--accent)] transition-all duration-300 hover:-translate-y-0.5 hover:scale-[1.01]">
                   <div className="aspect-video w-full bg-[var(--tag-bg)]/70 bg-cover bg-center"
                     style={anime?.coverUrl ? { backgroundImage: `linear-gradient(180deg, var(--color-cover-gradient-start), var(--color-cover-gradient-end)), url(${anime.coverUrl})` } : undefined} />
                   <div className="p-4">
                     <div className="mt-1 text-base text-[var(--text-primary)] truncate">{anime?.title ?? record.animeTitle}</div>
                     <div className="text-xs text-[var(--text-muted)] truncate">{anime?.originalTitle ?? '来自观看历史'}</div>
                     <div className="mt-3 flex items-center justify-between gap-2">
-                      <span className="inline-flex rounded-full badge-airing-soft border px-2.5 py-1 text-[11px]">第 {record.episode} 集</span>
+                      <span className="inline-flex rounded-full theme-accent-soft px-2.5 py-1 text-[11px]">第 {record.episode} 集</span>
                       <span className="text-[11px] text-[var(--text-muted)] font-mono">{formatWatchMoment(record.dateObj)}</span>
                     </div>
                   </div>
@@ -247,7 +233,7 @@ export default function Dashboard() {
           <div className="glass-panel p-6 lg:p-7 rounded-[32px] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between mb-5 flex-shrink-0">
               <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)] flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full glow-watching" />最近记录
+                <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />最近记录
               </h2>
               <Link href="/anime/timeline" className="text-[10px] font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">查看全部</Link>
             </div>

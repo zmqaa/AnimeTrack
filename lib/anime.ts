@@ -1,5 +1,5 @@
 import 'server-only';
-import { query, type DbResult } from './db';
+import { getRawDb, query, type DbResult } from './db';
 import { parseJsonStringArray } from './anime-cast';
 import { extractSeasonNumber, hasSeasonMarker, normalizeTitleToken } from './chinese-parser';
 import { nowISO } from './date-utils';
@@ -10,7 +10,7 @@ export type { AnimeStatus };
 /** 解析路由参数中的 ID */
 export function parseAnimeId(idParam: string): number | null {
   const id = Number(idParam);
-  if (!Number.isFinite(id) || id <= 0) return null;
+  if (!Number.isInteger(id) || id <= 0) return null;
   return id;
 }
 
@@ -467,6 +467,38 @@ export async function createAnimeRecord(input: CreateAnimeDTO): Promise<AnimeRec
   };
 }
 
+/** 新建番剧，并可在同一事务中写入首条观看历史。 */
+export function createAnimeRecordWithHistory(
+  input: CreateAnimeDTO,
+  history?: { episode: number; watchedAt?: Date },
+): AnimeRecord {
+  const db = getRawDb();
+  const transaction = db.transaction(() => {
+    const now = nowISO();
+    const result = db.prepare(`
+      INSERT INTO anime (title, original_title, coverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      input.title, input.originalTitle || null, input.coverUrl || null, input.status,
+      input.score ?? null, input.progress, input.totalEpisodes ?? null,
+      input.durationMinutes ?? null, input.notes || null, JSON.stringify(input.tags || []),
+      input.summary || null, input.startDate || null, input.endDate || null,
+      input.premiereDate || null, JSON.stringify(input.cast || []),
+      JSON.stringify(input.castAliases || []),
+      input.isFinished == null ? null : (input.isFinished ? 1 : 0), now, now,
+    );
+    const id = Number(result.lastInsertRowid);
+    if (history && history.episode > 0) {
+      db.prepare(
+        'INSERT INTO watch_history (animeId, animeTitle, episode, watchedAt) VALUES (?, ?, ?, ?)',
+      ).run(id, input.title, history.episode, (history.watchedAt || new Date()).toISOString());
+    }
+    const row = db.prepare('SELECT * FROM anime WHERE id = ?').get(id) as AnimeRow;
+    return mapRowToAnimeRecord(row);
+  });
+  return transaction();
+}
+
 export async function updateAnimeRecord(
   id: number,
   input: Partial<CreateAnimeDTO>
@@ -494,7 +526,7 @@ export async function updateAnimeRecord(
   if (input.premiereDate !== undefined) { fields.push('premiere_date = ?'); params.push(input.premiereDate); }
   if (input.cast !== undefined) { fields.push('cast = ?'); params.push(JSON.stringify(input.cast)); }
   if (input.castAliases !== undefined) { fields.push('cast_aliases = ?'); params.push(JSON.stringify(input.castAliases)); }
-  if (input.isFinished !== undefined) { fields.push('isFinished = ?'); params.push(input.isFinished ? 1 : 0); }
+  if (input.isFinished !== undefined) { fields.push('isFinished = ?'); params.push(input.isFinished == null ? null : (input.isFinished ? 1 : 0)); }
 
   if (fields.length <= 1) return await getAnimeRecord(id);
 
@@ -504,6 +536,83 @@ export async function updateAnimeRecord(
   const rows = await query<AnimeRow[]>(sql, params);
   if (rows.length === 0) return null;
   return mapRowToAnimeRecord(rows[0]);
+}
+
+/**
+ * 原子更新番剧进度及其观看历史，避免进度已保存但历史写入失败。
+ */
+export function updateAnimeRecordWithHistory(
+  id: number,
+  input: Partial<CreateAnimeDTO>,
+  historyOptions: boolean | {
+    recordHistory: boolean;
+    watchedAt?: Date;
+    replayEpisode?: number;
+  },
+): AnimeRecord | null {
+  const options = typeof historyOptions === 'boolean'
+    ? { recordHistory: historyOptions }
+    : historyOptions;
+  const db = getRawDb();
+  const transaction = db.transaction(() => {
+    const beforeRow = db.prepare('SELECT * FROM anime WHERE id = ?').get(id) as AnimeRow | undefined;
+    if (!beforeRow) return null;
+
+    const fields: string[] = ['updatedAt = ?'];
+    const params: unknown[] = [nowISO()];
+    const add = (column: string, value: unknown) => {
+      fields.push(`${column} = ?`);
+      params.push(value);
+    };
+
+    if (input.originalTitle !== undefined) add('original_title', input.originalTitle);
+    if (input.title !== undefined) add('title', input.title);
+    if (input.coverUrl !== undefined) add('coverUrl', input.coverUrl);
+    if (input.status !== undefined) add('status', input.status);
+    if (input.score !== undefined) add('score', input.score);
+    if (input.progress !== undefined) add('progress', input.progress);
+    if (input.totalEpisodes !== undefined) add('totalEpisodes', input.totalEpisodes);
+    if (input.durationMinutes !== undefined) add('durationMinutes', input.durationMinutes);
+    if (input.notes !== undefined) add('notes', input.notes);
+    if (input.tags !== undefined) add('tags', JSON.stringify(input.tags));
+    if (input.summary !== undefined) add('summary', input.summary);
+    if (input.startDate !== undefined) add('start_date', input.startDate);
+    if (input.endDate !== undefined) add('end_date', input.endDate);
+    if (input.premiereDate !== undefined) add('premiere_date', input.premiereDate);
+    if (input.cast !== undefined) add('cast', JSON.stringify(input.cast));
+    if (input.castAliases !== undefined) add('cast_aliases', JSON.stringify(input.castAliases));
+    if (input.isFinished !== undefined) add('isFinished', input.isFinished == null ? null : (input.isFinished ? 1 : 0));
+
+    if (fields.length > 1) {
+      db.prepare(`UPDATE anime SET ${fields.join(', ')} WHERE id = ?`).run(...params, id);
+    }
+
+    const updatedRow = db.prepare('SELECT * FROM anime WHERE id = ?').get(id) as AnimeRow | undefined;
+    if (!updatedRow) return null;
+
+    const beforeProgress = Number(beforeRow.progress) || 0;
+    const updatedProgress = Number(updatedRow.progress) || 0;
+    const delta = updatedProgress - beforeProgress;
+    if (delta > 0 && options.recordHistory) {
+      const watchedAt = (options.watchedAt || new Date()).toISOString();
+      const insert = db.prepare(
+        'INSERT INTO watch_history (animeId, animeTitle, episode, watchedAt) VALUES (?, ?, ?, ?)',
+      );
+      for (let episode = beforeProgress + 1; episode <= updatedProgress; episode++) {
+        insert.run(id, updatedRow.title, episode, watchedAt);
+      }
+    } else if (delta === 0 && options.recordHistory && options.replayEpisode && options.replayEpisode > 0) {
+      db.prepare(
+        'INSERT INTO watch_history (animeId, animeTitle, episode, watchedAt) VALUES (?, ?, ?, ?)',
+      ).run(id, updatedRow.title, options.replayEpisode, (options.watchedAt || new Date()).toISOString());
+    } else if (delta < 0) {
+      db.prepare('DELETE FROM watch_history WHERE animeId = ? AND episode > ?').run(id, updatedProgress);
+    }
+
+    return mapRowToAnimeRecord(updatedRow);
+  });
+
+  return transaction();
 }
 
 export async function deleteAnimeRecord(id: number): Promise<void> {

@@ -167,15 +167,17 @@ export default memo(function TimelineEnhancedList({ entries, groupBy, searchQuer
 
   if (filtered.length === 0) {
     return (
-      <div className="text-center py-20 text-[var(--text-muted)] border border-dashed border-[var(--border)] rounded-3xl">
-        <span className="text-4xl mb-4 block">🎬</span>
-        <p>{searchQuery ? '没有匹配的记录' : '暂无观看记录，去更新一下进度吧！'}</p>
+      <div className="glass-panel rounded-[28px] p-5 md:p-6">
+        <div className="text-center py-16 text-[var(--text-muted)] border border-dashed border-[var(--border)] rounded-3xl">
+          <span className="text-4xl mb-4 block">🎬</span>
+          <p>{searchQuery ? '没有匹配的记录' : '暂无观看记录，去更新一下进度吧！'}</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="glass-panel rounded-[28px] p-5 md:p-6">
       <div className="relative ml-4 space-y-12 border-l-2 border-[var(--border)] py-4 pl-6 xl:ml-5 xl:pl-8">
         {grouped.map((group) => (
           <div key={group.key} className="relative">
@@ -185,10 +187,10 @@ export default memo(function TimelineEnhancedList({ entries, groupBy, searchQuer
             </div>
 
             <div className="mb-6 flex items-center gap-3">
-              <h2 className="surface-pill rounded-xl px-3 py-1.5 text-base font-bold text-white">
+              <h2 className="surface-pill rounded-xl px-3 py-1.5 text-base font-bold text-[var(--text-primary)]">
                 {group.label}
               </h2>
-              <span className="text-[11px] font-mono uppercase tracking-[0.22em] text-zinc-500">
+              <span className="text-[11px] font-mono uppercase tracking-[0.22em] text-[var(--text-muted)]">
                 {group.entries.length} 集
               </span>
             </div>
@@ -203,7 +205,7 @@ export default memo(function TimelineEnhancedList({ entries, groupBy, searchQuer
                   />
 
                   {/* Time */}
-                  <span className="block text-xs font-mono text-zinc-500 mb-2">
+                  <span className="block text-xs font-mono text-[var(--text-muted)] mb-2">
                     {h.dateObj.toLocaleDateString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
                   </span>
 
@@ -227,10 +229,10 @@ export default memo(function TimelineEnhancedList({ entries, groupBy, searchQuer
                       {/* Info */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm text-zinc-200 font-medium group-hover:text-primary transition-colors truncate">
+                          <span className="text-sm text-[var(--text-primary)] font-medium group-hover:text-primary transition-colors truncate">
                             {h.animeTitle}
                           </span>
-                          <span className="shrink-0 text-[10px] font-mono bg-white/5 px-2 py-1 rounded-full text-zinc-500">
+                          <span className="shrink-0 text-[10px] font-mono bg-[var(--color-surface-raised)] px-2 py-1 rounded-full text-[var(--text-muted)]">
                             EP {h.episode}
                           </span>
                         </div>

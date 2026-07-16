@@ -107,17 +107,17 @@ export default function AnimeTimelinePage() {
         <div className="space-y-1">
           <Link
             href="/anime"
-            className="text-zinc-500 hover:text-white flex items-center gap-1 text-sm mb-4 transition-colors"
+            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] flex items-center gap-1 text-sm mb-4 transition-colors"
           >
             <ChevronLeftIcon className="w-4 h-4" /> 返回番剧管理
           </Link>
           <h1 className="text-3xl font-bold tracking-tight">详细记录</h1>
-          <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest">
+          <p className="text-[var(--text-muted)] font-mono text-xs uppercase tracking-widest">
             Watch History &amp; Analytics
           </p>
         </div>
         <div className="hidden sm:block text-right">
-          <span className="text-4xl font-black text-white/5 italic select-none">TIMELINE</span>
+          <span className="text-4xl font-black text-[var(--color-surface-raised)] italic select-none">TIMELINE</span>
         </div>
       </header>
 
@@ -187,7 +187,7 @@ export default function AnimeTimelinePage() {
 
       {/* Footer */}
       <footer className="text-center pt-8 pb-4">
-        <p className="text-[10px] text-zinc-700 font-mono tracking-tighter italic">
+        <p className="text-[10px] text-[var(--text-muted)] font-mono tracking-tighter italic opacity-60">
           &ldquo;Every episode is a page in your story.&rdquo;
         </p>
       </footer>

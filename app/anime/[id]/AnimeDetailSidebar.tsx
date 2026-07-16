@@ -27,7 +27,7 @@ export default function AnimeDetailSidebar({
   return (
     <aside className="space-y-5 xl:sticky xl:top-8 xl:self-start">
       {/* Cover Image */}
-      <div className="glass-panel-strong overflow-hidden rounded-[28px] shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
+      <div className="glass-panel-strong shadow-theme-lg overflow-hidden rounded-[28px]">
         <div className="aspect-[2/3] w-full bg-[var(--bg-card)]">
           {coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -41,7 +41,7 @@ export default function AnimeDetailSidebar({
             <div className="flex h-full items-center justify-center text-sm text-[var(--text-muted)]">No Image</div>
           )}
         </div>
-        <div className="border-t border-[var(--border)] bg-black/20 p-4">
+        <div className="border-t border-[var(--border)] bg-[var(--color-surface-raised)] p-4">
           <div className={`rounded-2xl border px-4 py-3 text-center text-sm font-semibold tracking-[0.2em] ${statusBadgeStyles[displayStatus]}`}>
             {statusMap[displayStatus]}
           </div>

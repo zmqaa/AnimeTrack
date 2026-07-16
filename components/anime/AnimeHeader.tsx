@@ -21,14 +21,14 @@ export default function AnimeHeader({
   return (
     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
-        <h1 className="text-3xl font-light tracking-tight text-white">动漫追番</h1>
-        <p className="text-zinc-500 text-sm mt-1">记录看过的每一部佳作</p>
+        <h1 className="text-3xl font-light tracking-tight text-[var(--text-primary)]">动漫追番</h1>
+        <p className="text-sm mt-1 text-[var(--text-muted)]">记录看过的每一部佳作</p>
       </div>
       
       <div className="flex items-center gap-2">
           <Link
               href="/anime/timeline"
-                className="surface-pill flex items-center gap-2 px-4 py-2 hover:bg-zinc-800 text-zinc-300 rounded-lg text-sm font-medium transition-all"
+                className="surface-pill surface-hover flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
           >
               <CalendarDaysIcon className="w-4 h-4" />
               <span>追番时光机</span>
@@ -38,7 +38,7 @@ export default function AnimeHeader({
             <>
               <button
                   onClick={() => { resetForm(); setShowForm(!showForm); }}
-                  className="flex items-center gap-2 px-4 py-2 bg-white text-black rounded-lg hover:opacity-90 transition font-medium text-sm shadow-sm"
+                  className="theme-accent-button flex items-center gap-2 px-4 py-2 rounded-lg transition font-medium text-sm shadow-theme-md"
               >
                   <PlusIcon className="w-4 h-4" />
                   <span>{showForm && !editingId ? '取消' : '手动添加'}</span>

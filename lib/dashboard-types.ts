@@ -23,10 +23,3 @@ export interface ParsedWatchHistory extends WatchHistoryRecord {
 
 /** @deprecated 使用 ANIME_STATUS_LABELS */
 export const statusLabels = ANIME_STATUS_LABELS;
-
-export const statusColors: Record<AnimeStatus, string> = {
-  watching: '#22c55e',
-  completed: '#10b981',
-  dropped: '#ef4444',
-  plan_to_watch: '#8b5cf6',
-};

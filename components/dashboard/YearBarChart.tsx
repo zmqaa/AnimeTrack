@@ -47,20 +47,26 @@ export function YearBarChart({ data, height = 220, sortBy = 'label', labelFontSi
   }, [data, sortBy]);
 
   const maxVal = Math.max(...chartData.map((d) => d.value), 1);
-  const chartAreaHeight = height - 40;
+  const denseLabels = chartData.length > 15;
+  const topPad = 12;
+  // Rotated year labels extend below their anchor point, so reserve a real
+  // x-axis gutter instead of anchoring them against the SVG's clipped edge.
+  const bottomPad = denseLabels ? 44 : 30;
+  const chartAreaHeight = Math.max(height - topPad - bottomPad, 40);
   const leftPad = 36;
   const rightPad = 20;
   const chartW = Math.max(containerWidth - leftPad - rightPad, 200);
   const barSpacing = chartW / Math.max(chartData.length, 1);
   const barWidth = Math.max(6, Math.min(40, barSpacing - 8));
-  const denseLabels = chartData.length > 15;
+  const baselineY = topPad + chartAreaHeight;
+  const labelY = baselineY + (denseLabels ? 13 : 16);
 
   return (
     <div ref={containerRef} style={{ height: `${height}px`, width: '100%' }}>
       <svg width="100%" height={height} className="select-none">
         {/* Y-axis grid lines */}
         {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-          const y = 12 + chartAreaHeight * (1 - ratio);
+          const y = topPad + chartAreaHeight * (1 - ratio);
           return (
             <g key={ratio}>
               <line x1={leftPad} x2={leftPad + chartW} y1={y} y2={y} stroke="var(--barchart-grid)" strokeDasharray="4,4" />
@@ -72,13 +78,13 @@ export function YearBarChart({ data, height = 220, sortBy = 'label', labelFontSi
         })}
 
         {/* Baseline */}
-        <line x1={leftPad} x2={leftPad + chartW} y1={12 + chartAreaHeight} y2={12 + chartAreaHeight} stroke="var(--barchart-baseline)" />
+        <line x1={leftPad} x2={leftPad + chartW} y1={baselineY} y2={baselineY} stroke="var(--barchart-baseline)" />
 
         {/* Bars */}
         {chartData.map((d, i) => {
           const barH = Math.max(2, (d.value / maxVal) * chartAreaHeight);
           const barX = leftPad + i * barSpacing + (barSpacing - barWidth) / 2;
-          const barY = 12 + chartAreaHeight - barH;
+          const barY = baselineY - barH;
           const color = d.color || 'var(--barchart-bar-default)';
           const barId = `bar-grad-${i}`;
           const labelText = d.label.replace(' 年', '');
@@ -103,11 +109,11 @@ export function YearBarChart({ data, height = 220, sortBy = 'label', labelFontSi
               {/* X-axis label */}
               <text
                 x={barX + barWidth / 2}
-                y={height - 6}
+                y={labelY}
                 textAnchor={denseLabels ? 'end' : 'middle'}
                 fill="var(--barchart-axis-x)"
                 fontSize={labelFontSize ?? (denseLabels ? 8 : 9)}
-                transform={denseLabels ? `rotate(-45 ${barX + barWidth / 2} ${height - 6})` : undefined}
+                transform={denseLabels ? `rotate(-45 ${barX + barWidth / 2} ${labelY})` : undefined}
               >
                 {labelText}
               </text>
@@ -116,7 +122,7 @@ export function YearBarChart({ data, height = 220, sortBy = 'label', labelFontSi
                 x={barX - 4}
                 y={0}
                 width={barWidth + 8}
-                height={height - 18}
+                height={baselineY}
                 fill="transparent"
                 className="peer"
               />
@@ -129,7 +135,7 @@ export function YearBarChart({ data, height = 220, sortBy = 'label', labelFontSi
                 className="pointer-events-none opacity-0 transition-opacity group-hover:opacity-100"
                 style={{ overflow: 'visible' }}
               >
-                <div className="rounded-xl px-3 py-2.5 text-center shadow-[0_18px_40px_rgba(0,0,0,0.35)]"
+                <div className="shadow-theme-lg rounded-xl px-3 py-2.5 text-center"
                   style={{ backgroundColor: 'var(--barchart-tooltip-bg)', border: '1px solid var(--barchart-tooltip-border)' }}>
                   <div className="text-[10px] uppercase" style={{ color: 'var(--barchart-tooltip-sub)' }}>{labelText}</div>
                   <div className="mt-0.5 text-sm font-semibold" style={{ color: 'var(--barchart-tooltip-text)' }}>{d.value} 部</div>

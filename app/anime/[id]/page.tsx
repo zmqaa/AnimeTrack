@@ -129,7 +129,7 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
 
   return (
     <div className="mx-auto w-full max-w-[1660px] px-4 md:px-6 xl:px-8 2xl:px-10 pb-20 animate-in fade-in zoom-in-95 duration-300">
-      <div className="relative overflow-hidden rounded-[32px] border border-[var(--border)] shadow-[0_30px_80px_rgba(0,0,0,0.45)]" style={{ backgroundColor: 'var(--bg-card)' }}>
+      <div className="shadow-theme-xl relative overflow-hidden rounded-[32px] border border-[var(--border)]" style={{ backgroundColor: 'var(--bg-card)' }}>
         {/* Background blur from cover */}
         {(typeof formData.coverUrl === 'string' ? formData.coverUrl : item.coverUrl) && (
           <div className="absolute inset-0 opacity-[0.08]">

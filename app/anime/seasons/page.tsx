@@ -1,10 +1,12 @@
 "use client";
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { CheckIcon, ChevronLeftIcon, ChevronUpDownIcon } from '@heroicons/react/24/outline';
 import { useAnimeData } from '@/hooks/useAnimeData';
 import { AnimeRecord, statusLabels } from '@/lib/dashboard-types';
+import AnimePagination from '../AnimePagination';
 import {
   type SeasonName,
   startOfDay,
@@ -18,6 +20,7 @@ import {
 } from './seasons-helpers';
 
 type SortDirection = 'desc' | 'asc';
+const SEASONS_PER_PAGE = 6;
 
 interface SeasonBucket {
   key: string;
@@ -38,15 +41,29 @@ interface VisibleSeasonBucket {
   visibleItems: AnimeRecord[];
 }
 
-export default function AnimeSeasonsPage() {
+function parseYearParam(value: string | null): number | 'all' {
+  if (!value || value === 'all') return 'all';
+  const year = Number(value);
+  return Number.isInteger(year) && year > 0 ? year : 'all';
+}
+
+function AnimeSeasonsPageContent() {
   const { animeList, isLoading: animeLoading } = useAnimeData();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const today = useMemo(() => startOfDay(new Date()), []);
-  const [showStartedOnly, setShowStartedOnly] = useState(false);
-  const [selectedYear, setSelectedYear] = useState<number | 'all'>('all');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [showStartedOnly, setShowStartedOnly] = useState(() => searchParams.get('started') === '1');
+  const [selectedYear, setSelectedYear] = useState<number | 'all'>(() => parseYearParam(searchParams.get('year')));
+  const [sortDirection, setSortDirection] = useState<SortDirection>(() => searchParams.get('order') === 'asc' ? 'asc' : 'desc');
+  const [currentPage, setCurrentPage] = useState(() => {
+    const page = Number(searchParams.get('page'));
+    return Number.isInteger(page) && page > 0 ? page : 1;
+  });
   const [isYearMenuOpen, setIsYearMenuOpen] = useState(false);
   const [expandedBuckets, setExpandedBuckets] = useState<Record<string, boolean>>({});
   const yearMenuRef = useRef<HTMLDivElement | null>(null);
+  const resultsRef = useRef<HTMLElement | null>(null);
 
   const seasonAnimeEntries = useMemo(
     () => animeList.flatMap((anime) => {
@@ -150,24 +167,16 @@ export default function AnimeSeasonsPage() {
     });
   }, [seasonBuckets, selectedYear, showStartedOnly, sortDirection]);
 
-  const withPremiereCount = useMemo(
-    () => seasonAnimeEntries.length,
-    [seasonAnimeEntries]
+  const scopedAnime = useMemo(
+    () => visibleSeasonBuckets.flatMap(({ visibleItems }) => visibleItems),
+    [visibleSeasonBuckets]
   );
-
-  const startedCount = useMemo(
-    () => seasonAnimeEntries.filter(({ anime }) => hasStartedWatching(anime)).length,
-    [seasonAnimeEntries]
-  );
-
-  const completedCount = useMemo(
-    () => seasonAnimeEntries.filter(({ anime }) => anime.status === 'completed').length,
-    [seasonAnimeEntries]
-  );
-
+  const withPremiereCount = scopedAnime.length;
+  const startedCount = useMemo(() => scopedAnime.filter(hasStartedWatching).length, [scopedAnime]);
+  const completedCount = useMemo(() => scopedAnime.filter((anime) => anime.status === 'completed').length, [scopedAnime]);
   const totalProgressEpisodes = useMemo(
-    () => seasonAnimeEntries.reduce((sum, { anime }) => sum + (anime.progress || 0), 0),
-    [seasonAnimeEntries]
+    () => scopedAnime.reduce((sum, anime) => sum + (anime.progress || 0), 0),
+    [scopedAnime]
   );
   const visibleAnimeCount = useMemo(
     () => visibleSeasonBuckets.reduce((sum, entry) => sum + entry.visibleItems.length, 0),
@@ -176,6 +185,57 @@ export default function AnimeSeasonsPage() {
   const yearScopeLabel = selectedYear === 'all' ? '全部年份' : `${selectedYear} 年`;
   const orderScopeLabel = sortDirection === 'desc' ? '从新到旧' : '从旧到新';
   const loading = animeLoading;
+  const totalPages = selectedYear === 'all'
+    ? Math.max(1, Math.ceil(visibleSeasonBuckets.length / SEASONS_PER_PAGE))
+    : 1;
+  const safePage = loading ? currentPage : Math.min(currentPage, totalPages);
+  const paginatedSeasonBuckets = useMemo(
+    () => selectedYear === 'all'
+      ? visibleSeasonBuckets.slice((safePage - 1) * SEASONS_PER_PAGE, safePage * SEASONS_PER_PAGE)
+      : visibleSeasonBuckets,
+    [safePage, selectedYear, visibleSeasonBuckets]
+  );
+  const returnTo = useMemo(() => {
+    const params = new URLSearchParams();
+    if (selectedYear !== 'all') params.set('year', String(selectedYear));
+    if (sortDirection === 'asc') params.set('order', 'asc');
+    if (showStartedOnly) params.set('started', '1');
+    if (safePage > 1) params.set('page', String(safePage));
+    const query = params.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  }, [pathname, safePage, selectedYear, showStartedOnly, sortDirection]);
+
+  useEffect(() => {
+    if (!loading && currentPage !== safePage) setCurrentPage(safePage);
+  }, [currentPage, loading, safePage]);
+
+  useEffect(() => {
+    router.replace(returnTo, { scroll: false });
+  }, [returnTo, router]);
+
+  const changePage = useCallback((page: number) => {
+    setCurrentPage(page);
+    requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }, []);
+
+  const changeYear = useCallback((year: number | 'all') => {
+    setSelectedYear(year);
+    setCurrentPage(1);
+    setExpandedBuckets({});
+    setIsYearMenuOpen(false);
+  }, []);
+
+  const changeSortDirection = useCallback((direction: SortDirection) => {
+    setSortDirection(direction);
+    setCurrentPage(1);
+    setExpandedBuckets({});
+  }, []);
+
+  const changeStartedOnly = useCallback((startedOnly: boolean) => {
+    setShowStartedOnly(startedOnly);
+    setCurrentPage(1);
+    setExpandedBuckets({});
+  }, []);
 
   useEffect(() => {
     if (!isYearMenuOpen) {
@@ -221,37 +281,39 @@ export default function AnimeSeasonsPage() {
           </div>
           <div className="grid grid-cols-2 gap-3 min-w-full lg:min-w-[360px] lg:max-w-[380px]">
             <div className="surface-card rounded-[24px] p-4">
-              <div className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)]">Premiere</div>
-              <div className="mt-2 text-2xl font-mono text-[var(--text-primary)]">{withPremiereCount}</div>
-              <div className="text-xs text-[var(--text-muted)] mt-1">已开播且有首播日期的作品</div>
+              <div className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)]">In Scope</div>
+              <div className="mt-2 text-2xl font-mono text-[var(--text-primary)]">{loading ? '—' : withPremiereCount}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-1">当前范围内的开播作品</div>
             </div>
             <div className="surface-card rounded-[24px] p-4">
               <div className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)]">Started</div>
-              <div className="theme-secondary-text mt-2 text-2xl font-mono">{startedCount}</div>
-              <div className="text-xs text-[var(--text-muted)] mt-1">已经开始追过的作品</div>
+              <div className="theme-secondary-text mt-2 text-2xl font-mono">{loading ? '—' : startedCount}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-1">当前范围内已经开始追过</div>
             </div>
             <div className="surface-card rounded-[24px] p-4">
               <div className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)]">Completed</div>
-              <div className="theme-accent-text mt-2 text-2xl font-mono">{completedCount}</div>
-              <div className="text-xs text-[var(--text-muted)] mt-1">你已经看完的作品</div>
+              <div className="theme-accent-text mt-2 text-2xl font-mono">{loading ? '—' : completedCount}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-1">当前范围内已经看完</div>
             </div>
             <div className="surface-card rounded-[24px] p-4">
               <div className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)]">Progress</div>
-              <div className="mt-2 text-2xl font-mono score-text">{totalProgressEpisodes}</div>
-              <div className="text-xs text-[var(--text-muted)] mt-1">这些开播季里的累计进度</div>
+              <div className="mt-2 text-2xl font-mono score-text">{loading ? '—' : totalProgressEpisodes}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-1">当前范围内的累计进度</div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="relative z-20 flex flex-col gap-4 rounded-[30px] border border-[var(--border)] bg-white/[0.025] px-5 py-5 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+      <section className="relative z-20 flex flex-col gap-4 rounded-[30px] border border-[var(--border)] bg-[var(--color-surface-raised)] px-5 py-5 lg:flex-row lg:items-center lg:justify-between lg:px-6">
         <div className="space-y-1">
           <div className="text-[11px] uppercase tracking-[0.28em] text-[var(--text-muted)]">Notebook Scope</div>
           <div className="text-sm text-[var(--text-secondary)] lg:text-base">
             {showStartedOnly ? '当前只显示已经开始追番的作品卡片。' : '当前显示全部已开播作品。'}
             {` 年份范围：${yearScopeLabel}；排序：${orderScopeLabel}。`}
           </div>
-          <div className="text-xs text-[var(--text-muted)] lg:text-sm">覆盖 {visibleSeasonBuckets.length} 个季度，共 {visibleAnimeCount} 部作品。</div>
+          <div className="text-xs text-[var(--text-muted)] lg:text-sm">
+            {loading ? '正在整理档期数据…' : `覆盖 ${visibleSeasonBuckets.length} 个季度，共 ${visibleAnimeCount} 部作品。`}
+          </div>
         </div>
         <div className="flex flex-row flex-wrap items-center gap-3">
           <div ref={yearMenuRef} className="relative">
@@ -270,13 +332,12 @@ export default function AnimeSeasonsPage() {
               <div
                 role="listbox"
                 aria-label="按年份筛选季度"
-                className="surface-card absolute right-0 top-[calc(100%+0.65rem)] z-30 flex max-h-80 min-w-[180px] flex-col overflow-hidden rounded-[22px] p-2 shadow-[0_20px_60px_rgba(0,0,0,0.42)] backdrop-blur-xl"
+                className="surface-card shadow-theme-lg absolute right-0 top-[calc(100%+0.65rem)] z-30 flex max-h-80 min-w-[180px] flex-col overflow-hidden rounded-[22px] p-2 backdrop-blur-xl"
               >
                 <button
                   type="button"
                   onClick={() => {
-                    setSelectedYear('all');
-                    setIsYearMenuOpen(false);
+                    changeYear('all');
                   }}
                   className={selectedYear === 'all'
                     ? 'theme-secondary-soft flex items-center justify-between rounded-[16px] px-4 py-3 text-left text-sm'
@@ -292,8 +353,7 @@ export default function AnimeSeasonsPage() {
                       key={year}
                       type="button"
                       onClick={() => {
-                        setSelectedYear(year);
-                        setIsYearMenuOpen(false);
+                        changeYear(year);
                       }}
                       className={selectedYear === year
                         ? 'theme-secondary-soft flex items-center justify-between rounded-[16px] px-4 py-3 text-left text-sm'
@@ -309,40 +369,40 @@ export default function AnimeSeasonsPage() {
           </div>
           <button
             type="button"
-            onClick={() => setSortDirection('desc')}
+            onClick={() => changeSortDirection('desc')}
             aria-pressed={sortDirection === 'desc'}
             className={sortDirection === 'desc'
-              ? 'theme-secondary-soft rounded-full px-4 py-2 text-sm text-white'
+              ? 'theme-secondary-soft rounded-full px-4 py-2 text-sm'
               : 'surface-pill rounded-full px-4 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]'}
           >
             最新在前
           </button>
           <button
             type="button"
-            onClick={() => setSortDirection('asc')}
+            onClick={() => changeSortDirection('asc')}
             aria-pressed={sortDirection === 'asc'}
             className={sortDirection === 'asc'
-              ? 'theme-secondary-soft rounded-full px-4 py-2 text-sm text-white'
+              ? 'theme-secondary-soft rounded-full px-4 py-2 text-sm'
               : 'surface-pill rounded-full px-4 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]'}
           >
             最早在前
           </button>
           <button
             type="button"
-            onClick={() => setShowStartedOnly(false)}
+            onClick={() => changeStartedOnly(false)}
             aria-pressed={!showStartedOnly}
             className={showStartedOnly
               ? 'surface-pill rounded-full px-4 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]'
-              : 'theme-secondary-soft rounded-full px-4 py-2 text-sm text-white'}
+              : 'theme-secondary-soft rounded-full px-4 py-2 text-sm'}
           >
             全部开播作品
           </button>
           <button
             type="button"
-            onClick={() => setShowStartedOnly(true)}
+            onClick={() => changeStartedOnly(true)}
             aria-pressed={showStartedOnly}
             className={showStartedOnly
-              ? 'theme-secondary-soft rounded-full px-4 py-2 text-sm text-white'
+              ? 'theme-secondary-soft rounded-full px-4 py-2 text-sm'
               : 'surface-pill rounded-full px-4 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]'}
           >
             只看已开始追番
@@ -350,8 +410,30 @@ export default function AnimeSeasonsPage() {
         </div>
       </section>
 
-      <section className="relative z-10 space-y-5">
-        {visibleSeasonBuckets.map(({ bucket, visibleItems }) => {
+      <section ref={resultsRef} className="relative z-10 scroll-mt-6 space-y-5">
+        {!loading && totalPages > 1 && (
+          <AnimePagination
+            loading={false}
+            itemsCount={visibleSeasonBuckets.length}
+            currentPage={safePage}
+            totalPages={totalPages}
+            onPageChange={changePage}
+          />
+        )}
+
+        {loading && Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="glass-panel animate-pulse rounded-[34px] p-7 lg:p-8">
+            <div className="h-8 w-52 rounded-full bg-[var(--color-surface-hover)]" />
+            <div className="mt-5 h-16 rounded-[22px] bg-[var(--color-surface-hover)]" />
+            <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 3 }).map((__, cardIndex) => (
+                <div key={cardIndex} className="h-24 rounded-[22px] bg-[var(--color-surface-hover)]" />
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {!loading && paginatedSeasonBuckets.map(({ bucket, visibleItems }) => {
           const isExpanded = Boolean(expandedBuckets[bucket.key]);
           const canExpand = visibleItems.length > 6;
           const renderedItems = isExpanded ? visibleItems : visibleItems.slice(0, 6);
@@ -374,21 +456,18 @@ export default function AnimeSeasonsPage() {
                 </div>
               </div>
 
-              <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-3">
-                <div className="surface-card rounded-[22px] px-5 py-4">
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-muted)]">Progress</div>
-                  <div className="mt-2 text-2xl font-mono text-[var(--text-primary)]">{bucket.totalProgress} 集</div>
-                  <div className="mt-1 text-sm text-[var(--text-muted)]">这个开播季累计看了多少集</div>
+              <div className="surface-card-muted mt-5 grid grid-cols-2 rounded-[22px] px-2 py-4 sm:grid-cols-3">
+                <div className="px-3 sm:px-5">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-[var(--text-muted)]">Progress</div>
+                  <div className="mt-1 text-lg font-mono text-[var(--text-primary)]">{bucket.totalProgress} 集</div>
                 </div>
-                <div className="surface-card rounded-[22px] px-5 py-4">
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-muted)]">Last Watch</div>
-                  <div className="mt-2 text-2xl font-mono text-[var(--text-primary)]">{formatSeasonLastWatchLabel(bucket)}</div>
-                  <div className="mt-1 text-sm text-[var(--text-muted)]">最近一次追这个档期里的作品；没有时间记录时会单独标出来</div>
+                <div className="border-l border-[var(--border)] px-3 sm:px-5">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-[var(--text-muted)]">Last Watch</div>
+                  <div className="mt-1 text-lg font-mono text-[var(--text-primary)]">{formatSeasonLastWatchLabel(bucket)}</div>
                 </div>
-                <div className="surface-card rounded-[22px] px-5 py-4">
-                  <div className="text-[11px] uppercase tracking-[0.24em] text-[var(--text-muted)]">Season View</div>
-                  <div className="mt-2 text-2xl font-mono text-[var(--text-primary)]">{bucket.started}/{bucket.count}</div>
-                  <div className="mt-1 text-sm text-[var(--text-muted)]">已经开始追番的作品数量</div>
+                <div className="col-span-2 mt-4 border-t border-[var(--border)] px-3 pt-4 sm:col-span-1 sm:mt-0 sm:border-l sm:border-t-0 sm:px-5 sm:pt-0">
+                  <div className="text-[10px] uppercase tracking-[0.22em] text-[var(--text-muted)]">Season View</div>
+                  <div className="mt-1 text-lg font-mono text-[var(--text-primary)]">{bucket.started}/{bucket.count} 已开始</div>
                 </div>
               </div>
 
@@ -396,7 +475,7 @@ export default function AnimeSeasonsPage() {
                 {renderedItems.map((anime) => (
                   <Link
                     key={anime.id}
-                    href={`/anime/${anime.id}`}
+                    href={`/anime/${anime.id}?returnTo=${encodeURIComponent(returnTo)}`}
                     className="group surface-card-muted rounded-[22px] px-5 py-4 hover:border-[var(--color-airing)]/20 transition-all"
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -441,18 +520,32 @@ export default function AnimeSeasonsPage() {
           );
         })}
 
-        {!visibleSeasonBuckets.length && (
+        {!loading && !visibleSeasonBuckets.length && (
           <div className="glass-panel rounded-[34px] p-8 text-base text-[var(--text-muted)]">
             {seasonBuckets.length
               ? '当前筛选下没有符合条件的开播作品。'
               : '暂时还没有可用的首播季度数据。只有 premiereDate 已填写且已经开播的作品，才会出现在这里。'}
           </div>
         )}
-      </section>
 
-      {loading && (
-        <div className="text-sm text-[var(--text-muted)] font-mono px-2">SEASON_NOTEBOOK_LOADING...</div>
-      )}
+        {!loading && totalPages > 1 && (
+          <AnimePagination
+            loading={false}
+            itemsCount={visibleSeasonBuckets.length}
+            currentPage={safePage}
+            totalPages={totalPages}
+            onPageChange={changePage}
+          />
+        )}
+      </section>
     </main>
+  );
+}
+
+export default function AnimeSeasonsPage() {
+  return (
+    <Suspense fallback={<main className="p-8 text-[var(--text-muted)]">正在打开档期簿...</main>}>
+      <AnimeSeasonsPageContent />
+    </Suspense>
   );
 }

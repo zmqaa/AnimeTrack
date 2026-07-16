@@ -2,6 +2,7 @@
 
 import { memo, useMemo, useState, useRef, useEffect } from 'react';
 import { ParsedWatchHistory } from '@/lib/dashboard-types';
+import SegmentedControl from '@/components/shared/SegmentedControl';
 
 /** Inline SVG line chart — adapted from AdvancedActivityStats */
 function ActivityLineChart({ data, maxValue, scale }: { data: { label: string; value: number }[]; maxValue: number; scale: 'week' | 'month' | 'year' }) {
@@ -179,21 +180,17 @@ export default memo(function TimelineChart({ history }: TimelineChartProps) {
             {scale === 'week' ? '过去 7 天' : scale === 'month' ? '本月每日' : '今年每月'} · 合计 {chartData.reduce((s, d) => s + d.value, 0)} 集
           </p>
         </div>
-        <div className="surface-card-muted flex p-1 rounded-xl self-start">
-          {(['week', 'month', 'year'] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setScale(s)}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase transition-all ${
-                scale === s
-                  ? 'bg-[var(--tag-bg)] text-primary shadow-sm ring-1 ring-[var(--border)]'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-              }`}
-            >
-              {s === 'week' ? '周' : s === 'month' ? '月' : '年'}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          value={scale}
+          options={[
+            { value: 'week', label: '周' },
+            { value: 'month', label: '月' },
+            { value: 'year', label: '年' },
+          ]}
+          onChange={setScale}
+          ariaLabel="观看趋势时间范围"
+          className="self-start"
+        />
       </div>
 
       {/* Callout cards */}
@@ -214,7 +211,7 @@ export default memo(function TimelineChart({ history }: TimelineChartProps) {
       </div>
 
       {/* Chart */}
-      <div className="surface-card rounded-2xl p-3 md:p-4 bg-[linear-gradient(180deg,var(--bg-card),transparent)]">
+      <div className="surface-card-muted rounded-2xl p-3 md:p-4 bg-[linear-gradient(180deg,var(--tag-bg),transparent)]">
         <ActivityLineChart data={chartData} maxValue={maxValue} scale={scale} />
       </div>
     </div>
