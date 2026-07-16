@@ -5,8 +5,8 @@ import { ANIME_STATUS_LABELS } from '@/lib/anime-shared';
 export const statusMap = ANIME_STATUS_LABELS;
 
 export const statusBadgeStyles: Record<AnimeStatus, string> = {
-  watching: 'theme-status-watching',
-  completed: 'theme-status-completed',
+  watching: 'status-watching-soft',
+  completed: 'status-completed-soft',
   dropped: 'status-dropped-soft',
   plan_to_watch: 'status-plan-soft',
 };

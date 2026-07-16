@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { CheckIcon, ChevronLeftIcon, ChevronUpDownIcon } from '@heroicons/react/24/outline';
 import { useAnimeData } from '@/hooks/useAnimeData';
 import { AnimeRecord, statusLabels } from '@/lib/dashboard-types';
+import StatTile from '@/components/shared/StatTile';
 import AnimePagination from '../AnimePagination';
 import {
   type SeasonName,
@@ -280,26 +281,10 @@ function AnimeSeasonsPageContent() {
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 min-w-full lg:min-w-[360px] lg:max-w-[380px]">
-            <div className="surface-card rounded-[24px] p-4">
-              <div className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)]">In Scope</div>
-              <div className="mt-2 text-2xl font-mono text-[var(--text-primary)]">{loading ? '—' : withPremiereCount}</div>
-              <div className="text-xs text-[var(--text-muted)] mt-1">当前范围内的开播作品</div>
-            </div>
-            <div className="surface-card rounded-[24px] p-4">
-              <div className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)]">Started</div>
-              <div className="theme-secondary-text mt-2 text-2xl font-mono">{loading ? '—' : startedCount}</div>
-              <div className="text-xs text-[var(--text-muted)] mt-1">当前范围内已经开始追过</div>
-            </div>
-            <div className="surface-card rounded-[24px] p-4">
-              <div className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)]">Completed</div>
-              <div className="theme-accent-text mt-2 text-2xl font-mono">{loading ? '—' : completedCount}</div>
-              <div className="text-xs text-[var(--text-muted)] mt-1">当前范围内已经看完</div>
-            </div>
-            <div className="surface-card rounded-[24px] p-4">
-              <div className="text-[10px] uppercase tracking-[0.28em] text-[var(--text-muted)]">Progress</div>
-              <div className="mt-2 text-2xl font-mono score-text">{loading ? '—' : totalProgressEpisodes}</div>
-              <div className="text-xs text-[var(--text-muted)] mt-1">当前范围内的累计进度</div>
-            </div>
+            <StatTile surface="card" label="范围作品" value={loading ? '—' : withPremiereCount} detail="当前范围内的开播作品" />
+            <StatTile surface="card" label="已经开追" value={loading ? '—' : startedCount} detail="当前范围内已经开始追过" />
+            <StatTile surface="card" label="已经看完" value={loading ? '—' : completedCount} detail="当前范围内已经看完" />
+            <StatTile surface="card" label="累计进度" value={loading ? '—' : totalProgressEpisodes} unit="集" detail="当前范围内的累计进度" />
           </div>
         </div>
       </section>
@@ -340,7 +325,7 @@ function AnimeSeasonsPageContent() {
                     changeYear('all');
                   }}
                   className={selectedYear === 'all'
-                    ? 'theme-secondary-soft flex items-center justify-between rounded-[16px] px-4 py-3 text-left text-sm'
+                    ? 'surface-pill theme-selected-pill flex items-center justify-between rounded-[16px] px-4 py-3 text-left text-sm'
                     : 'flex items-center justify-between rounded-[16px] px-4 py-3 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--text-primary)]'}
                 >
                   <span>全部年份</span>
@@ -356,7 +341,7 @@ function AnimeSeasonsPageContent() {
                         changeYear(year);
                       }}
                       className={selectedYear === year
-                        ? 'theme-secondary-soft flex items-center justify-between rounded-[16px] px-4 py-3 text-left text-sm'
+                        ? 'surface-pill theme-selected-pill flex items-center justify-between rounded-[16px] px-4 py-3 text-left text-sm'
                         : 'flex items-center justify-between rounded-[16px] px-4 py-3 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--text-primary)]'}
                     >
                       <span>{year} 年</span>
@@ -371,9 +356,7 @@ function AnimeSeasonsPageContent() {
             type="button"
             onClick={() => changeSortDirection('desc')}
             aria-pressed={sortDirection === 'desc'}
-            className={sortDirection === 'desc'
-              ? 'theme-secondary-soft rounded-full px-4 py-2 text-sm'
-              : 'surface-pill rounded-full px-4 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]'}
+            className="surface-pill theme-filter-pill rounded-full px-4 py-2 text-sm"
           >
             最新在前
           </button>
@@ -381,9 +364,7 @@ function AnimeSeasonsPageContent() {
             type="button"
             onClick={() => changeSortDirection('asc')}
             aria-pressed={sortDirection === 'asc'}
-            className={sortDirection === 'asc'
-              ? 'theme-secondary-soft rounded-full px-4 py-2 text-sm'
-              : 'surface-pill rounded-full px-4 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]'}
+            className="surface-pill theme-filter-pill rounded-full px-4 py-2 text-sm"
           >
             最早在前
           </button>
@@ -391,9 +372,7 @@ function AnimeSeasonsPageContent() {
             type="button"
             onClick={() => changeStartedOnly(false)}
             aria-pressed={!showStartedOnly}
-            className={showStartedOnly
-              ? 'surface-pill rounded-full px-4 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]'
-              : 'theme-secondary-soft rounded-full px-4 py-2 text-sm'}
+            className="surface-pill theme-filter-pill rounded-full px-4 py-2 text-sm"
           >
             全部开播作品
           </button>
@@ -401,9 +380,7 @@ function AnimeSeasonsPageContent() {
             type="button"
             onClick={() => changeStartedOnly(true)}
             aria-pressed={showStartedOnly}
-            className={showStartedOnly
-              ? 'theme-secondary-soft rounded-full px-4 py-2 text-sm'
-              : 'surface-pill rounded-full px-4 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]'}
+            className="surface-pill theme-filter-pill rounded-full px-4 py-2 text-sm"
           >
             只看已开始追番
           </button>
@@ -447,9 +424,9 @@ function AnimeSeasonsPageContent() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2.5">
                   <span className="surface-pill rounded-full px-4 py-2 text-sm text-[var(--text-secondary)]">入库 {bucket.count} 部</span>
-                  <span className="theme-secondary-soft rounded-full px-4 py-2 text-sm">已开始追番 {bucket.started} 部</span>
-                  <span className="theme-accent-soft rounded-full px-4 py-2 text-sm">已看完 {bucket.completed} 部</span>
-                  <span className="theme-warm-soft rounded-full px-4 py-2 text-sm">追番中 {bucket.watching} 部</span>
+                  <span className="surface-pill rounded-full px-4 py-2 text-sm text-[var(--text-secondary)]">已开始追番 {bucket.started} 部</span>
+                  <span className="surface-pill rounded-full px-4 py-2 text-sm text-[var(--text-secondary)]">已看完 {bucket.completed} 部</span>
+                  <span className="surface-pill rounded-full px-4 py-2 text-sm text-[var(--text-secondary)]">追番中 {bucket.watching} 部</span>
                   {showStartedOnly && (
                     <span className="surface-pill rounded-full px-4 py-2 text-sm text-[var(--text-secondary)]">当前展示 {visibleItems.length} 部</span>
                   )}

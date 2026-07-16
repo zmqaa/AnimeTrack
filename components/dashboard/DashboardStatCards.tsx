@@ -17,18 +17,13 @@ export default React.memo(function DashboardStatCards({ stats }: { stats: StatIt
       {stats.map((stat, i) => {
         const content = (
           <div className="w-full">
-            <div className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
-              <span className="text-xs font-bold tracking-wide text-[var(--text-secondary)]">
-              {stat.label}
-              </span>
-            </div>
-            <div className="mt-2 flex items-baseline gap-1.5">
+            <div className="stat-tile-label">{stat.label}</div>
+            <div className="stat-tile-value-row">
               {stat.prefix ? (
-                <span className="text-xs font-semibold text-[var(--text-muted)]">{stat.prefix}</span>
+                <span className="stat-tile-unit">{stat.prefix}</span>
               ) : null}
-              <span className="text-3xl font-bold tracking-tight text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent)]">{stat.value}</span>
-              <span className="text-xs font-bold text-[var(--text-muted)]">{stat.unit}</span>
+              <span className="stat-tile-value">{stat.value}</span>
+              <span className="stat-tile-unit">{stat.unit}</span>
             </div>
           </div>
         );

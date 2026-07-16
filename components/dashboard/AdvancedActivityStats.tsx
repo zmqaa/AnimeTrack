@@ -3,6 +3,7 @@
 import { memo, useMemo, useState, useRef, useEffect } from 'react';
 import { AnimeRecord, ParsedWatchHistory } from '@/lib/dashboard-types';
 import SegmentedControl from '@/components/shared/SegmentedControl';
+import StatTile from '@/components/shared/StatTile';
 
 /** Inline SVG line chart — replacing echarts for ~800KB bundle savings */
 function ActivityLineChart({ data, maxValue, scale }: { data: { label: string; value: number }[]; maxValue: number; scale: 'week' | 'month' | 'year' }) {
@@ -216,19 +217,20 @@ export default memo(function AdvancedActivityStats({ history, animeList }: { his
       {/* Stat cards */}
       <div className="surface-card-muted grid grid-cols-1 gap-2 rounded-2xl p-2 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          { label: '总看番集数', value: statsData.totalEpisodes, unit: '集', detail: `峰值 ${statsData.peakPoint.label} · ${statsData.peakPoint.value} 集`, colorClass: 'text-[var(--text-primary)]' },
-          { label: '时长', value: Math.round(statsData.totalMinutes / 60), unit: '小时', detail: '按每集 24 分钟估算', colorClass: 'text-[var(--color-watching)]' },
-          { label: '活跃效率', value: (statsData.totalEpisodes / averagePerUnit).toFixed(1), unit: '集/日', detail: `${statsData.activeDays} 个活跃日`, colorClass: 'text-[var(--color-completed)]' },
-          { label: '高频时段', value: statsData.mostActiveWindow[0], unit: `× ${statsData.mostActiveWindow[1]}`, detail: `整库推进 ${statsData.libraryCoverage}%`, colorClass: 'score-text' },
+          { label: '总看番集数', value: statsData.totalEpisodes, unit: '集', detail: `峰值 ${statsData.peakPoint.label} · ${statsData.peakPoint.value} 集` },
+          { label: '时长', value: Math.round(statsData.totalMinutes / 60), unit: '小时', detail: '按每集 24 分钟估算' },
+          { label: '活跃效率', value: (statsData.totalEpisodes / averagePerUnit).toFixed(1), unit: '集/日', detail: `${statsData.activeDays} 个活跃日` },
+          { label: '高频时段', value: statsData.mostActiveWindow[0], unit: `× ${statsData.mostActiveWindow[1]}`, detail: `整库推进 ${statsData.libraryCoverage}%` },
         ].map((item) => (
-          <div key={item.label} className="rounded-xl bg-[var(--color-surface-hover)] px-4 py-3.5 lg:px-5">
-            <div className="text-xs font-bold tracking-wide text-[var(--text-secondary)]">{item.label}</div>
-            <div className="mt-2 flex items-baseline gap-1.5">
-              <span className={`font-mono text-2xl font-bold tracking-tighter ${item.colorClass}`}>{item.value}</span>
-              <span className="text-[10px] font-bold text-[var(--text-muted)]">{item.unit}</span>
-            </div>
-            <div className="mt-1.5 truncate text-[10px] text-[var(--text-muted)]">{item.detail}</div>
-          </div>
+          <StatTile
+            key={item.label}
+            label={item.label}
+            value={item.value}
+            unit={item.unit}
+            detail={item.detail}
+            surface="inset"
+            className="lg:px-5"
+          />
         ))}
       </div>
 
