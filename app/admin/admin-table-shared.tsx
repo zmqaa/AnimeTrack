@@ -215,6 +215,22 @@ export function UndoWatchIconButton({ onClick, disabled }: { onClick: () => void
   );
 }
 
+export function EditTimeIconButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--color-completed)] hover:bg-[var(--color-completed)]/10 transition-all disabled:opacity-50"
+      title="修改观看时间"
+      aria-label="修改观看时间"
+    >
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    </button>
+  );
+}
+
 export function SkeletonRows({ cols, rows = 8 }: { cols: number; rows?: number }) {
   return (
     <>

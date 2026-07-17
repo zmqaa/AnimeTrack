@@ -48,6 +48,13 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function normalizeTitleForExactMatch(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .replace(/\s+/g, '')
+    .toLowerCase();
+}
+
 /**
  * 从多个同名候选中选出最匹配的 subject。
  *
@@ -115,23 +122,26 @@ async function searchBangumiExact(originalTitle, anime) {
         sort: 'match',
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      return { subject: null, error: `Bangumi 搜索请求失败：HTTP ${res.status}` };
+    }
     const data = await res.json();
-    if (!data?.data?.length) return null;
+    if (!data?.data?.length) return { subject: null, error: null };
 
-    // 收集所有 name 精确匹配的结果
-    const exactAll = data.data.filter(s => s.name === originalTitle);
-    if (exactAll.length > 0) return pickBestSubject(exactAll, anime);
-
-    // 次选：name 包含 originalTitle（季度后缀稍有差异）
-    const partialAll = data.data.filter(s =>
-      s.name?.includes(originalTitle) || originalTitle.includes(s.name || '')
+    // 忽略全半角和空格差异，但不接受“短标题包含长标题”。
+    // 后者会把带季度后缀的续作错误匹配成首季。
+    const normalizedOriginalTitle = normalizeTitleForExactMatch(originalTitle);
+    const exactAll = data.data.filter(
+      s => normalizeTitleForExactMatch(s.name) === normalizedOriginalTitle
     );
-    if (partialAll.length > 0) return pickBestSubject(partialAll, anime);
+    if (exactAll.length > 0) return { subject: pickBestSubject(exactAll, anime), error: null };
 
-    return null;
-  } catch {
-    return null;
+    return { subject: null, error: null };
+  } catch (error) {
+    return {
+      subject: null,
+      error: `Bangumi 搜索请求失败：${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 }
 
@@ -153,15 +163,20 @@ async function searchBangumiByTitle(title, anime) {
         sort: 'match',
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      return { subject: null, error: `Bangumi 搜索请求失败：HTTP ${res.status}` };
+    }
     const data = await res.json();
-    if (!data?.data?.length) return null;
+    if (!data?.data?.length) return { subject: null, error: null };
     // 先尝试找 name_cn 匹配中文标题的
     const cnMatch = data.data.filter(s => s.name_cn === title);
-    if (cnMatch.length > 0) return pickBestSubject(cnMatch, anime);
-    return pickBestSubject(data.data, anime);
-  } catch {
-    return null;
+    if (cnMatch.length > 0) return { subject: pickBestSubject(cnMatch, anime), error: null };
+    return { subject: pickBestSubject(data.data, anime), error: null };
+  } catch (error) {
+    return {
+      subject: null,
+      error: `Bangumi 搜索请求失败：${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 }
 
@@ -277,11 +292,12 @@ function extractPremiereDate(subject, detail) {
 // ─── 主流程 ─────────────────────────────────────────────────────────────────
 
 function parseArgs(argv) {
-  const opts = { dryRun: true, force: false, ids: null, limit: null, concurrency: 2 };
+  const opts = { dryRun: true, force: false, coversOnly: false, ids: null, limit: null, concurrency: 2 };
   for (const arg of argv) {
     if (arg === '--help') { printHelp(); process.exit(0); }
     if (arg === '--write') { opts.dryRun = false; continue; }
     if (arg === '--force') { opts.force = true; continue; }
+    if (arg === '--covers-only') { opts.coversOnly = true; continue; }
     if (arg.startsWith('--ids=')) {
       opts.ids = arg.slice(6).split(',').map(Number).filter(n => n > 0);
       continue;
@@ -306,6 +322,7 @@ Usage: node scripts/enrich/enrich_bangumi.js [options]
 
   --write           写入数据库（默认 dry-run）
   --force           强制覆盖已有字段（默认跳过已填字段）
+  --covers-only     只补充缺失的远程封面来源 coverUrl
   --ids=1,2,3       只处理指定 ID
   --limit=N         最多处理 N 条
   --concurrency=N   并发数（默认 2，建议不超过 3）
@@ -337,7 +354,10 @@ async function processAnime(anime, opts) {
     return false;
   };
 
-  const fieldsNeeded = ['score', 'totalEpisodes', 'durationMinutes', 'summary', 'tags', 'coverUrl', 'isFinished', 'premiereDate']
+  const candidateFields = opts.coversOnly
+    ? ['coverUrl']
+    : ['score', 'totalEpisodes', 'durationMinutes', 'summary', 'tags', 'coverUrl', 'isFinished', 'premiereDate'];
+  const fieldsNeeded = candidateFields
     .filter(needsUpdate);
 
   if (fieldsNeeded.length === 0) {
@@ -348,19 +368,29 @@ async function processAnime(anime, opts) {
   await sleep(API_DELAY_MS);
   let subject = null;
   let matchMethod = '';
+  let requestError = null;
 
   if (anime.original_title) {
-    subject = await searchBangumiExact(anime.original_title, anime);
+    const result = await searchBangumiExact(anime.original_title, anime);
+    subject = result.subject;
+    requestError = result.error;
     if (subject) matchMethod = 'original_title精确';
   }
 
   if (!subject) {
-    subject = await searchBangumiByTitle(anime.title, anime);
+    const result = await searchBangumiByTitle(anime.title, anime);
+    subject = result.subject;
+    requestError = result.error || requestError;
     matchMethod = subject ? 'title回退' : '';
   }
 
   if (!subject) {
-    return { label, skip: true, reason: '未找到 Bangumi 结果' };
+    return {
+      label,
+      skip: true,
+      reason: requestError || '未找到 Bangumi 结果',
+      requestFailed: Boolean(requestError),
+    };
   }
 
   const subjectId = subject.id;
@@ -497,6 +527,10 @@ async function main() {
   if (opts.force) console.log('  --force: 强制覆盖已有字段');
   console.log();
 
+  if (opts.coversOnly) {
+    console.log('  --covers-only: only restore missing remote coverUrl values');
+  }
+
   const db = getDb();
 
   try {
@@ -510,7 +544,9 @@ async function main() {
       params.push(...opts.ids);
     }
 
-    if (!opts.force) {
+    if (opts.coversOnly && !opts.force) {
+      conditions.push(`(coverUrl IS NULL OR coverUrl = '')`);
+    } else if (!opts.force) {
       // 只取至少有一个字段为空的记录（SQLite 中 JSON 字段存储为 TEXT）
       conditions.push(`(
         score IS NULL OR totalEpisodes IS NULL OR durationMinutes IS NULL
@@ -547,8 +583,12 @@ async function main() {
       const anime = rows[i];
 
       if (r.skip) {
-        console.log(`⏭  ${r.label} — ${r.reason}`);
-        skipped++;
+        console.log(`${r.requestFailed ? '❌' : '⏭ '} ${r.label} — ${r.reason}`);
+        if (r.requestFailed) {
+          failed++;
+        } else {
+          skipped++;
+        }
         continue;
       }
 

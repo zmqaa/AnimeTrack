@@ -2,9 +2,11 @@ import 'server-only';
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { runDatabaseMigrations } from '@/lib/database-migrations';
+import { getDatabasePath, getProjectResourcePath } from '@/lib/runtime-paths';
 
-const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data', 'animetrack.db');
-const SCHEMA_PATH = path.join(process.cwd(), 'database', 'schema.sql');
+const DB_PATH = getDatabasePath();
+const SCHEMA_PATH = getProjectResourcePath('database', 'schema.sql');
 
 let _db: Database.Database | null = null;
 
@@ -28,6 +30,13 @@ function getDb(): Database.Database {
   if (fs.existsSync(SCHEMA_PATH)) {
     const schema = fs.readFileSync(SCHEMA_PATH, 'utf-8');
     db.exec(schema);
+  }
+
+  const migrationResult = runDatabaseMigrations(db, DB_PATH);
+  if (migrationResult.applied.length > 0 || migrationResult.baselined.length > 0) {
+    console.log(
+      `[db:migrate] 初始化完成，执行 ${migrationResult.applied.length} 个迁移，登记 ${migrationResult.baselined.length} 个兼容基线`,
+    );
   }
 
   // 启动时清理孤儿观看历史（anime 已删除但 history 未清理的记录）

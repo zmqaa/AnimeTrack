@@ -34,7 +34,7 @@ export default memo(function TimelineStats({ history, animeMap }: TimelineStatsP
     let withCover = 0;
     uniqueAnimeIds.forEach(id => {
       const anime = animeMap.get(id);
-      if (anime?.coverUrl) withCover++;
+      if (anime?.displayCoverUrl) withCover++;
     });
 
     return {

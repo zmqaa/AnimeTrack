@@ -2,6 +2,7 @@
   "name": "anime-track-web",
   "version": "1.0.0",
   "private": true,
+  "main": "dist-desktop/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "node scripts/deploy/prod_build_guard.js",
@@ -21,7 +22,17 @@
     "anime:enrich-titles": "node scripts/enrich/enrich_titles.js",
     "anime:enrich-titles:write": "node scripts/enrich/enrich_titles.js --write",
     "anime:enrich-bangumi": "node scripts/enrich/enrich_bangumi.js",
-    "anime:enrich-bangumi:write": "node scripts/enrich/enrich_bangumi.js --write"
+    "anime:enrich-bangumi:write": "node scripts/enrich/enrich_bangumi.js --write",
+    "covers:restore-sources": "node scripts/enrich/enrich_bangumi.js --covers-only",
+    "covers:restore-sources:write": "node scripts/enrich/enrich_bangumi.js --covers-only --write",
+    "desktop:prepare": "node scripts/desktop/prepare-standalone.js",
+    "desktop:build:web": "npm run build:next && npm run desktop:prepare",
+    "desktop:build:electron": "tsc -p desktop/tsconfig.json",
+    "desktop:build": "npm run desktop:build:web && npm run desktop:build:electron",
+    "desktop:rebuild-native": "electron-builder install-app-deps && node scripts/desktop/sync-native-modules.js .next/standalone/node_modules",
+    "desktop:start": "npm run desktop:build && node scripts/desktop/run-electron.js",
+    "desktop:pack": "npm run desktop:build && node scripts/desktop/package-electron.js dir",
+    "desktop:dist": "npm run desktop:build && node scripts/desktop/package-electron.js portable"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
@@ -44,9 +55,44 @@
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
     "autoprefixer": "^10.4.17",
+    "electron": "^43.1.1",
+    "electron-builder": "^26.15.3",
     "eslint": "^8.56.0",
     "eslint-config-next": "^14.1.0",
     "postcss": "^8.4.33",
     "tailwindcss": "^3.4.1"
+  },
+  "build": {
+    "appId": "com.animetrack.desktop",
+    "productName": "AnimeTrack",
+    "asar": true,
+    "afterPack": "scripts/desktop/after-pack.js",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist-desktop/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "dist-desktop/standalone",
+        "to": "app/standalone",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "AnimeTrack-${version}-portable.${ext}"
+    }
   }
 }

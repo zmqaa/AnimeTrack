@@ -20,6 +20,7 @@ interface AnimeSummary {
   title: string;
   originalTitle?: string;
   coverUrl?: string;
+  displayCoverUrl?: string;
   status: string;
   totalWatched: number;
   latestEpisode: number;
@@ -42,7 +43,7 @@ export default memo(function TimelineAnimeSummary({ entries, searchQuery }: Time
           animeId: h.animeId,
           title: h.animeTitle,
           originalTitle: anime?.originalTitle,
-          coverUrl: anime?.coverUrl,
+          coverUrl: anime?.displayCoverUrl,
           status: anime?.status ?? 'watching',
           totalWatched: 0,
           latestEpisode: 0,

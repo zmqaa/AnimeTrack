@@ -11,8 +11,10 @@ const fs = require('fs');
 const path = require('path');
 const { getDb, projectRoot, nowCSTTimestamp, nowCSTReadable } = require('../shared/db_env');
 
-const BACKUP_DIR = path.join(projectRoot, 'backups');
-const BACKUP_PREFIX = 'scheduled-backup-';
+const BACKUP_DIR = process.env.ANIMETRACK_BACKUPS_DIR
+  ? path.resolve(process.env.ANIMETRACK_BACKUPS_DIR)
+  : path.join(projectRoot, 'backups');
+const BACKUP_PREFIX = process.env.ANIMETRACK_BACKUP_PREFIX || 'scheduled-backup-';
 const DEFAULT_KEEP = 10;
 
 function parseArgs() {
@@ -64,7 +66,7 @@ async function main() {
     const historyRows = db.prepare('SELECT id, animeId, animeTitle, episode, watchedAt FROM watch_history ORDER BY watchedAt ASC, id ASC').all();
 
     const animeColumns = [
-      'id', 'title', 'original_title', 'coverUrl', 'status', 'score',
+      'id', 'title', 'original_title', 'coverUrl', 'localCoverUrl', 'status', 'score',
       'progress', 'totalEpisodes', 'durationMinutes', 'notes', 'tags', 'summary',
       'start_date', 'end_date', 'premiere_date',
       'cast', 'cast_aliases', 'isFinished', 'createdAt', 'updatedAt',
@@ -72,8 +74,14 @@ async function main() {
     const historyColumns = ['id', 'animeId', 'animeTitle', 'episode', 'watchedAt'];
 
     const ts = nowCSTTimestamp();
-    const fileName = `${BACKUP_PREFIX}${ts}.sql`;
-    const filePath = path.join(BACKUP_DIR, fileName);
+    let fileName = `${BACKUP_PREFIX}${ts}.sql`;
+    let filePath = path.join(BACKUP_DIR, fileName);
+    let suffix = 2;
+    while (fs.existsSync(filePath)) {
+      fileName = `${BACKUP_PREFIX}${ts}-${suffix}.sql`;
+      filePath = path.join(BACKUP_DIR, fileName);
+      suffix++;
+    }
 
     const lines = [
       '-- Scheduled backup (scheduled_backup.js)',

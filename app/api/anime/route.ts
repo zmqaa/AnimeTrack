@@ -4,7 +4,7 @@ import { normalizeStringArray } from '@/lib/anime-cast';
 import { enrichAnimeInput } from '@/lib/anime-enrichment';
 import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
 import { createAnimeSchema } from '@/lib/validations';
-import { resolveCoverImage } from '@/lib/cover-image';
+import { resolveLocalCoverImage } from '@/lib/cover-image';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -92,11 +92,10 @@ export async function POST(request: NextRequest) {
 
     // 下载封面图到本地
     if (newRecord.coverUrl) {
-      const resolved = await resolveCoverImage(newRecord.coverUrl, newRecord.id);
-      if (resolved !== newRecord.coverUrl) {
-        await updateAnimeRecord(newRecord.id, { coverUrl: resolved ?? undefined });
-        newRecord.coverUrl = resolved ?? undefined;
-      }
+      const localCoverUrl = await resolveLocalCoverImage(newRecord.coverUrl, newRecord.id);
+      await updateAnimeRecord(newRecord.id, { localCoverUrl });
+      newRecord.localCoverUrl = localCoverUrl ?? undefined;
+      newRecord.displayCoverUrl = localCoverUrl || newRecord.coverUrl;
     }
 
     return apiSuccess(newRecord);

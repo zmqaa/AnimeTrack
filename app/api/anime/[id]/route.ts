@@ -2,7 +2,7 @@ import { deleteAnimeRecord, getAnimeRecord, updateAnimeRecordWithHistory, AnimeR
 import { buildVoiceActorAliases } from '@/lib/ai';
 import { normalizeStringArray, areStringArraysEqual } from '@/lib/anime-cast';
 import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
-import { resolveCoverImage, deleteCoverImage } from '@/lib/cover-image';
+import { resolveLocalCoverImage, deleteCoverImage } from '@/lib/cover-image';
 import { patchAnimeBodySchema } from '@/lib/validations';
 
 function areAllowedFieldValuesEqual(key: string, nextValue: unknown, currentValue: unknown) {
@@ -78,7 +78,10 @@ export async function PATCH(
   };
   const allowedKeys = ['title', 'originalTitle', 'status', 'progress', 'score', 'totalEpisodes', 'notes', 'coverUrl', 'durationMinutes', 'tags', 'summary', 'startDate', 'endDate', 'premiereDate', 'cast', 'castAliases', 'isFinished'] as const;
   type AllowedKey = (typeof allowedKeys)[number];
-  const updateData: Omit<Partial<AnimeRecord>, 'coverUrl'> & { coverUrl?: string | null } = {};
+  const updateData: Omit<Partial<AnimeRecord>, 'coverUrl' | 'localCoverUrl' | 'displayCoverUrl'> & {
+    coverUrl?: string | null;
+    localCoverUrl?: string | null;
+  } = {};
   const updateRecord = updateData as Partial<Record<AllowedKey, unknown>>;
 
   for (const key of allowedKeys) {
@@ -125,17 +128,13 @@ export async function PATCH(
 
   // 如果更新了 coverUrl，同步下载封面到本地
   if (updateData.coverUrl !== undefined) {
-    const resolvedCoverUrl = await resolveCoverImage(updateData.coverUrl, id, {
-      fallbackOnDownloadFailure: before.coverUrl || null,
-    });
-    if (resolvedCoverUrl === (before.coverUrl ?? null)) {
-      delete updateData.coverUrl;
-    } else {
-      updateData.coverUrl = resolvedCoverUrl;
-    }
+    updateData.localCoverUrl = await resolveLocalCoverImage(updateData.coverUrl, id);
   }
 
-  const updated = updateAnimeRecordWithHistory(id, updateData, Boolean(body.recordHistory));
+  const updated = updateAnimeRecordWithHistory(id, updateData, {
+    recordHistory: Boolean(body.recordHistory),
+    trimHistoryOnProgressDecrease: Boolean(body.trimHistoryOnProgressDecrease),
+  });
   if (!updated) return apiError('Not found', 404);
 
   return apiSuccess({ ok: true, entry: updated });

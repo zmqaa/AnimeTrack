@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { createAiRuntimeConfig, getAiApiKey, requestAiJson as requestSharedAiJson } from './ai-runtime';
+import { createAiRuntimeConfig, requestAiJson as requestSharedAiJson } from './ai-runtime';
 import { containsCjkText, uniqueStrings } from './anime-cast';
 import { parseChineseNumberToken, appendSeasonToTitle, stripSeasonToken } from './chinese-parser';
 import { fetchAiAnimeMetadata } from './metadata/ai-metadata-source';
@@ -65,7 +65,6 @@ type AiMessage = {
   content: string;
 };
 
-const AI_RUNTIME = createAiRuntimeConfig();
 const QUICK_RECORD_PARSE_TIMEOUT_MS = Math.max(3_000, Number(process.env.QUICK_RECORD_AI_TIMEOUT_MS || 12_000));
 
 function escapeRegExp(value: string): string {
@@ -342,7 +341,7 @@ function normalizeQuickRecordBatchPayload(payload: Record<string, unknown>): Par
 
 async function requestAiJson<T>(messages: AiMessage[], temperature = 0.2): Promise<T | null> {
   return requestSharedAiJson<T>({
-    ...AI_RUNTIME,
+    ...createAiRuntimeConfig(),
     messages,
     temperature,
     timeoutMs: 30_000,
@@ -356,7 +355,7 @@ export async function enrichAnimeData(queryName: string): Promise<EnrichedAnimeD
     return null;
   }
 
-  const metadata = await fetchAiAnimeMetadata(normalizedQuery, getAiApiKey());
+  const metadata = await fetchAiAnimeMetadata(normalizedQuery);
   if (!metadata) {
     return null;
   }
@@ -421,7 +420,7 @@ export async function parseQuickRecordBatch(inputText: string): Promise<ParsedQu
   }
 
   const payload = await requestSharedAiJson<Record<string, unknown>>({
-    ...AI_RUNTIME,
+    ...createAiRuntimeConfig(),
     messages: [
       {
         role: 'system',

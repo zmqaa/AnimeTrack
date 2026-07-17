@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react';
+import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/24/outline';
 import type { AnimeDetailItem, AnimeStatus } from '@/lib/anime-shared';
 import { statusMap, statusBadgeStyles } from './anime-detail-helpers';
 import FormField from '@/components/shared/FormField';
@@ -24,7 +26,31 @@ export default function AnimeDetailSidebar({
   displayDuration,
   onChange,
 }: Props) {
-  const coverUrl = (typeof formData.coverUrl === 'string' ? formData.coverUrl : undefined) || item.coverUrl || '';
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const statusMenuRef = useRef<HTMLDivElement>(null);
+  const coverUrl = (typeof formData.coverUrl === 'string' ? formData.coverUrl : undefined)
+    || item.displayCoverUrl
+    || '';
+
+  useEffect(() => {
+    if (!statusMenuOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!statusMenuRef.current?.contains(event.target as Node)) {
+        setStatusMenuOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setStatusMenuOpen(false);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [statusMenuOpen]);
 
   return (
     <aside className="space-y-5 xl:sticky xl:top-8 xl:self-start">
@@ -55,15 +81,48 @@ export default function AnimeDetailSidebar({
         {canEdit ? (
           <div className="space-y-4">
             <FormField label="状态">
-              <select
-                value={formData.status || item.status}
-                onChange={(event) => onChange('status', event.target.value as AnimeStatus)}
-                className="surface-input theme-focus-accent w-full rounded-xl px-3 py-2.5 text-sm text-[var(--text-primary)] transition"
-              >
-                {Object.keys(statusMap).map((status) => (
-                  <option key={status} value={status}>{statusMap[status as AnimeStatus]}</option>
-                ))}
-              </select>
+              <div ref={statusMenuRef} className="relative">
+                <button
+                  type="button"
+                  aria-haspopup="listbox"
+                  aria-expanded={statusMenuOpen}
+                  onClick={() => setStatusMenuOpen((open) => !open)}
+                  className="surface-input theme-focus-accent flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm text-[var(--text-primary)] transition-colors hover:border-[var(--border-light)]"
+                >
+                  <span>{statusMap[displayStatus]}</span>
+                  <ChevronUpDownIcon className="h-4 w-4 text-[var(--text-secondary)]" />
+                </button>
+
+                {statusMenuOpen && (
+                  <div
+                    role="listbox"
+                    aria-label="观看状态"
+                    className="surface-card shadow-theme-lg absolute left-0 right-0 top-[calc(100%+0.5rem)] z-30 flex flex-col gap-1 rounded-2xl p-2 backdrop-blur-xl"
+                  >
+                    {(Object.keys(statusMap) as AnimeStatus[]).map((status) => {
+                      const selected = status === displayStatus;
+                      return (
+                        <button
+                          key={status}
+                          type="button"
+                          role="option"
+                          aria-selected={selected}
+                          onClick={() => {
+                            onChange('status', status);
+                            setStatusMenuOpen(false);
+                          }}
+                          className={selected
+                            ? 'surface-pill theme-selected-pill flex items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm'
+                            : 'flex items-center justify-between rounded-xl px-3 py-2.5 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--text-primary)]'}
+                        >
+                          <span>{statusMap[status]}</span>
+                          {selected && <CheckIcon className="h-4 w-4" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </FormField>
             <div className="grid grid-cols-2 gap-3">
               <FormField label="评分">

@@ -218,9 +218,9 @@ export default memo(function TimelineEnhancedList({ entries, groupBy, searchQuer
                       {/* Cover thumbnail */}
                       <div
                         className="shrink-0 w-11 h-16 rounded-lg bg-cover bg-center bg-[var(--tag-bg)]"
-                        style={anime?.coverUrl ? { backgroundImage: `url(${anime.coverUrl})` } : undefined}
+                        style={anime?.displayCoverUrl ? { backgroundImage: `url(${anime.displayCoverUrl})` } : undefined}
                       >
-                        {!anime?.coverUrl && (
+                        {!anime?.displayCoverUrl && (
                           <div className="flex h-full w-full items-center justify-center text-[8px] text-[var(--text-muted)]">
                             无封面
                           </div>
