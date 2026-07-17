@@ -8,21 +8,15 @@ import { createMainWindow } from './window';
 let serverHandle: LocalServerHandle | null = null;
 let stopping = false;
 
-function getPortableRoot(): string {
+function getApplicationRoot(): string {
   if (!app.isPackaged) {
     return process.cwd();
   }
-
-  const portableExecutableDirectory = process.env.PORTABLE_EXECUTABLE_DIR;
-  if (portableExecutableDirectory) {
-    return path.resolve(portableExecutableDirectory);
-  }
-
   return path.dirname(process.execPath);
 }
 
 function ensureDesktopPaths(): DesktopPaths {
-  const data = path.join(getPortableRoot(), 'data');
+  const data = path.join(getApplicationRoot(), 'data');
   const paths: DesktopPaths = {
     data,
     backups: path.join(data, 'backups'),
@@ -39,9 +33,14 @@ function ensureDesktopPaths(): DesktopPaths {
 }
 
 function getStandaloneRoot(): string {
+  const configuredRoot = process.env.ANIMETRACK_STANDALONE_ROOT?.trim();
+  if (configuredRoot) {
+    return path.resolve(configuredRoot);
+  }
+
   return app.isPackaged
     ? path.join(process.resourcesPath, 'app', 'standalone')
-    : path.join(process.cwd(), '.next', 'standalone');
+    : path.join(process.cwd(), 'dist-desktop', 'standalone');
 }
 
 async function stopServer(): Promise<void> {

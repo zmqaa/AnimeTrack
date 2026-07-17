@@ -22,7 +22,7 @@ const { getDb, loadDatabaseEnv } = require('../shared/db_env');
 loadDatabaseEnv();
 
 const DEFAULT_AI_URL = 'https://api.deepseek.com/chat/completions';
-const DEFAULT_AI_MODEL = 'deepseek-chat';
+const DEFAULT_AI_MODEL = 'deepseek-v4-flash';
 const FETCH_TIMEOUT_MS = 30000;
 const MAX_CONCURRENCY = 5;
 
@@ -40,36 +40,12 @@ function normalizeAiApiUrl(value) {
   return withoutTrailingSlash;
 }
 
-function shouldUseJsonFormat(apiUrl, model) {
-  const override = String(process.env.AI_JSON_FORMAT ?? '').trim().toLowerCase();
-  if (['false', '0', 'off', 'no'].includes(override)) {
-    return false;
-  }
-
-  if (['true', '1', 'on', 'yes'].includes(override)) {
-    return true;
-  }
-
-  if (String(apiUrl || '').includes('.volces.com') || String(model || '').toLowerCase().startsWith('ep-')) {
-    return false;
-  }
-
-  return true;
-}
-
 function getAiConfig() {
   return {
     apiUrl: normalizeAiApiUrl(process.env.AI_API_URL),
     model: String(process.env.AI_MODEL || '').trim() || DEFAULT_AI_MODEL,
     apiKey: String(process.env.AI_API_KEY || process.env.DEEPSEEK_API_KEY || '').trim(),
   };
-}
-
-function shouldDisableThinking(aiConfig) {
-  if (String(process.env.AI_DISABLE_THINKING || '').trim().toLowerCase() === 'false') {
-    return false;
-  }
-  return aiConfig.apiUrl.includes('dashscope.aliyuncs.com') || aiConfig.model.startsWith('qwen');
 }
 
 function parseArgs(argv) {
@@ -201,8 +177,7 @@ async function requestAiJson(aiConfig, messages) {
     model: aiConfig.model,
     messages,
     temperature: 0.1,
-    ...(shouldUseJsonFormat(aiConfig.apiUrl, aiConfig.model) ? { response_format: { type: 'json_object' } } : {}),
-    ...(shouldDisableThinking(aiConfig) ? { enable_thinking: false } : {}),
+    response_format: { type: 'json_object' },
   };
 
   try {

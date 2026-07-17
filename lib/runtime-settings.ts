@@ -7,12 +7,9 @@ import { isDesktopRuntime } from '@/lib/runtime-mode';
 import { getSettingsPath } from '@/lib/runtime-paths';
 
 export type StoredAiSettings = {
-  provider?: string;
   apiUrl?: string;
   model?: string;
   apiKey?: string;
-  jsonFormat?: boolean;
-  disableThinking?: boolean;
 };
 
 export type RuntimeSettings = {
@@ -33,12 +30,9 @@ function normalizeStoredAiSettings(value: unknown): StoredAiSettings | undefined
   const input = value as Record<string, unknown>;
 
   return {
-    provider: normalizeOptionalString(input.provider),
     apiUrl: normalizeOptionalString(input.apiUrl),
     model: normalizeOptionalString(input.model),
     apiKey: normalizeOptionalString(input.apiKey),
-    jsonFormat: typeof input.jsonFormat === 'boolean' ? input.jsonFormat : undefined,
-    disableThinking: typeof input.disableThinking === 'boolean' ? input.disableThinking : undefined,
   };
 }
 

@@ -12,8 +12,6 @@ export type AiRuntimeConfig = {
   apiUrl: string;
   model: string;
   apiKey: string;
-  jsonFormat: boolean;
-  disableThinking: boolean;
 };
 
 export type RequestAiJsonOptions = Partial<AiRuntimeConfig> & {
@@ -21,12 +19,11 @@ export type RequestAiJsonOptions = Partial<AiRuntimeConfig> & {
   temperature?: number;
   timeoutMs?: number;
   cache?: RequestCache;
-  includeThinkingControl?: boolean;
   extraBody?: Record<string, unknown>;
 };
 
 export const DEFAULT_AI_URL = 'https://api.deepseek.com/chat/completions';
-export const DEFAULT_AI_MODEL = 'deepseek-chat';
+export const DEFAULT_AI_MODEL = 'deepseek-v4-flash';
 
 export function normalizeAiApiUrl(value?: string): string {
   const normalized = String(value || '').trim();
@@ -40,27 +37,6 @@ export function normalizeAiApiUrl(value?: string): string {
   }
 
   return withoutTrailingSlash;
-}
-
-export function shouldUseJsonFormat(apiUrl?: string, model?: string, configuredValue?: boolean): boolean {
-  if (typeof configuredValue === 'boolean') {
-    return configuredValue;
-  }
-
-  const override = String(process.env.AI_JSON_FORMAT ?? '').trim().toLowerCase();
-  if (['false', '0', 'off', 'no'].includes(override)) {
-    return false;
-  }
-
-  if (['true', '1', 'on', 'yes'].includes(override)) {
-    return true;
-  }
-
-  if (String(apiUrl || '').includes('.volces.com') || String(model || '').toLowerCase().startsWith('ep-')) {
-    return false;
-  }
-
-  return true;
 }
 
 export function parseJsonFromAiContent<T = unknown>(content: string): T | null {
@@ -100,16 +76,6 @@ export function getAiApiKey(): string {
   return String(process.env.AI_API_KEY || process.env.DEEPSEEK_API_KEY || '').trim();
 }
 
-export function shouldDisableThinking(aiConfig?: Partial<AiRuntimeConfig>): boolean {
-  if (String(process.env.AI_DISABLE_THINKING || '').trim().toLowerCase() === 'false') {
-    return false;
-  }
-
-  const apiUrl = String(aiConfig?.apiUrl || '').trim().toLowerCase();
-  const model = String(aiConfig?.model || '').trim().toLowerCase();
-  return apiUrl.includes('dashscope.aliyuncs.com') || model.startsWith('qwen');
-}
-
 export function createAiRuntimeConfig(overrides: Partial<AiRuntimeConfig> = {}): AiRuntimeConfig {
   const stored = isDesktopRuntime() ? readRuntimeSettings().ai : undefined;
   const apiUrl = normalizeAiApiUrl(overrides.apiUrl ?? stored?.apiUrl ?? process.env.AI_API_URL);
@@ -117,23 +83,11 @@ export function createAiRuntimeConfig(overrides: Partial<AiRuntimeConfig> = {}):
   const model = String(modelInput || '').trim() || DEFAULT_AI_MODEL;
   const apiKeyInput = overrides.apiKey ?? stored?.apiKey ?? getAiApiKey();
   const apiKey = String(apiKeyInput || '').trim();
-  const hasJsonFormat = Object.prototype.hasOwnProperty.call(overrides, 'jsonFormat');
-  const hasDisableThinking = Object.prototype.hasOwnProperty.call(overrides, 'disableThinking');
-  const jsonFormat = hasJsonFormat
-    ? Boolean(overrides.jsonFormat)
-    : shouldUseJsonFormat(apiUrl, model, stored?.jsonFormat);
-  const disableThinking = hasDisableThinking
-    ? Boolean(overrides.disableThinking)
-    : typeof stored?.disableThinking === 'boolean'
-      ? stored.disableThinking
-      : shouldDisableThinking({ apiUrl, model });
 
   return {
     apiUrl,
     model,
     apiKey,
-    jsonFormat,
-    disableThinking,
   };
 }
 
@@ -142,8 +96,6 @@ export async function requestAiJson<T = unknown>(options: RequestAiJsonOptions =
   if (options.apiUrl !== undefined) runtimeOverrides.apiUrl = options.apiUrl;
   if (options.model !== undefined) runtimeOverrides.model = options.model;
   if (options.apiKey !== undefined) runtimeOverrides.apiKey = options.apiKey;
-  if (options.jsonFormat !== undefined) runtimeOverrides.jsonFormat = options.jsonFormat;
-  if (options.disableThinking !== undefined) runtimeOverrides.disableThinking = options.disableThinking;
   const runtime = createAiRuntimeConfig(runtimeOverrides);
 
   if (!runtime.apiKey || !Array.isArray(options.messages) || options.messages.length === 0) {
@@ -158,8 +110,7 @@ export async function requestAiJson<T = unknown>(options: RequestAiJsonOptions =
     model: runtime.model,
     messages: options.messages,
     temperature: typeof options.temperature === 'number' ? options.temperature : 0.1,
-    ...(runtime.jsonFormat ? { response_format: { type: 'json_object' } } : {}),
-    ...(runtime.disableThinking ? { enable_thinking: false } : {}),
+    response_format: { type: 'json_object' },
     ...(options.extraBody && typeof options.extraBody === 'object' ? options.extraBody : {}),
   };
 

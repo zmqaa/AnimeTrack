@@ -25,18 +25,19 @@
     "anime:enrich-bangumi:write": "node scripts/enrich/enrich_bangumi.js --write",
     "covers:restore-sources": "node scripts/enrich/enrich_bangumi.js --covers-only",
     "covers:restore-sources:write": "node scripts/enrich/enrich_bangumi.js --covers-only --write",
-    "desktop:prepare": "node scripts/desktop/prepare-standalone.js",
-    "desktop:build:web": "npm run build:next && npm run desktop:prepare",
+    "desktop:prepare": "node scripts/desktop/prepare-staging.js",
+    "desktop:build:web": "npm run build:next",
     "desktop:build:electron": "tsc -p desktop/tsconfig.json",
-    "desktop:build": "npm run desktop:build:web && npm run desktop:build:electron",
-    "desktop:rebuild-native": "electron-builder install-app-deps && node scripts/desktop/sync-native-modules.js .next/standalone/node_modules",
+    "desktop:build": "npm run desktop:build:web && npm run desktop:build:electron && npm run desktop:prepare",
+    "desktop:verify": "node scripts/desktop/verify-staging.js",
     "desktop:start": "npm run desktop:build && node scripts/desktop/run-electron.js",
-    "desktop:pack": "npm run desktop:build && node scripts/desktop/package-electron.js dir",
-    "desktop:dist": "npm run desktop:build && node scripts/desktop/package-electron.js portable"
+    "desktop:pack": "npm run desktop:build && npm run desktop:verify && node scripts/desktop/build-artifact.js dir",
+    "desktop:clean:dist": "node scripts/desktop/cleanup-artifacts.js",
+    "desktop:dist": "npm run desktop:build && npm run desktop:verify && node scripts/desktop/build-artifact.js zip && node scripts/desktop/verify-artifact.js && npm run desktop:clean:dist"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
-    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.11.1",
     "dotenv": "^17.2.4",
     "next": "^14.1.0",
@@ -49,7 +50,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/bcrypt": "^6.0.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.11.5",
     "@types/react": "^18.2.48",
@@ -66,13 +66,16 @@
     "appId": "com.animetrack.desktop",
     "productName": "AnimeTrack",
     "asar": true,
-    "afterPack": "scripts/desktop/after-pack.js",
+    "npmRebuild": false,
     "directories": {
       "output": "dist-electron"
     },
     "files": [
-      "dist-desktop/**/*",
-      "package.json"
+      "dist-desktop/main.js",
+      "dist-desktop/server.js",
+      "dist-desktop/window.js",
+      "package.json",
+      "!node_modules/**/*"
     ],
     "extraResources": [
       {
@@ -84,15 +87,16 @@
       }
     ],
     "win": {
+      "icon": "desktop/assets/animetrack.ico",
       "target": [
         {
-          "target": "portable",
+          "target": "zip",
           "arch": [
             "x64"
           ]
         }
       ],
-      "artifactName": "AnimeTrack-${version}-portable.${ext}"
+      "artifactName": "AnimeTrack-${version}-win-${arch}.${ext}"
     }
   }
 }

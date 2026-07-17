@@ -6,31 +6,24 @@ const fs = require('fs');
 const resultPath = process.argv[2] ? path.resolve(process.argv[2]) : null;
 
 try {
-  const packagedModules = path.join(
-    process.resourcesPath,
-    'app',
-    'standalone',
-    'server_node_modules',
-  );
+  const standaloneRoot = process.env.ANIMETRACK_VERIFY_STANDALONE
+    ? path.resolve(process.env.ANIMETRACK_VERIFY_STANDALONE)
+    : path.join(process.resourcesPath, 'app', 'standalone');
+  const packagedModules = path.join(standaloneRoot, 'server_node_modules');
   process.env.NODE_PATH = [packagedModules, process.env.NODE_PATH]
     .filter(Boolean)
     .join(path.delimiter);
   require('module').Module._initPaths();
   const Database = require(path.join(packagedModules, 'better-sqlite3'));
-  const bcrypt = require(path.join(packagedModules, 'bcrypt'));
 
   const db = new Database(':memory:');
   const databaseResult = db.prepare('SELECT 1 AS ok').get();
   db.close();
 
-  const passwordHash = bcrypt.hashSync('AnimeTrack native check', 4);
-  const bcryptResult = bcrypt.compareSync('AnimeTrack native check', passwordHash);
-
   const result = JSON.stringify({
     electron: process.versions.electron,
     modules: process.versions.modules,
     database: databaseResult.ok === 1,
-    bcrypt: bcryptResult,
   });
 
   if (resultPath) {
