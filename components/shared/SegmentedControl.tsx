@@ -35,7 +35,7 @@ export default function SegmentedControl<T extends string>({
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      className={`surface-card-muted flex items-stretch divide-x divide-[var(--border-light)] rounded-xl p-1 ${className}`}
+      className={`surface-card-muted flex items-stretch rounded-xl p-1 ${className}`}
     >
       {options.map(({ value: optionValue, label, icon: Icon }) => {
         const selected = value === optionValue;
@@ -48,7 +48,7 @@ export default function SegmentedControl<T extends string>({
             aria-label={iconOnly ? label : undefined}
             onClick={() => onChange(optionValue)}
             style={selected ? { backgroundColor: 'var(--bg-control, var(--color-surface-raised))' } : undefined}
-            className={`flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors first:rounded-l-lg last:rounded-r-lg ${buttonClassName} ${
+            className={`flex items-center justify-center gap-1.5 rounded-lg whitespace-nowrap transition-colors ${buttonClassName} ${
               selected
                 ? activeClassName
                 : 'text-[var(--text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--text-secondary)]'
