@@ -4,10 +4,10 @@ import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
 import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
+import { getBackupsDirectory, getDatabasePath } from '@/lib/runtime-paths';
 
 const execFileAsync = promisify(execFile);
 
-const BACKUPS_DIR = path.join(process.cwd(), 'backups');
 
 /** GET — list backup files */
 export async function GET() {
@@ -16,22 +16,22 @@ export async function GET() {
     return auth.response;
   }
 
-  if (!fs.existsSync(BACKUPS_DIR)) {
+  const backupsDirectory = getBackupsDirectory();
+  if (!fs.existsSync(backupsDirectory)) {
     return apiSuccess({ backups: [] });
   }
 
-  const files = fs.readdirSync(BACKUPS_DIR)
+  const files = fs.readdirSync(backupsDirectory)
     .filter((f) => f.endsWith('.sql'))
-    .sort()
-    .reverse()
     .map((name) => {
-      const stat = fs.statSync(path.join(BACKUPS_DIR, name));
+      const stat = fs.statSync(path.join(backupsDirectory, name));
       return {
         name,
         size: stat.size,
         createdAt: stat.mtime.toISOString(),
       };
-    });
+    })
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
   return apiSuccess({ backups: files });
 }
@@ -44,10 +44,16 @@ export async function POST() {
   }
 
   try {
+    const backupsDirectory = getBackupsDirectory();
     const scriptPath = path.join(process.cwd(), 'scripts/db/scheduled_backup.js');
     const { stdout, stderr } = await execFileAsync(process.execPath, [scriptPath], {
       cwd: process.cwd(),
       timeout: 30000,
+      env: {
+        ...process.env,
+        DB_PATH: getDatabasePath(),
+        ANIMETRACK_BACKUPS_DIR: backupsDirectory,
+      },
     });
 
     const output = (stdout + '\n' + stderr).trim();
@@ -58,7 +64,7 @@ export async function POST() {
 
     let fileInfo = null;
     if (fileName) {
-      const filePath = path.join(BACKUPS_DIR, fileName);
+      const filePath = path.join(backupsDirectory, fileName);
       if (fs.existsSync(filePath)) {
         const stat = fs.statSync(filePath);
         fileInfo = { name: fileName, size: stat.size, createdAt: stat.mtime.toISOString() };
@@ -90,7 +96,7 @@ export async function DELETE(request: NextRequest) {
     return apiError('无效的文件名', 400);
   }
 
-  const filePath = path.join(BACKUPS_DIR, baseName);
+  const filePath = path.join(getBackupsDirectory(), baseName);
   if (!fs.existsSync(filePath)) {
     return apiError('文件不存在', 404);
   }

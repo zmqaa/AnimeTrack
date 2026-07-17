@@ -55,7 +55,7 @@ async function main() {
     // anime
     const animeRows = db.prepare('SELECT * FROM anime ORDER BY id ASC').all();
     const animeColumns = [
-      'id', 'title', 'original_title', 'coverUrl', 'status', 'score',
+      'id', 'title', 'original_title', 'coverUrl', 'localCoverUrl', 'status', 'score',
       'progress', 'totalEpisodes', 'durationMinutes', 'notes', 'tags', 'summary',
       'start_date', 'end_date', 'premiere_date',
       'cast', 'cast_aliases', 'isFinished', 'createdAt', 'updatedAt',

@@ -2,7 +2,7 @@ import { getAnimeRecord, updateAnimeRecord, CreateAnimeDTO, parseAnimeId, animeR
 import { enrichAnimeInput } from '@/lib/anime-enrichment';
 import { DEFAULT_METADATA_FIELDS, buildMetadataPatch } from '@/lib/metadata/merge-policy';
 import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
-import { isPlaceholderCoverPath, resolveCoverImage } from '@/lib/cover-image';
+import { isPlaceholderCoverPath, resolveLocalCoverImage } from '@/lib/cover-image';
 
 export async function POST(
   _request: Request,
@@ -60,12 +60,7 @@ export async function POST(
   Object.assign(patch, metadataPatch);
 
   if (patch.coverUrl !== undefined) {
-    patch.coverUrl = await resolveCoverImage(patch.coverUrl, id, {
-      fallbackOnDownloadFailure: record.coverUrl || null,
-    }) ?? undefined;
-    if (patch.coverUrl === undefined || patch.coverUrl === record.coverUrl) {
-      delete patch.coverUrl;
-    }
+    patch.localCoverUrl = await resolveLocalCoverImage(patch.coverUrl, id);
   }
 
   const appliedFields = Object.keys(patch);

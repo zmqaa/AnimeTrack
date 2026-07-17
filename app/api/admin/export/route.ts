@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { listAnimeRecords } from '@/lib/anime';
 import { getWatchHistory } from '@/lib/history';
 import { requireAdmin } from '@/lib/api-response';
+import { isRemoteUrl } from '@/lib/cover-image';
+import type { AnimeRecord } from '@/lib/anime';
 
 function escapeCsvValue(value: unknown): string {
   if (value === null || value === undefined) return '';
@@ -10,6 +12,19 @@ function escapeCsvValue(value: unknown): string {
     return '"' + str.replace(/"/g, '""') + '"';
   }
   return str;
+}
+
+function toPortableAnimeRecord(record: AnimeRecord): Omit<AnimeRecord, 'localCoverUrl' | 'displayCoverUrl'> {
+  const portableRecord = { ...record };
+
+  delete portableRecord.localCoverUrl;
+  delete portableRecord.displayCoverUrl;
+
+  if (!isRemoteUrl(portableRecord.coverUrl)) {
+    delete portableRecord.coverUrl;
+  }
+
+  return portableRecord;
 }
 
 /** GET — export data as JSON or CSV */
@@ -73,9 +88,11 @@ export async function GET(request: NextRequest) {
   }
 
   // JSON format
+  const portableAnime = anime.map(toPortableAnimeRecord);
   const data = {
+    formatVersion: 2,
     exportedAt: new Date().toISOString(),
-    anime: table !== 'history' ? { count: anime.length, records: anime } : undefined,
+    anime: table !== 'history' ? { count: portableAnime.length, records: portableAnime } : undefined,
     watchHistory: table !== 'anime' ? { count: history.length, records: history } : undefined,
   };
 

@@ -39,9 +39,9 @@ export default memo(function AnimeListView({ items, onEdit, updateProgress, isAd
           >
             {/* 封面缩略图 */}
             <Link href={detailHref} onClick={onOpenDetail} className="flex-shrink-0 w-14 h-[74px] rounded-xl overflow-hidden bg-[var(--tag-bg)] relative">
-              {item.coverUrl ? (
+              {item.displayCoverUrl ? (
                 <Image
-                  src={item.coverUrl}
+                  src={item.displayCoverUrl}
                   alt={item.title}
                   fill
                   unoptimized

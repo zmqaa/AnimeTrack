@@ -47,9 +47,9 @@ export default memo(function AnimeCard({ item, onEdit, updateProgress, isAdmin =
       {/* 封面部分 */}
       <div className="relative aspect-[3/4] overflow-hidden bg-[var(--tag-bg)]">
         <Link href={detailHref} className="block h-full" onClick={onOpenDetail}>
-          {item.coverUrl ? (
+          {item.displayCoverUrl ? (
             <Image
-              src={item.coverUrl}
+              src={item.displayCoverUrl}
               alt={item.title}
               fill
               unoptimized

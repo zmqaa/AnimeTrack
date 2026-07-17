@@ -6,15 +6,15 @@ import { usePathname, useRouter } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import { navigationItems } from '@/lib/config';
 import { useTheme } from '@/components/theme/ThemeProvider';
+import { useRuntimeAccess } from '@/hooks/useRuntimeAccess';
 
 interface TopNavProps {
   children: React.ReactNode;
 }
 
-type SessionUser = { role?: string };
-
 export default function TopNav({ children }: TopNavProps) {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
+  const { canManage, isDesktop } = useRuntimeAccess();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const pathname = usePathname();
@@ -22,12 +22,11 @@ export default function TopNav({ children }: TopNavProps) {
   const { theme, setTheme, themes } = useTheme();
   const nextTheme = themes[(themes.findIndex((t) => t.value === theme) + 1) % themes.length];
 
-  const isAuthPage = pathname === '/login' || pathname === '/register';
+  const isAuthPage = !isDesktop && (pathname === '/login' || pathname === '/register');
   const isAuthenticated = status === 'authenticated';
-  const isAdmin = (session?.user as SessionUser | undefined)?.role === 'admin';
 
   const visibleItems = navigationItems.filter(
-    (item) => !item.adminOnly || isAdmin
+    (item) => !item.adminOnly || canManage
   );
 
   const isActive = (href: string) => {
@@ -104,7 +103,7 @@ export default function TopNav({ children }: TopNavProps) {
               </svg>
             </button>
 
-            {isAuthenticated && (
+            {!isDesktop && isAuthenticated && (
               <button
                 onClick={handleSignOut}
                 disabled={isSigningOut}
@@ -153,7 +152,7 @@ export default function TopNav({ children }: TopNavProps) {
                   </Link>
                 );
               })}
-              {isAuthenticated && (
+              {!isDesktop && isAuthenticated && (
                 <button
                   onClick={handleSignOut}
                   disabled={isSigningOut}

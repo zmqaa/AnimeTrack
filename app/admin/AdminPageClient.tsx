@@ -1,18 +1,19 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import useSWR, { mutate as globalMutate } from 'swr';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import SegmentedControl from '@/components/shared/SegmentedControl';
 import { fetchJson } from '@/lib/client-api';
+import { useRuntimeAccess } from '@/hooks/useRuntimeAccess';
 import { adminAnimeKey, adminHistoryKey, ANIME_LIST_KEY, HISTORY_KEY, swrFetcher } from '@/lib/swr-config';
 import {
   Checkbox,
   DeleteButton,
   DeleteIconButton,
+  EditTimeIconButton,
   Pagination,
   SearchBar,
   SkeletonRows,
@@ -21,7 +22,6 @@ import {
   useSelectableRows,
 } from './admin-table-shared';
 
-type SessionUser = { role?: string };
 type TabKey = 'anime' | 'history';
 
 interface AnimeRow {
@@ -76,13 +76,22 @@ function formatDate(iso: string) {
   });
 }
 
+function toDateTimeLocalValue(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+    + `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 // ─────────────────────────────────────────────
 // Anime Records Tab
 // ─────────────────────────────────────────────
 
 function AnimeTab() {
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(50);
+  const [pageSize] = useState(10);
   const [confirmDelete, setConfirmDelete] = useState<{ ids: number[] } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { search, searchInput, handleSearchInput } = useDebouncedSearch(() => {
@@ -226,11 +235,13 @@ function AnimeTab() {
 
 function HistoryTab() {
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(50);
+  const [pageSize] = useState(10);
   const [confirmDelete, setConfirmDelete] = useState<{ ids: number[] } | null>(null);
   const [confirmUndo, setConfirmUndo] = useState<UndoPreview | null>(null);
+  const [editingTime, setEditingTime] = useState<{ id: number; value: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [undoing, setUndoing] = useState(false);
+  const [savingTime, setSavingTime] = useState(false);
   const { search, searchInput, handleSearchInput } = useDebouncedSearch(() => {
     setPage(1);
   });
@@ -330,6 +341,43 @@ function HistoryTab() {
     }
   };
 
+  const handleSaveTime = async () => {
+    if (!editingTime || savingTime) return;
+
+    const watchedAt = new Date(editingTime.value);
+    if (!editingTime.value || Number.isNaN(watchedAt.getTime())) {
+      toast.error('请选择有效的观看时间');
+      return;
+    }
+
+    setSavingTime(true);
+    try {
+      await fetchJson<{ updated: true; record: HistoryRow }>(
+        `/api/admin/history/${editingTime.id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ watchedAt: watchedAt.toISOString() }),
+        },
+        '修改观看时间失败',
+      );
+      toast.success('观看时间已修改');
+      setEditingTime(null);
+      mutate();
+      globalMutate(HISTORY_KEY);
+      globalMutate((key) => typeof key === 'string' && (
+        key.startsWith('/api/admin/history?') ||
+        key === ANIME_LIST_KEY ||
+        key.startsWith('/api/anime?') ||
+        key.startsWith('/api/admin/anime?')
+      ));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '修改观看时间失败');
+    } finally {
+      setSavingTime(false);
+    }
+  };
+
   const undoRangeText = confirmUndo
     ? confirmUndo.firstAffectedEpisode === confirmUndo.lastAffectedEpisode
       ? `第 ${confirmUndo.firstAffectedEpisode} 集的 1 条记录`
@@ -372,11 +420,50 @@ function HistoryTab() {
                     <td className="px-5 py-4 text-[var(--text-muted)] tabular-nums text-sm">{r.id}</td>
                     <td className="px-5 py-4 text-[var(--text-secondary)] font-medium text-base truncate max-w-xs" title={r.animeTitle}>{r.animeTitle}</td>
                     <td className="px-5 py-4 text-[var(--text-secondary)] tabular-nums text-sm">第 {r.episode} 集</td>
-                    <td className="px-5 py-4 text-[var(--text-muted)] tabular-nums text-sm">{formatDate(r.watchedAt)}</td>
+                    <td className="px-5 py-4 text-[var(--text-muted)] tabular-nums text-sm">
+                      {editingTime?.id === r.id ? (
+                        <input
+                          type="datetime-local"
+                          step="1"
+                          value={editingTime.value}
+                          onChange={(event) => setEditingTime({ id: r.id, value: event.target.value })}
+                          disabled={savingTime}
+                          aria-label={`${r.animeTitle} 第 ${r.episode} 集的观看时间`}
+                          className="surface-input min-w-52 rounded-xl px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-completed)]/30 disabled:opacity-50"
+                        />
+                      ) : formatDate(r.watchedAt)}
+                    </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-1">
-                        <UndoWatchIconButton onClick={() => openUndoPreview(r.id)} disabled={deleting || undoing} />
-                        <DeleteIconButton onClick={() => setConfirmDelete({ ids: [r.id] })} disabled={deleting || undoing} />
+                        {editingTime?.id === r.id ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={handleSaveTime}
+                              disabled={savingTime || !editingTime.value}
+                              className="px-3 py-2 rounded-xl text-sm font-medium text-[var(--color-completed)] hover:bg-[var(--color-completed)]/10 transition-all disabled:opacity-50"
+                            >
+                              保存
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingTime(null)}
+                              disabled={savingTime}
+                              className="px-3 py-2 rounded-xl text-sm text-[var(--text-muted)] hover:bg-[var(--color-surface-hover)] transition-all disabled:opacity-50"
+                            >
+                              取消
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <EditTimeIconButton
+                              onClick={() => setEditingTime({ id: r.id, value: toDateTimeLocalValue(r.watchedAt) })}
+                              disabled={deleting || undoing || savingTime}
+                            />
+                            <UndoWatchIconButton onClick={() => openUndoPreview(r.id)} disabled={deleting || undoing || savingTime} />
+                            <DeleteIconButton onClick={() => setConfirmDelete({ ids: [r.id] })} disabled={deleting || undoing || savingTime} />
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -422,19 +509,18 @@ function HistoryTab() {
 // ─────────────────────────────────────────────
 
 export default function AdminPageClient() {
-  const { data: session, status } = useSession();
+  const { canManage, isLoading: accessLoading } = useRuntimeAccess();
   const router = useRouter();
-  const role = (session?.user as SessionUser | undefined)?.role;
 
   const [activeTab, setActiveTab] = useState<TabKey>('anime');
 
   useEffect(() => {
-    if (status === 'authenticated' && role !== 'admin') {
+    if (!accessLoading && !canManage) {
       router.replace('/');
     }
-  }, [status, role, router]);
+  }, [accessLoading, canManage, router]);
 
-  if (status === 'loading' || (status === 'authenticated' && role !== 'admin')) {
+  if (accessLoading || !canManage) {
     return <main className="p-6 text-[var(--text-muted)]">验证权限中...</main>;
   }
 

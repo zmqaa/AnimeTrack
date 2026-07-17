@@ -5,11 +5,16 @@ const animeStatusSchema = z.enum(['watching', 'completed', 'dropped', 'plan_to_w
 const dateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY-MM-DD').optional().nullable();
 
 const stringArraySchema = z.array(z.string().max(200)).max(100).optional();
+const coverUrlSchema = z.union([
+  z.string().url().max(2000),
+  z.string().regex(/^\/(?:covers|api\/local-covers)\/\d+\.(?:jpg|jpeg|png|webp|gif)$/i, '无效的本地封面地址'),
+  z.literal(''),
+]).optional().nullable();
 
 export const createAnimeSchema = z.object({
   title: z.string().min(1, '标题不能为空').max(500),
   originalTitle: z.string().max(500).optional().nullable(),
-  coverUrl: z.string().url().max(2000).optional().nullable().or(z.literal('')),
+  coverUrl: coverUrlSchema,
   status: animeStatusSchema.default('plan_to_watch'),
   score: z.number().min(0).max(10).optional().nullable(),
   progress: z.number().int().min(0).default(0),
@@ -30,6 +35,7 @@ export const updateAnimeSchema = createAnimeSchema.partial();
 
 export const patchAnimeBodySchema = updateAnimeSchema.extend({
   recordHistory: z.boolean().optional(),
+  trimHistoryOnProgressDecrease: z.boolean().optional(),
 });
 
 export type CreateAnimeInput = z.infer<typeof createAnimeSchema>;

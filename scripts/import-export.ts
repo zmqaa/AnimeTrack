@@ -14,6 +14,7 @@ interface AnimeRecord {
   title: string;
   originalTitle?: string;
   coverUrl?: string;
+  localCoverUrl?: string;
   status?: string;
   score?: number | null;
   progress?: number;
@@ -98,11 +99,11 @@ async function main() {
       if (existing) {
         const dbId = existing.id;
         db.prepare(
-          `UPDATE anime SET title=?, original_title=?, coverUrl=?, status=?, score=?, progress=?,
+          `UPDATE anime SET title=?, original_title=?, coverUrl=?, localCoverUrl=?, status=?, score=?, progress=?,
            totalEpisodes=?, durationMinutes=?, tags=?, cast=?, summary=?, end_date=?, premiere_date=?, isFinished=?, updatedAt=?
            WHERE id=?`
         ).run(
-          title, originalTitle, item.coverUrl || null, item.status || 'plan_to_watch',
+          title, originalTitle, item.coverUrl || null, item.localCoverUrl || null, item.status || 'plan_to_watch',
           item.score ?? null, Number(item.progress ?? 0), item.totalEpisodes ?? null,
           item.durationMinutes ?? null, JSON.stringify(item.tags || []),
           JSON.stringify(item.cast || []), item.summary || null,
@@ -116,11 +117,11 @@ async function main() {
         updatedAnime++;
       } else {
         const result = db.prepare(
-          `INSERT INTO anime (title, original_title, coverUrl, status, score, progress, totalEpisodes,
+          `INSERT INTO anime (title, original_title, coverUrl, localCoverUrl, status, score, progress, totalEpisodes,
            durationMinutes, tags, cast, summary, end_date, premiere_date, isFinished, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).run(
-          title, originalTitle, item.coverUrl || null, item.status || 'plan_to_watch',
+          title, originalTitle, item.coverUrl || null, item.localCoverUrl || null, item.status || 'plan_to_watch',
           item.score ?? null, Number(item.progress ?? 0), item.totalEpisodes ?? null,
           item.durationMinutes ?? null, JSON.stringify(item.tags || []),
           JSON.stringify(item.cast || []), item.summary || null,

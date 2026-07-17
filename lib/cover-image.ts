@@ -1,12 +1,14 @@
 import 'server-only';
 import { existsSync, mkdirSync, unlinkSync } from 'fs';
 import { writeFile, unlink } from 'fs/promises';
-import { join } from 'path';
+import { basename, join } from 'path';
+import { isDesktopRuntime } from '@/lib/runtime-mode';
+import { getCoversDirectory } from '@/lib/runtime-paths';
 
-const COVERS_DIR = join(process.cwd(), 'public', 'covers');
+const LEGACY_COVERS_PUBLIC_PREFIX = '/covers';
+const DATA_COVERS_PUBLIC_PREFIX = '/api/local-covers';
 
 /** 封面存放的公开路径前缀 */
-const COVERS_PUBLIC_PREFIX = '/covers';
 const MAX_COVER_BYTES = 8 * 1024 * 1024;
 const DEFAULT_ALLOWED_COVER_HOSTS = ['lain.bgm.tv', 'cdn.myanimelist.net'];
 
@@ -49,8 +51,9 @@ async function readBodyWithLimit(response: Response): Promise<Buffer> {
 let dirReady = false;
 function ensureCoversDir(): void {
   if (dirReady) return;
-  if (!existsSync(COVERS_DIR)) {
-    mkdirSync(COVERS_DIR, { recursive: true });
+  const coversDirectory = getCoversDirectory();
+  if (!existsSync(coversDirectory)) {
+    mkdirSync(coversDirectory, { recursive: true });
   }
   dirReady = true;
 }
@@ -64,7 +67,28 @@ export function isRemoteUrl(value: string | null | undefined): boolean {
 /** 判断是否为本地封面路径 */
 export function isLocalCoverPath(value: string | null | undefined): boolean {
   if (!value) return false;
-  return value.trim().startsWith(COVERS_PUBLIC_PREFIX);
+  const trimmed = value.trim();
+  return trimmed.startsWith(LEGACY_COVERS_PUBLIC_PREFIX)
+    || trimmed.startsWith(DATA_COVERS_PUBLIC_PREFIX);
+}
+
+export function resolveDisplayCoverUrl(
+  localCoverUrl: string | null | undefined,
+  remoteCoverUrl: string | null | undefined,
+): string | undefined {
+  const local = String(localCoverUrl || '').trim();
+  const remote = String(remoteCoverUrl || '').trim();
+
+  if (!local || !isLocalCoverPath(local)) {
+    return remote || undefined;
+  }
+
+  const fileName = basename(local.split(/[?#]/, 1)[0]);
+  const localFilePath = local.startsWith(DATA_COVERS_PUBLIC_PREFIX)
+    ? join(getCoversDirectory(), fileName)
+    : join(process.cwd(), 'public', 'covers', fileName);
+
+  return existsSync(localFilePath) ? local : (remote || undefined);
 }
 
 /** 判断是否为系统生成的本地占位封面 */
@@ -76,12 +100,15 @@ export function isPlaceholderCoverPath(value: string | null | undefined): boolea
 
 /** 获取封面文件的磁盘绝对路径 */
 function coverFilePath(animeId: number): string {
-  return join(COVERS_DIR, `${animeId}.jpg`);
+  return join(getCoversDirectory(), `${animeId}.jpg`);
 }
 
 /** 获取封面文件的公开 URL 路径 */
 function coverPublicPath(animeId: number): string {
-  return `${COVERS_PUBLIC_PREFIX}/${animeId}.jpg`;
+  const prefix = isDesktopRuntime()
+    ? DATA_COVERS_PUBLIC_PREFIX
+    : LEGACY_COVERS_PUBLIC_PREFIX;
+  return `${prefix}/${animeId}.jpg`;
 }
 
 /**
@@ -184,10 +211,9 @@ export function deleteCoverImageSync(animeId: number): void {
  * - 本地路径 → 直接返回（无需变动）
  * - null / 空 → 删除本地文件 → 返回 null
  */
-export async function resolveCoverImage(
+export async function resolveLocalCoverImage(
   coverUrl: string | null | undefined,
   animeId: number,
-  options: { fallbackOnDownloadFailure?: string | null; preserveRemoteOnFailure?: boolean } = {},
 ): Promise<string | null> {
   const trimmed = (coverUrl ?? '').trim();
 
@@ -208,16 +234,7 @@ export async function resolveCoverImage(
     if (localPath) {
       return localPath;
     }
-    const fallback = options.fallbackOnDownloadFailure;
-    if (fallback !== undefined) {
-      console.warn(`[cover] 封面下载失败，保留原封面: ${trimmed}`);
-      return fallback;
-    }
-    if (options.preserveRemoteOnFailure !== false) {
-      console.warn(`[cover] 封面下载失败，保留远程 URL: ${trimmed}`);
-      return trimmed;
-    }
-    console.warn(`[cover] 封面下载失败，清空 coverUrl: ${trimmed}`);
+    console.warn(`[cover] 封面下载失败，将继续使用远程来源地址: ${trimmed}`);
     return null;
   }
 

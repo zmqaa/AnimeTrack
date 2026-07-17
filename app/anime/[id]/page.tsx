@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR, { mutate as globalMutate } from 'swr';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { fetchJson } from '@/lib/client-api';
-import type { AnimeStatus, AnimeDetailItem, SessionUser } from '@/lib/anime-shared';
+import type { AnimeStatus, AnimeDetailItem } from '@/lib/anime-shared';
+import { useRuntimeAccess } from '@/hooks/useRuntimeAccess';
 import { ANIME_LIST_KEY, HISTORY_KEY, animeDetailKey, swrFetcher } from '@/lib/swr-config';
 import {
   buildChangedPayload, resolveReturnTo,
@@ -19,10 +19,9 @@ import AnimeDetailMain from './AnimeDetailMain';
 import PageContainer from '@/components/shared/PageContainer';
 
 export default function AnimeDetailPage({ params }: { params: { id: string } }) {
-  const { data: session } = useSession();
+  const { canManage: isAdmin } = useRuntimeAccess();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isAdmin = (session?.user as SessionUser | undefined)?.role === 'admin';
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isAiEnriching, setIsAiEnriching] = useState(false);
@@ -138,10 +137,10 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
     <PageContainer width="wide" spacing="detail" animation="zoom">
       <div className="shadow-theme-xl relative overflow-hidden rounded-[32px] border border-[var(--border)]" style={{ backgroundColor: 'var(--bg-card)' }}>
         {/* Background blur from cover */}
-        {(typeof formData.coverUrl === 'string' ? formData.coverUrl : item.coverUrl) && (
+        {((typeof formData.coverUrl === 'string' ? formData.coverUrl : undefined) || item.displayCoverUrl) && (
           <div className="absolute inset-0 opacity-[0.08]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={formData.coverUrl as string || item.coverUrl || ''} alt={item.title} className="h-full w-full scale-110 object-cover blur-3xl" />
+            <img src={(formData.coverUrl as string) || item.displayCoverUrl || ''} alt={item.title} className="h-full w-full scale-110 object-cover blur-3xl" />
           </div>
         )}
         <div className="theme-detail-aura absolute inset-0" />

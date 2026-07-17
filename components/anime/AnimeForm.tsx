@@ -131,10 +131,10 @@ export default function AnimeForm({
                        value={coverUrl} onChange={e => setCoverUrl(e.target.value)}
                        className="surface-input flex-1 rounded-lg px-3 py-2.5 focus-theme focus:outline-none transition text-sm font-mono text-[var(--text-primary)]"
                    />
-                   {coverUrl && (
+                   {(coverUrl || initialData.displayCoverUrl) && (
                        <div className="surface-card-muted w-10 h-11 rounded-md overflow-hidden shrink-0">
                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                           <img src={coverUrl} alt="Cover" className="w-full h-full object-cover" />
+                           <img src={coverUrl || initialData.displayCoverUrl} alt="Cover" className="w-full h-full object-cover" />
                        </div>
                    )}
                </div>

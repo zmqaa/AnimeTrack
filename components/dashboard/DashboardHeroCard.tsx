@@ -32,9 +32,9 @@ export default React.memo(function DashboardHeroCard({
     return () => window.clearInterval(interval);
   }, []);
 
-  const heroStyle = heroAnime?.coverUrl
+  const heroStyle = heroAnime?.displayCoverUrl
     ? {
-        backgroundImage: `var(--hero-overlay), url(${heroAnime.coverUrl})`,
+        backgroundImage: `var(--hero-overlay), url(${heroAnime.displayCoverUrl})`,
         backgroundSize: 'cover' as const,
         backgroundPosition: 'center' as const,
       }

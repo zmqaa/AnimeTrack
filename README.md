@@ -41,3 +41,22 @@ npm run user:create-admin -- admin 你的强密码 "管理员"
 ## 技术栈
 
 Next.js 14 / React 18 / TypeScript / Tailwind CSS / SQLite / NextAuth.js
+
+## 封面来源补充
+
+封面使用两个字段：`coverUrl` 保存 Bangumi 等远程来源地址，`localCoverUrl`
+保存下载后的本地缓存地址。页面优先显示本地缓存，本地缓存不存在时回退到远程地址。
+
+旧数据如果只有本地封面，可以先预览批量匹配结果：
+
+```bash
+npm run covers:restore-sources -- --limit=10
+```
+
+确认匹配正确后再写入数据库：
+
+```bash
+npm run covers:restore-sources:write
+```
+
+也可以用 `--ids=1,2,3` 只处理指定记录。脚本默认不会覆盖已有的 `coverUrl`。

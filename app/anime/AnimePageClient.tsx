@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { useSession } from 'next-auth/react';
 import useSWR, { mutate as globalMutate } from 'swr';
 import { MagnifyingGlassIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
 import SegmentedControl from '@/components/shared/SegmentedControl';
@@ -14,7 +13,8 @@ import AnimeGrid, { type ViewMode } from '@/components/anime/AnimeGrid';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import PageContainer from '@/components/shared/PageContainer';
 import { fetchJson } from '@/lib/client-api';
-import type { AnimeStatus, AnimeSortBy, SessionUser, AnimeListItem, AnimeCardItem } from '@/lib/anime-shared';
+import type { AnimeStatus, AnimeSortBy, AnimeListItem, AnimeCardItem } from '@/lib/anime-shared';
+import { useRuntimeAccess } from '@/hooks/useRuntimeAccess';
 import { ANIME_LIST_KEY, HISTORY_KEY, animePageKey, swrFetcher } from '@/lib/swr-config';
 import AnimePagination from './AnimePagination';
 import AnimeQuickRecordPanel from './AnimeQuickRecordPanel';
@@ -31,11 +31,10 @@ import {
 const ANIME_LIST_SCROLL_KEY = 'anime-list-scroll-y';
 
 export default function AnimePageClient() {
-  const { data: session } = useSession();
+  const { canManage: isAdmin } = useRuntimeAccess();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const isAdmin = (session?.user as SessionUser | undefined)?.role === 'admin';
 
   // ── SWR: 全量番剧列表（侧边栏统计 + 客户端筛选降级）───────────────────
   const { data: allItems = [], isLoading: listLoading, mutate: mutateAll } = useSWR<AnimeListItem[]>(
@@ -73,6 +72,8 @@ export default function AnimePageClient() {
     status: 'watching' as AnimeStatus,
     notes: '',
     coverUrl: '',
+    localCoverUrl: '',
+    displayCoverUrl: '',
     tags: '',
     durationMinutes: '',
     startDate: '',
@@ -228,6 +229,8 @@ export default function AnimePageClient() {
       status: 'watching',
       notes: '',
       coverUrl: '',
+      localCoverUrl: '',
+      displayCoverUrl: '',
       tags: '',
       durationMinutes: '',
       startDate: '',
@@ -246,6 +249,8 @@ export default function AnimePageClient() {
       status: item.status,
       notes: item.notes || '',
       coverUrl: item.coverUrl || '',
+      localCoverUrl: item.localCoverUrl || '',
+      displayCoverUrl: item.displayCoverUrl || '',
       tags: item.tags ? item.tags.join(', ') : '',
       durationMinutes: item.durationMinutes ? String(item.durationMinutes) : '',
       startDate: item.startDate || '',
@@ -314,6 +319,7 @@ export default function AnimePageClient() {
           progress: current,
           status: newStatus,
           recordHistory: true,
+          trimHistoryOnProgressDecrease: true,
         }),
       }, '更新失败，请重试');
 

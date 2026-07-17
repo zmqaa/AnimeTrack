@@ -90,6 +90,7 @@ function isFieldValueUnchanged(key: EditableField, nextValue: unknown, currentVa
 export function buildChangedPayload(formData: Partial<AnimeDetailItem>, item: AnimeDetailItem): AnimeDetailPatchPayload {
   const payload: AnimeDetailPatchPayload = {};
   for (const key of editableKeys) {
+    if (!Object.prototype.hasOwnProperty.call(formData, key)) continue;
     const normalizedValue = normalizeEditableFieldValue(key, formData[key]);
     if (normalizedValue === OMIT_FIELD) continue;
     if (isFieldValueUnchanged(key, normalizedValue, item[key])) continue;

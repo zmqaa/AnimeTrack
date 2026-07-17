@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { apiError, requireAdmin } from '@/lib/api-response';
-
-
-const BACKUPS_DIR = path.join(process.cwd(), 'backups');
+import { getBackupsDirectory } from '@/lib/runtime-paths';
 
 /** GET — download a backup file */
 export async function GET(request: NextRequest) {
@@ -24,11 +22,12 @@ export async function GET(request: NextRequest) {
     return apiError('无效的文件名', 400);
   }
 
-  const filePath = path.join(BACKUPS_DIR, baseName);
+  const backupsDirectory = getBackupsDirectory();
+  const filePath = path.join(backupsDirectory, baseName);
 
   // Ensure resolved path is within backups dir
   const resolved = path.resolve(filePath);
-  if (!resolved.startsWith(path.resolve(BACKUPS_DIR))) {
+  if (path.dirname(resolved) !== path.resolve(backupsDirectory)) {
     return apiError('无效的文件路径', 400);
   }
 

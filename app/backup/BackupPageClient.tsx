@@ -1,13 +1,13 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { mutate as globalMutate } from 'swr';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { fetchBlob, fetchJson } from '@/lib/client-api';
 import { ANIME_LIST_KEY, HISTORY_KEY } from '@/lib/swr-config';
+import { useRuntimeAccess } from '@/hooks/useRuntimeAccess';
 
 interface BackupFile {
   name: string;
@@ -27,18 +27,22 @@ interface ImportResult {
   };
 }
 
+interface RestoreResult {
+  success: true;
+  restored: string;
+  animeCount: number;
+  historyCount: number;
+}
+
 type PendingImport = {
   payload: unknown;
   animeCount: number;
   historyCount: number;
 };
 
-type SessionUser = { role?: string };
-
 export default function BackupPageClient() {
-  const { data: session, status } = useSession();
+  const { canManage, isLoading: accessLoading } = useRuntimeAccess();
   const router = useRouter();
-  const role = (session?.user as SessionUser | undefined)?.role;
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const [backups, setBackups] = useState<BackupFile[]>([]);
@@ -46,14 +50,16 @@ export default function BackupPageClient() {
   const [creating, setCreating] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [restoring, setRestoring] = useState<string | null>(null);
+  const [restoreConfirm, setRestoreConfirm] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
 
   useEffect(() => {
-    if (status === 'authenticated' && role !== 'admin') {
+    if (!accessLoading && !canManage) {
       router.replace('/');
     }
-  }, [status, role, router]);
+  }, [accessLoading, canManage, router]);
 
   const fetchBackups = useCallback(async () => {
     setLoading(true);
@@ -68,8 +74,8 @@ export default function BackupPageClient() {
   }, []);
 
   useEffect(() => {
-    if (role === 'admin') fetchBackups();
-  }, [fetchBackups, role]);
+    if (canManage) fetchBackups();
+  }, [fetchBackups, canManage]);
 
   const handleCreateBackup = async () => {
     setCreating(true);
@@ -165,6 +171,35 @@ export default function BackupPageClient() {
     }
   };
 
+  const handleRestoreBackup = async (name: string) => {
+    if (restoring) return;
+
+    setRestoring(name);
+    try {
+      const result = await fetchJson<RestoreResult>('/api/admin/backup/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      }, '恢复备份失败');
+
+      toast.success(`恢复完成：${result.animeCount} 部番剧，${result.historyCount} 条观看历史`);
+      await Promise.all([
+        globalMutate((key) => typeof key === 'string' && (
+          key.startsWith('/api/anime') ||
+          key.startsWith('/api/history') ||
+          key.startsWith('/api/admin/anime') ||
+          key.startsWith('/api/admin/history')
+        )),
+        fetchBackups(),
+      ]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '恢复备份失败');
+    } finally {
+      setRestoring(null);
+      setRestoreConfirm(null);
+    }
+  };
+
   const handleConfirmImport = async () => {
     if (!pendingImport || importing) return;
 
@@ -203,7 +238,7 @@ export default function BackupPageClient() {
     });
   };
 
-  if (status === 'loading' || (status === 'authenticated' && role !== 'admin')) {
+  if (accessLoading || !canManage) {
     return <main className="p-6 text-[var(--text-secondary)]">验证权限中...</main>;
   }
 
@@ -212,7 +247,7 @@ export default function BackupPageClient() {
       {/* Header */}
       <div>
         <h1 className="text-2xl md:text-3xl font-display tracking-tight text-[var(--text-primary)]">备份与导出</h1>
-        <p className="text-base text-[var(--text-muted)] mt-2">导出数据、创建和管理 SQL 备份文件</p>
+        <p className="text-base text-[var(--text-muted)] mt-2">导出可迁移文件，或创建应用侧的 SQL 数据快照</p>
       </div>
 
       {/* Export Section */}
@@ -223,9 +258,10 @@ export default function BackupPageClient() {
         </p>
         <div className="flex flex-wrap gap-3">
           <button
+            type="button"
             onClick={() => handleExport('csv')}
             disabled={exporting !== null}
-            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl success-soft text-sm font-medium hover:bg-[var(--color-completed)]/20 transition-all disabled:opacity-50"
+            className="theme-accent-soft flex items-center gap-2.5 rounded-2xl px-5 py-3 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -233,9 +269,10 @@ export default function BackupPageClient() {
             {exporting === 'csv' ? '导出中...' : '导出 CSV（Excel）'}
           </button>
           <button
+            type="button"
             onClick={() => handleExport('json')}
             disabled={exporting !== null}
-            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl badge-airing-soft text-sm font-medium hover:bg-[var(--color-airing)]/20 transition-all disabled:opacity-50"
+            className="theme-accent-soft flex items-center gap-2.5 rounded-2xl px-5 py-3 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -243,9 +280,10 @@ export default function BackupPageClient() {
             {exporting === 'json' ? '导出中...' : '导出 JSON'}
           </button>
           <button
+            type="button"
             onClick={handleImportClick}
             disabled={importing}
-            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-[var(--color-score)]/10 text-[var(--color-score)] text-sm font-medium hover:bg-[var(--color-score)]/20 transition-all disabled:opacity-50"
+            className="theme-accent-soft flex items-center gap-2.5 rounded-2xl px-5 py-3 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20V10m0 0l-4 4m4-4l4 4M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1" />
@@ -270,9 +308,10 @@ export default function BackupPageClient() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
           <h2 className="text-lg font-medium text-[var(--text-primary)]">SQL 备份</h2>
           <button
+            type="button"
             onClick={handleCreateBackup}
             disabled={creating}
-            className="flex items-center gap-2.5 px-5 py-3 rounded-2xl status-plan-soft text-sm font-medium hover:bg-[var(--color-plan)]/20 transition-all disabled:opacity-50 w-fit"
+            className="theme-accent-button flex w-fit items-center gap-2.5 rounded-2xl px-5 py-3 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -281,7 +320,7 @@ export default function BackupPageClient() {
           </button>
         </div>
         <p className="text-sm text-[var(--text-muted)] mb-6">
-          备份 anime 和 watch_history 表为 SQL 文件。可用于恢复数据、迁移到其他服务器，或配合 <code className="text-[var(--text-secondary)]">/setup</code> 页面初始化新环境。
+          将 anime 和 watch_history 表保存到应用的备份目录，常规备份默认保留最近 10 份。可以直接恢复到某个备份时间点；恢复前会自动保存当前状态。跨设备迁移仍优先使用 JSON。
         </p>
 
         {loading ? (
@@ -309,7 +348,9 @@ export default function BackupPageClient() {
                 </div>
                 <div className="flex items-center gap-1 ml-4 shrink-0">
                   <button
+                    type="button"
                     onClick={() => handleDownload(backup.name)}
+                    disabled={restoring !== null}
                     className="p-2.5 rounded-xl text-[var(--text-secondary)] hover:text-[var(--color-watching)] hover:bg-[var(--color-watching)]/10 transition-all"
                     title="下载"
                   >
@@ -318,7 +359,20 @@ export default function BackupPageClient() {
                     </svg>
                   </button>
                   <button
+                    type="button"
+                    onClick={() => setRestoreConfirm(backup.name)}
+                    disabled={restoring !== null}
+                    className="p-2.5 rounded-xl text-[var(--text-secondary)] transition-all hover:bg-[var(--accent-light)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40"
+                    title={restoring === backup.name ? '恢复中...' : '恢复'}
+                  >
+                    <svg className={`w-5 h-5 ${restoring === backup.name ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.023 9.348h4.992V4.356m-.62 4.37A9 9 0 105.64 18.36M7.977 14.652H2.985v4.992m.62-4.37A9 9 0 0018.36 5.64" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setDeleteConfirm(backup.name)}
+                    disabled={restoring !== null}
                     className="p-2.5 rounded-xl text-[var(--text-muted)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 transition-all"
                     title="删除"
                   >
@@ -341,6 +395,16 @@ export default function BackupPageClient() {
         variant="danger"
         onConfirm={handleConfirmImport}
         onCancel={() => !importing && setPendingImport(null)}
+      />
+
+      <ConfirmDialog
+        open={restoreConfirm !== null}
+        title="恢复 SQL 备份"
+        message={`确定恢复到「${restoreConfirm || ''}」吗？当前番剧和观看历史会被替换；系统会先自动创建一份“恢复前备份”。`}
+        confirmText={restoring ? '恢复中...' : '确认恢复'}
+        variant="warning"
+        onConfirm={() => restoreConfirm && handleRestoreBackup(restoreConfirm)}
+        onCancel={() => !restoring && setRestoreConfirm(null)}
       />
 
       <ConfirmDialog

@@ -91,6 +91,21 @@ export async function deleteWatchHistoryById(id: number): Promise<boolean> {
   return result.affectedRows > 0;
 }
 
+export async function updateWatchHistoryTime(id: number, watchedAt: Date): Promise<WatchHistoryRecord | null> {
+  const watchedAtISO = watchedAt.toISOString();
+  const result = await query<DbResult>(
+    'UPDATE watch_history SET watchedAt = ? WHERE id = ?',
+    [watchedAtISO, id],
+  );
+  if (result.affectedRows === 0) return null;
+
+  const [row] = await query<WatchHistoryRow[]>(
+    'SELECT id, animeId, animeTitle, episode, watchedAt FROM watch_history WHERE id = ?',
+    [id],
+  );
+  return row ? mapRowToHistory(row) : null;
+}
+
 export async function deleteWatchHistoryBatch(ids: number[]): Promise<number> {
   if (ids.length === 0) return 0;
   const placeholders = ids.map(() => '?').join(', ');

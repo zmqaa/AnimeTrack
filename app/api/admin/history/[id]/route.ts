@@ -1,4 +1,4 @@
-import { deleteWatchHistoryById } from '@/lib/history';
+import { deleteWatchHistoryById, updateWatchHistoryTime } from '@/lib/history';
 import { getRawDb } from '@/lib/db';
 import { nowISO } from '@/lib/date-utils';
 import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
@@ -103,6 +103,36 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   if (!result) return apiError('记录或对应番剧不存在', 404);
 
   return apiSuccess({ undone: true, result });
+}
+
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { authorized, response } = await requireAdmin();
+  if (!authorized) return response;
+
+  const { id: idStr } = await params;
+  const id = parseHistoryId(idStr);
+  if (!id) return apiError('无效的记录 ID', 400);
+
+  let body: { watchedAt?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return apiError('请求内容不是有效的 JSON', 400);
+  }
+
+  if (typeof body.watchedAt !== 'string' || !body.watchedAt.trim()) {
+    return apiError('观看时间不能为空', 400);
+  }
+
+  const watchedAt = new Date(body.watchedAt);
+  if (Number.isNaN(watchedAt.getTime())) {
+    return apiError('观看时间格式无效', 400);
+  }
+
+  const record = await updateWatchHistoryTime(id, watchedAt);
+  if (!record) return apiError('记录不存在', 404);
+
+  return apiSuccess({ updated: true, record });
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {

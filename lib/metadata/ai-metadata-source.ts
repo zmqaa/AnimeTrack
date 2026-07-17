@@ -1,4 +1,4 @@
-import { createAiRuntimeConfig, getAiApiKey, requestAiJson } from '../ai-runtime';
+import { createAiRuntimeConfig, requestAiJson } from '../ai-runtime';
 import {
   toOptionalString,
   toOptionalNumber,
@@ -19,18 +19,17 @@ export interface AiAnimeMetadata {
   coverUrl?: string;
 }
 
-const AI_RUNTIME = createAiRuntimeConfig();
-
 export async function fetchAiAnimeMetadata(queryName: string, providedApiKey?: string): Promise<AiAnimeMetadata | null> {
   const normalizedQuery = String(queryName || '').trim();
   if (!normalizedQuery) {
     return null;
   }
 
-  const apiKey = String(providedApiKey || getAiApiKey()).trim();
+  const runtime = createAiRuntimeConfig(
+    providedApiKey ? { apiKey: String(providedApiKey).trim() } : {},
+  );
   const payload = await requestAiJson<Record<string, unknown>>({
-    ...AI_RUNTIME,
-    apiKey,
+    ...runtime,
     messages: [
       {
         role: 'system',

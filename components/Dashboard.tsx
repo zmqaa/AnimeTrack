@@ -194,7 +194,7 @@ export default function Dashboard() {
                 <Link key={`recent-${record.id}`} href={`/anime/${record.animeId}`}
                   className="group surface-card-muted rounded-[22px] overflow-hidden hover:border-[var(--accent)] transition-all duration-300 hover:-translate-y-0.5 hover:scale-[1.01]">
                   <div className="aspect-video w-full bg-[var(--tag-bg)]/70 bg-cover bg-center"
-                    style={anime?.coverUrl ? { backgroundImage: `linear-gradient(180deg, var(--color-cover-gradient-start), var(--color-cover-gradient-end)), url(${anime.coverUrl})` } : undefined} />
+                    style={anime?.displayCoverUrl ? { backgroundImage: `linear-gradient(180deg, var(--color-cover-gradient-start), var(--color-cover-gradient-end)), url(${anime.displayCoverUrl})` } : undefined} />
                   <div className="p-4">
                     <div className="mt-1 text-base text-[var(--text-primary)] truncate">{anime?.title ?? record.animeTitle}</div>
                     <div className="text-xs text-[var(--text-muted)] truncate">{anime?.originalTitle ?? '来自观看历史'}</div>

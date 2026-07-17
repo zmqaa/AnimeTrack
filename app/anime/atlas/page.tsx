@@ -262,7 +262,7 @@ export default function AnimeAtlasPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {data.scored.map((anime, index) => (
                 <Link key={anime.id} href={`/anime/${anime.id}`} className="group surface-card-muted rounded-[28px] overflow-hidden hover:border-[var(--color-score)]/20 transition-all duration-300">
-                  <div className="h-40 bg-[var(--bg-card)] bg-cover bg-center" style={anime.coverUrl ? { backgroundImage: `linear-gradient(180deg, var(--color-cover-gradient-start), var(--color-cover-gradient-end)), url(${anime.coverUrl})` } : undefined} />
+                  <div className="h-40 bg-[var(--bg-card)] bg-cover bg-center" style={anime.displayCoverUrl ? { backgroundImage: `linear-gradient(180deg, var(--color-cover-gradient-start), var(--color-cover-gradient-end)), url(${anime.displayCoverUrl})` } : undefined} />
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">

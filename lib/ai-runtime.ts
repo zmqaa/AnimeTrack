@@ -1,3 +1,8 @@
+import 'server-only';
+
+import { isDesktopRuntime } from '@/lib/runtime-mode';
+import { readRuntimeSettings } from '@/lib/runtime-settings';
+
 export type AiMessage = {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -7,6 +12,7 @@ export type AiRuntimeConfig = {
   apiUrl: string;
   model: string;
   apiKey: string;
+  jsonFormat: boolean;
   disableThinking: boolean;
 };
 
@@ -36,7 +42,11 @@ export function normalizeAiApiUrl(value?: string): string {
   return withoutTrailingSlash;
 }
 
-export function shouldUseJsonFormat(apiUrl?: string, model?: string): boolean {
+export function shouldUseJsonFormat(apiUrl?: string, model?: string, configuredValue?: boolean): boolean {
+  if (typeof configuredValue === 'boolean') {
+    return configuredValue;
+  }
+
   const override = String(process.env.AI_JSON_FORMAT ?? '').trim().toLowerCase();
   if (['false', '0', 'off', 'no'].includes(override)) {
     return false;
@@ -101,28 +111,40 @@ export function shouldDisableThinking(aiConfig?: Partial<AiRuntimeConfig>): bool
 }
 
 export function createAiRuntimeConfig(overrides: Partial<AiRuntimeConfig> = {}): AiRuntimeConfig {
-  const apiUrl = normalizeAiApiUrl(overrides.apiUrl ?? process.env.AI_API_URL);
-  const modelInput = overrides.model ?? process.env.AI_MODEL;
+  const stored = isDesktopRuntime() ? readRuntimeSettings().ai : undefined;
+  const apiUrl = normalizeAiApiUrl(overrides.apiUrl ?? stored?.apiUrl ?? process.env.AI_API_URL);
+  const modelInput = overrides.model ?? stored?.model ?? process.env.AI_MODEL;
   const model = String(modelInput || '').trim() || DEFAULT_AI_MODEL;
-  const apiKeyInput = overrides.apiKey ?? getAiApiKey();
+  const apiKeyInput = overrides.apiKey ?? stored?.apiKey ?? getAiApiKey();
   const apiKey = String(apiKeyInput || '').trim();
+  const hasJsonFormat = Object.prototype.hasOwnProperty.call(overrides, 'jsonFormat');
   const hasDisableThinking = Object.prototype.hasOwnProperty.call(overrides, 'disableThinking');
+  const jsonFormat = hasJsonFormat
+    ? Boolean(overrides.jsonFormat)
+    : shouldUseJsonFormat(apiUrl, model, stored?.jsonFormat);
+  const disableThinking = hasDisableThinking
+    ? Boolean(overrides.disableThinking)
+    : typeof stored?.disableThinking === 'boolean'
+      ? stored.disableThinking
+      : shouldDisableThinking({ apiUrl, model });
 
   return {
     apiUrl,
     model,
     apiKey,
-    disableThinking: hasDisableThinking ? Boolean(overrides.disableThinking) : shouldDisableThinking({ apiUrl, model }),
+    jsonFormat,
+    disableThinking,
   };
 }
 
 export async function requestAiJson<T = unknown>(options: RequestAiJsonOptions = {} as RequestAiJsonOptions): Promise<T | null> {
-  const runtime = createAiRuntimeConfig({
-    apiUrl: options.apiUrl,
-    model: options.model,
-    apiKey: options.apiKey,
-    disableThinking: options.disableThinking,
-  });
+  const runtimeOverrides: Partial<AiRuntimeConfig> = {};
+  if (options.apiUrl !== undefined) runtimeOverrides.apiUrl = options.apiUrl;
+  if (options.model !== undefined) runtimeOverrides.model = options.model;
+  if (options.apiKey !== undefined) runtimeOverrides.apiKey = options.apiKey;
+  if (options.jsonFormat !== undefined) runtimeOverrides.jsonFormat = options.jsonFormat;
+  if (options.disableThinking !== undefined) runtimeOverrides.disableThinking = options.disableThinking;
+  const runtime = createAiRuntimeConfig(runtimeOverrides);
 
   if (!runtime.apiKey || !Array.isArray(options.messages) || options.messages.length === 0) {
     return null;
@@ -136,8 +158,8 @@ export async function requestAiJson<T = unknown>(options: RequestAiJsonOptions =
     model: runtime.model,
     messages: options.messages,
     temperature: typeof options.temperature === 'number' ? options.temperature : 0.1,
-    ...(shouldUseJsonFormat(runtime.apiUrl, runtime.model) ? { response_format: { type: 'json_object' } } : {}),
-    ...(options.includeThinkingControl && runtime.disableThinking ? { enable_thinking: false } : {}),
+    ...(runtime.jsonFormat ? { response_format: { type: 'json_object' } } : {}),
+    ...(runtime.disableThinking ? { enable_thinking: false } : {}),
     ...(options.extraBody && typeof options.extraBody === 'object' ? options.extraBody : {}),
   };
 

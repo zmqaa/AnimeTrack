@@ -26,6 +26,13 @@
 /data/*.db
 /data/*.db-wal
 /data/*.db-shm
+/data/settings.json
+/data/settings.json.tmp
+/data/covers/
+/data/backups/
+/data/logs/
+/dist-desktop/
+/dist-electron/
 /logs/
 /logs/maintenance/
 /docs-private/

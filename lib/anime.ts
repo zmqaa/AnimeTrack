@@ -4,6 +4,7 @@ import { parseJsonStringArray } from './anime-cast';
 import { extractSeasonNumber, hasSeasonMarker, normalizeTitleToken } from './chinese-parser';
 import { nowISO } from './date-utils';
 import type { AnimeStatus } from './anime-shared';
+import { resolveDisplayCoverUrl } from './cover-image';
 
 export type { AnimeStatus };
 
@@ -19,6 +20,8 @@ export interface AnimeRecord {
   title: string;
   originalTitle?: string;
   coverUrl?: string;
+  localCoverUrl?: string;
+  displayCoverUrl?: string;
   status: AnimeStatus;
   score?: number;
   progress: number;
@@ -42,6 +45,7 @@ export interface CreateAnimeDTO {
   title: string;
   originalTitle?: string;
   coverUrl?: string | null;
+  localCoverUrl?: string | null;
   status: AnimeStatus;
   score?: number;
   progress: number;
@@ -64,6 +68,7 @@ export function animeRecordToDTO(record: AnimeRecord): CreateAnimeDTO {
     title: record.title,
     originalTitle: record.originalTitle,
     coverUrl: record.coverUrl,
+    localCoverUrl: record.localCoverUrl,
     status: record.status,
     score: record.score,
     progress: record.progress,
@@ -86,6 +91,7 @@ interface AnimeRow {
   title: string;
   original_title?: string | null;
   coverUrl?: string | null;
+  localCoverUrl?: string | null;
   status: AnimeStatus;
   score?: number | string | null;
   progress: number;
@@ -111,6 +117,8 @@ function mapRowToAnimeRecord(row: AnimeRow): AnimeRecord {
     title: row.title,
     originalTitle: row.original_title || undefined,
     coverUrl: row.coverUrl || undefined,
+    localCoverUrl: row.localCoverUrl || undefined,
+    displayCoverUrl: resolveDisplayCoverUrl(row.localCoverUrl, row.coverUrl),
     status: row.status as AnimeStatus,
     score: row.score != null ? Number(row.score) : undefined,
     progress: row.progress,
@@ -255,7 +263,7 @@ const SORT_COLUMN_MAP: Record<string, string> = {
 };
 
 const LIST_COLUMNS_RAW = [
-  'id', 'title', 'original_title', 'coverUrl', 'status', 'score',
+  'id', 'title', 'original_title', 'coverUrl', 'localCoverUrl', 'status', 'score',
   'progress', 'totalEpisodes', 'durationMinutes', 'tags',
   'start_date', 'end_date', 'premiere_date', 'isFinished',
   'cast', 'cast_aliases', 'summary',
@@ -415,14 +423,15 @@ export async function getAnimeRecord(id: number): Promise<AnimeRecord | null> {
 export async function createAnimeRecord(input: CreateAnimeDTO): Promise<AnimeRecord> {
   const now = nowISO();
   const sql = `
-    INSERT INTO anime (title, original_title, coverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO anime (title, original_title, coverUrl, localCoverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   const params = [
     input.title,
     input.originalTitle || null,
     input.coverUrl || null,
+    input.localCoverUrl || null,
     input.status,
     input.score ?? null,
     input.progress,
@@ -448,6 +457,8 @@ export async function createAnimeRecord(input: CreateAnimeDTO): Promise<AnimeRec
     title: input.title,
     originalTitle: input.originalTitle,
     coverUrl: input.coverUrl || undefined,
+    localCoverUrl: input.localCoverUrl || undefined,
+    displayCoverUrl: resolveDisplayCoverUrl(input.localCoverUrl, input.coverUrl),
     status: input.status,
     score: input.score,
     progress: input.progress,
@@ -476,10 +487,10 @@ export function createAnimeRecordWithHistory(
   const transaction = db.transaction(() => {
     const now = nowISO();
     const result = db.prepare(`
-      INSERT INTO anime (title, original_title, coverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO anime (title, original_title, coverUrl, localCoverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      input.title, input.originalTitle || null, input.coverUrl || null, input.status,
+      input.title, input.originalTitle || null, input.coverUrl || null, input.localCoverUrl || null, input.status,
       input.score ?? null, input.progress, input.totalEpisodes ?? null,
       input.durationMinutes ?? null, input.notes || null, JSON.stringify(input.tags || []),
       input.summary || null, input.startDate || null, input.endDate || null,
@@ -513,6 +524,7 @@ export async function updateAnimeRecord(
   if (input.originalTitle !== undefined) { fields.push('original_title = ?'); params.push(input.originalTitle); }
   if (input.title !== undefined) { fields.push('title = ?'); params.push(input.title); }
   if (input.coverUrl !== undefined) { fields.push('coverUrl = ?'); params.push(input.coverUrl); }
+  if (input.localCoverUrl !== undefined) { fields.push('localCoverUrl = ?'); params.push(input.localCoverUrl); }
   if (input.status !== undefined) { fields.push('status = ?'); params.push(input.status); }
   if (input.score !== undefined) { fields.push('score = ?'); params.push(input.score); }
   if (input.progress !== undefined) { fields.push('progress = ?'); params.push(input.progress); }
@@ -548,6 +560,7 @@ export function updateAnimeRecordWithHistory(
     recordHistory: boolean;
     watchedAt?: Date;
     replayEpisode?: number;
+    trimHistoryOnProgressDecrease?: boolean;
   },
 ): AnimeRecord | null {
   const options = typeof historyOptions === 'boolean'
@@ -568,9 +581,15 @@ export function updateAnimeRecordWithHistory(
     if (input.originalTitle !== undefined) add('original_title', input.originalTitle);
     if (input.title !== undefined) add('title', input.title);
     if (input.coverUrl !== undefined) add('coverUrl', input.coverUrl);
+    if (input.localCoverUrl !== undefined) add('localCoverUrl', input.localCoverUrl);
     if (input.status !== undefined) add('status', input.status);
     if (input.score !== undefined) add('score', input.score);
-    if (input.progress !== undefined) add('progress', input.progress);
+    if (input.progress !== undefined) {
+      const requestedProgress = Number(input.progress) || 0;
+      const currentProgress = Number(beforeRow.progress) || 0;
+      const canDecreaseProgress = requestedProgress >= currentProgress || options.trimHistoryOnProgressDecrease;
+      if (canDecreaseProgress) add('progress', input.progress);
+    }
     if (input.totalEpisodes !== undefined) add('totalEpisodes', input.totalEpisodes);
     if (input.durationMinutes !== undefined) add('durationMinutes', input.durationMinutes);
     if (input.notes !== undefined) add('notes', input.notes);
@@ -605,7 +624,7 @@ export function updateAnimeRecordWithHistory(
       db.prepare(
         'INSERT INTO watch_history (animeId, animeTitle, episode, watchedAt) VALUES (?, ?, ?, ?)',
       ).run(id, updatedRow.title, options.replayEpisode, (options.watchedAt || new Date()).toISOString());
-    } else if (delta < 0) {
+    } else if (delta < 0 && options.trimHistoryOnProgressDecrease) {
       db.prepare('DELETE FROM watch_history WHERE animeId = ? AND episode > ?').run(id, updatedProgress);
     }
 

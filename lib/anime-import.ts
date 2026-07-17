@@ -108,12 +108,19 @@ function normalizeAnime(item: ImportAnimeItem, index: number): NormalizedAnime {
   if (!VALID_STATUSES.has(statusValue as AnimeStatus)) throw new Error(`${title} 的状态无效：${statusValue}`);
 
   const now = nowISO();
+  const importedCoverUrl = optionalString(item.coverUrl, 2000, `${title} 的封面地址`);
+  const importedLocalCoverUrl = optionalString(item.localCoverUrl, 2000, `${title} 的本地封面地址`);
+  const legacyLocalCoverUrl = importedCoverUrl?.startsWith('/covers/')
+    || importedCoverUrl?.startsWith('/api/local-covers/')
+    ? importedCoverUrl
+    : undefined;
   return {
     sourceId: item.id,
     payload: {
       title,
       originalTitle: optionalString(item.originalTitle, 500, `${title} 的原标题`),
-      coverUrl: optionalString(item.coverUrl, 2000, `${title} 的封面地址`),
+      coverUrl: legacyLocalCoverUrl ? undefined : importedCoverUrl,
+      localCoverUrl: importedLocalCoverUrl || legacyLocalCoverUrl,
       status: statusValue as AnimeStatus,
       score: optionalNumber(item.score, `${title} 的评分`, { min: 0, max: 10 }),
       progress: optionalNumber(item.progress, `${title} 的进度`, { min: 0, integer: true }) ?? 0,
@@ -175,12 +182,12 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
     db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('anime', 'watch_history')").run();
 
     const insertWithId = db.prepare(`
-      INSERT INTO anime (id, title, original_title, coverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO anime (id, title, original_title, coverUrl, localCoverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertWithoutId = db.prepare(`
-      INSERT INTO anime (title, original_title, coverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO anime (title, original_title, coverUrl, localCoverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const sourceIdMap = new Map<string, number>();
     const titleMap = new Map<string, number[]>();
@@ -194,7 +201,7 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
     for (const item of ordered) {
       const p = item.payload;
       const values = [
-        p.title, p.originalTitle || null, p.coverUrl || null, p.status, p.score ?? null,
+        p.title, p.originalTitle || null, p.coverUrl || null, p.localCoverUrl || null, p.status, p.score ?? null,
         p.progress, p.totalEpisodes ?? null, p.durationMinutes ?? null, p.notes || null,
         JSON.stringify(p.tags || []), p.summary || null, p.startDate || null, p.endDate || null,
         p.premiereDate || null, JSON.stringify(p.cast || []), JSON.stringify(p.castAliases || []),

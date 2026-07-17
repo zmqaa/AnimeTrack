@@ -18,6 +18,8 @@ export interface AnimeCardItem {
   title: string;
   originalTitle?: string;
   coverUrl?: string;
+  localCoverUrl?: string;
+  displayCoverUrl?: string;
   status: AnimeStatus;
   score?: number;
   progress: number;
@@ -51,6 +53,8 @@ export interface AnimeFormInitialData {
   status?: AnimeStatus;
   notes?: string;
   coverUrl?: string;
+  localCoverUrl?: string;
+  displayCoverUrl?: string;
   tags?: string;
   durationMinutes?: string | number;
   startDate?: string;

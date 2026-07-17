@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS anime (
     title TEXT NOT NULL,
     original_title TEXT,
     coverUrl TEXT,
+    localCoverUrl TEXT,
     status TEXT NOT NULL,
     score REAL,
     progress INTEGER DEFAULT 0,

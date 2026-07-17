@@ -54,6 +54,13 @@ export const navigationItems: NavigationItem[] = [
     section: '管理区',
     adminOnly: true,
   },
+  {
+    label: 'AI 设置',
+    href: '/settings',
+    description: '配置桌面版 AI 服务',
+    section: '管理区',
+    adminOnly: true,
+  },
 ];
 
 export const config = {
