@@ -6,6 +6,7 @@ import { mutate as globalMutate } from 'swr';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { fetchBlob, fetchJson } from '@/lib/client-api';
+import { buildExportFilename } from '@/lib/export-filename';
 import { ANIME_LIST_KEY, HISTORY_KEY } from '@/lib/swr-config';
 import { useRuntimeAccess } from '@/hooks/useRuntimeAccess';
 
@@ -117,7 +118,7 @@ export default function BackupPageClient() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `anime-track-export.${format}`;
+      a.download = buildExportFilename(format);
       a.click();
       URL.revokeObjectURL(url);
       toast.success(`${format.toUpperCase()} 导出成功`);

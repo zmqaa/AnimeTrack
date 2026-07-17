@@ -3,6 +3,7 @@ import { listAnimeRecords } from '@/lib/anime';
 import { getWatchHistory } from '@/lib/history';
 import { requireAdmin } from '@/lib/api-response';
 import { isRemoteUrl } from '@/lib/cover-image';
+import { buildExportFilename } from '@/lib/export-filename';
 import type { AnimeRecord } from '@/lib/anime';
 
 function escapeCsvValue(value: unknown): string {
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(csv, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="anime-track-export.csv"`,
+        'Content-Disposition': `attachment; filename="${buildExportFilename('csv')}"`,
       },
     });
   }
@@ -101,7 +102,7 @@ export async function GET(request: NextRequest) {
   return new NextResponse(json, {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      'Content-Disposition': `attachment; filename="anime-track-export.json"`,
+      'Content-Disposition': `attachment; filename="${buildExportFilename('json')}"`,
     },
   });
 }
