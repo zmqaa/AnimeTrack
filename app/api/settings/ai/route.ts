@@ -19,11 +19,8 @@ function responsePayload() {
     editable: isDesktopRuntime(),
     source: isDesktopRuntime() && stored ? 'desktop-settings' : 'environment',
     config: {
-      provider: stored?.provider || 'openai-compatible',
       apiUrl: runtime.apiUrl,
       model: runtime.model,
-      jsonFormat: runtime.jsonFormat,
-      disableThinking: runtime.disableThinking,
       hasApiKey: Boolean(runtime.apiKey),
       apiKeyPreview: apiKeyPreview(runtime.apiKey),
     },
@@ -60,12 +57,9 @@ export async function PUT(request: NextRequest) {
 
     const clearApiKey = body.clearApiKey === true;
     updateStoredAiSettings({
-      provider: optionalString(body.provider, '服务商', 100) || 'openai-compatible',
       apiUrl,
       model: optionalString(body.model, '模型名称', 200),
       apiKey: clearApiKey ? undefined : optionalString(body.apiKey, 'API Key', 4000),
-      jsonFormat: typeof body.jsonFormat === 'boolean' ? body.jsonFormat : undefined,
-      disableThinking: typeof body.disableThinking === 'boolean' ? body.disableThinking : undefined,
     }, {
       preserveApiKey: !clearApiKey,
     });

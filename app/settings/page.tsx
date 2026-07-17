@@ -11,11 +11,8 @@ type AiSettingsResponse = {
   editable: boolean;
   source: 'desktop-settings' | 'environment';
   config: {
-    provider: string;
     apiUrl: string;
     model: string;
-    jsonFormat: boolean;
-    disableThinking: boolean;
     hasApiKey: boolean;
     apiKeyPreview: string;
   };
@@ -32,12 +29,9 @@ export default function SettingsPage() {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [apiKeyPreview, setApiKeyPreview] = useState('');
   const [form, setForm] = useState({
-    provider: 'openai-compatible',
     apiUrl: '',
     model: '',
     apiKey: '',
-    jsonFormat: true,
-    disableThinking: false,
   });
 
   useEffect(() => {
@@ -57,11 +51,8 @@ export default function SettingsPage() {
         setApiKeyPreview(data.config.apiKeyPreview);
         setForm((current) => ({
           ...current,
-          provider: data.config.provider,
           apiUrl: data.config.apiUrl,
           model: data.config.model,
-          jsonFormat: data.config.jsonFormat,
-          disableThinking: data.config.disableThinking,
         }));
       })
       .catch((error) => toast.error(error instanceof Error ? error.message : '加载 AI 设置失败'))
@@ -73,12 +64,9 @@ export default function SettingsPage() {
   }, [canManage]);
 
   const payload = () => ({
-    provider: form.provider,
     apiUrl: form.apiUrl,
     model: form.model,
     apiKey: form.apiKey,
-    jsonFormat: form.jsonFormat,
-    disableThinking: form.disableThinking,
   });
 
   const handleSave = async () => {
@@ -141,18 +129,13 @@ export default function SettingsPage() {
           </div>
 
           <label className="block space-y-2">
-            <span className="text-sm text-[var(--text-secondary)]">服务商标识</span>
-            <input className={inputClass} disabled={!editable} value={form.provider} onChange={(event) => setForm({ ...form, provider: event.target.value })} />
-          </label>
-
-          <label className="block space-y-2">
             <span className="text-sm text-[var(--text-secondary)]">API URL</span>
             <input className={inputClass} disabled={!editable} value={form.apiUrl} onChange={(event) => setForm({ ...form, apiUrl: event.target.value })} placeholder="https://api.deepseek.com/chat/completions" />
           </label>
 
           <label className="block space-y-2">
             <span className="text-sm text-[var(--text-secondary)]">模型名称</span>
-            <input className={inputClass} disabled={!editable} value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} placeholder="deepseek-chat" />
+            <input className={inputClass} disabled={!editable} value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} placeholder="deepseek-v4-flash" />
           </label>
 
           <label className="block space-y-2">
@@ -161,17 +144,6 @@ export default function SettingsPage() {
             </span>
             <input className={inputClass} disabled={!editable} type="password" autoComplete="off" value={form.apiKey} onChange={(event) => setForm({ ...form, apiKey: event.target.value })} placeholder={hasApiKey ? '留空以保留现有密钥' : '请输入 API Key'} />
           </label>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex items-center gap-3 rounded-2xl border border-[var(--border)] p-4 text-sm text-[var(--text-secondary)]">
-              <input type="checkbox" disabled={!editable} checked={form.jsonFormat} onChange={(event) => setForm({ ...form, jsonFormat: event.target.checked })} />
-              请求 JSON 输出格式
-            </label>
-            <label className="flex items-center gap-3 rounded-2xl border border-[var(--border)] p-4 text-sm text-[var(--text-secondary)]">
-              <input type="checkbox" disabled={!editable} checked={form.disableThinking} onChange={(event) => setForm({ ...form, disableThinking: event.target.checked })} />
-              禁用思考模式
-            </label>
-          </div>
 
           {editable && (
             <div className="flex flex-wrap gap-3 pt-2">

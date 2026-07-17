@@ -269,7 +269,7 @@ export function CastNetwork({ nodes: inputNodes, links: inputLinks, height = 500
     };
 
     simulate();
-  }, [svgWidth, height, theme, layoutSignature]);
+  }, [svgWidth, height, layoutSignature]);
 
   useEffect(() => {
     if (animRef.current) cancelAnimationFrame(animRef.current);

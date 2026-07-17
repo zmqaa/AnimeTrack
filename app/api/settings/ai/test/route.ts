@@ -13,8 +13,6 @@ export async function POST(request: NextRequest) {
       apiUrl: typeof body.apiUrl === 'string' && body.apiUrl.trim() ? body.apiUrl.trim() : undefined,
       model: typeof body.model === 'string' && body.model.trim() ? body.model.trim() : undefined,
       apiKey: typeof body.apiKey === 'string' && body.apiKey.trim() ? body.apiKey.trim() : undefined,
-      jsonFormat: typeof body.jsonFormat === 'boolean' ? body.jsonFormat : undefined,
-      disableThinking: typeof body.disableThinking === 'boolean' ? body.disableThinking : undefined,
     };
     const runtime = createAiRuntimeConfig(
       Object.fromEntries(Object.entries(overrides).filter(([, value]) => value !== undefined)),
