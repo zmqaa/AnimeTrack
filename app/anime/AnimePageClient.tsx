@@ -44,13 +44,13 @@ export default function AnimePageClient() {
 
   // ── 筛选/排序/分页状态 ───────────────────────────────────────────────
   const [filterStatus, setFilterStatus] = useState<AnimeStatus | 'all'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
   const [castQuery, setCastQuery] = useState('');
   const [tagFilter, setTagFilter] = useState('');
   const [sortBy, setSortBy] = useState<AnimeSortBy>('lastWatchedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('search') || '');
   const hasSyncedUrlFilters = useRef(false);
   const lastFilterKeyRef = useRef('');
   const hasRestoredScrollRef = useRef(false);
@@ -123,9 +123,16 @@ export default function AnimePageClient() {
 
   const pageSize = 12;
   const returnTo = useMemo(() => {
-    const query = searchParams.toString();
+    const params = new URLSearchParams(searchParams.toString());
+    const trimmedSearch = searchQuery.trim();
+    if (trimmedSearch) {
+      params.set('search', trimmedSearch);
+    } else {
+      params.delete('search');
+    }
+    const query = params.toString();
     return query ? `${pathname}?${query}` : pathname;
-  }, [pathname, searchParams]);
+  }, [pathname, searchParams, searchQuery]);
 
   // ── 搜索防抖 ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -137,6 +144,21 @@ export default function AnimePageClient() {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
   }, [searchQuery]);
+
+  // 将搜索词写入 URL，进入详情页后可通过 returnTo 完整恢复列表状态。
+  useEffect(() => {
+    const trimmedSearch = debouncedSearch.trim();
+    if ((searchParams.get('search') || '') === trimmedSearch) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    if (trimmedSearch) {
+      params.set('search', trimmedSearch);
+    } else {
+      params.delete('search');
+    }
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [debouncedSearch, pathname, router, searchParams]);
 
   // ── SWR: 分页列表（cast/tag 筛选时暂停服务端分页，改用客户端过滤）────
   const swrPageKey = useMemo(() => {
@@ -382,7 +404,7 @@ export default function AnimePageClient() {
   const handleQuickRecord = useCallback(async () => {
     const text = quickInput.trim();
     if (!text) {
-      setQuickMessage('请输入一句话记录');
+      setQuickMessage('请输入动漫名称');
       return;
     }
 
@@ -579,7 +601,6 @@ export default function AnimePageClient() {
 
           <AnimeGrid
             items={pagedItems}
-            onEdit={startEdit}
             updateProgress={updateProgress}
             loading={loading || pageLoading}
             isAdmin={isAdmin}

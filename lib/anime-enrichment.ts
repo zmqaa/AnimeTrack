@@ -3,6 +3,7 @@ import 'server-only';
 import { enrichAnimeData, buildVoiceActorAliases } from './ai';
 import { fetchAnimeMetadataByQueries } from './anime-provider';
 import { uniqueStrings } from './anime-cast';
+import { extractSeasonNumber, normalizeTitleToken } from './chinese-parser';
 import type { CreateAnimeDTO } from './anime';
 import { DEFAULT_METADATA_FIELDS, applyMetadataPatch, buildMetadataCandidate } from './metadata/merge-policy';
 import {
@@ -21,6 +22,7 @@ export interface AnimeEnrichmentOptions {
   originalUserTitle?: string;
   skipVoiceActorAliases?: boolean;
   providerQueryLimit?: number;
+  expectedSeason?: number;
 }
 
 function normalizeTitle(value: string | undefined | null): string | undefined {
@@ -30,6 +32,29 @@ function normalizeTitle(value: string | undefined | null): string | undefined {
 
   const normalized = value.trim();
   return normalized || undefined;
+}
+
+function candidateMatchesExpectedSeason(
+  candidate: MetadataSourceInput & { title?: string },
+  expectedSeason: number | undefined,
+  referenceTitles: Array<string | undefined>,
+): boolean {
+  if (!expectedSeason || expectedSeason <= 1) return true;
+
+  const candidateTitles = [candidate.title, candidate.originalTitle]
+    .map(normalizeTitle)
+    .filter((value): value is string => Boolean(value));
+  const references = referenceTitles
+    .map(normalizeTitle)
+    .filter((value): value is string => Boolean(value));
+
+  const exactlyMatchesReference = candidateTitles.some((title) => {
+    const token = normalizeTitleToken(title);
+    return token && references.some((reference) => normalizeTitleToken(reference) === token);
+  });
+  if (exactlyMatchesReference) return true;
+
+  return candidateTitles.some((title) => extractSeasonNumber(title) === expectedSeason);
 }
 
 /** 清洗外部数据源（AI / Provider）返回值，防止脏数据入库 */
@@ -51,6 +76,9 @@ export async function enrichAnimeInput(input: CreateAnimeDTO, options: AnimeEnri
   const mode = options.mode || 'create';
   const originalUserTitle = (options.originalUserTitle || input.title || '').trim();
   const providerQueryLimit = Math.max(1, options.providerQueryLimit ?? 3);
+  const expectedSeason = options.expectedSeason
+    ?? extractSeasonNumber(input.title)
+    ?? extractSeasonNumber(originalUserTitle);
 
   let data: CreateAnimeDTO = {
     ...input,
@@ -83,7 +111,8 @@ export async function enrichAnimeInput(input: CreateAnimeDTO, options: AnimeEnri
   // 处理 AI 结果
   if (aiResult.status === 'fulfilled' && aiResult.value) {
     const enriched = aiResult.value;
-    aiCandidate = sanitizeExternalCandidate({
+    const rawAiCandidate = {
+      title: enriched.officialTitle,
       originalTitle: enriched.originalTitle,
       totalEpisodes: enriched.totalEpisodes,
       durationMinutes: enriched.durationMinutes,
@@ -92,10 +121,21 @@ export async function enrichAnimeInput(input: CreateAnimeDTO, options: AnimeEnri
       premiereDate: enriched.premiereDate,
       isFinished: enriched.isFinished,
       coverUrl: enriched.coverUrl,
-    });
+    };
+
+    if (candidateMatchesExpectedSeason(rawAiCandidate, expectedSeason, [input.title, originalUserTitle])) {
+      aiCandidate = sanitizeExternalCandidate(rawAiCandidate);
+    } else {
+      console.warn('[anime-enrichment] Rejected AI metadata with a conflicting season', {
+        expectedSeason,
+        inputTitle: input.title,
+        candidateTitle: enriched.officialTitle,
+        candidateOriginalTitle: enriched.originalTitle,
+      });
+    }
 
     const officialTitle = normalizeTitle(enriched.officialTitle);
-    if ((mode === 'create' || mode === 'fill-missing') && officialTitle) {
+    if (aiCandidate && (mode === 'create' || mode === 'fill-missing') && officialTitle) {
       titleWasStandardized = officialTitle !== originalUserTitle;
       data.title = officialTitle;
     }
@@ -110,20 +150,43 @@ export async function enrichAnimeInput(input: CreateAnimeDTO, options: AnimeEnri
     console.error('Provider metadata enrichment failed:', initialProviderResult.reason);
   }
 
-  // ── 第二步（条件）：如果 AI 返回了更好的搜索词（原名），用原名再搜一次 ──
+  // ── 第二步（条件）：如果 AI 返回了更精确的原名，用原名复查 Provider 候选 ──
   const aiOriginalTitle = normalizeTitle(aiCandidate?.originalTitle as string);
   const hasBetterQuery = aiOriginalTitle && !initialProviderQueries.includes(aiOriginalTitle);
+  const providerOriginalTitle = normalizeTitle(providerCandidate?.originalTitle);
+  const providerMatchesAiOriginal = Boolean(
+    aiOriginalTitle
+    && providerOriginalTitle
+    && normalizeTitleToken(aiOriginalTitle) === normalizeTitleToken(providerOriginalTitle)
+  );
 
-  if (hasBetterQuery && !providerCandidate) {
-    // Provider 第一轮没命中，用 AI 原名重试
+  if (hasBetterQuery && !providerMatchesAiOriginal) {
+    // 第一轮可能只命中了同系列的其他季度；精确原名的结果应替换模糊候选。
     try {
       const metadata = await fetchAnimeMetadataByQueries(aiOriginalTitle);
       if (metadata) {
         providerCandidate = sanitizeExternalCandidate(metadata);
+      } else {
+        providerCandidate = null;
       }
     } catch (error) {
       console.error('Provider retry with AI original title failed:', error);
+      providerCandidate = null;
     }
+  }
+
+  if (providerCandidate && !candidateMatchesExpectedSeason(providerCandidate, expectedSeason, [
+    input.title,
+    originalUserTitle,
+    aiOriginalTitle,
+  ])) {
+    console.warn('[anime-enrichment] Rejected provider metadata with a conflicting season', {
+      expectedSeason,
+      inputTitle: input.title,
+      candidateTitle: (providerCandidate as Record<string, unknown>).title,
+      candidateOriginalTitle: providerCandidate.originalTitle,
+    });
+    providerCandidate = null;
   }
 
   // 提取 Provider 标题

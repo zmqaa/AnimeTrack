@@ -70,24 +70,19 @@ export function buildQuickRecordMessage(data: QuickRecordResponse) {
       .map((item) => item?.entry?.title || item?.recognition?.matchedTitle || item?.recognition?.standardTitle || '番剧')
       .join('、');
     const tail = results.length > 3 ? ` 等${results.length}部` : '';
-    const countsText = `新建${Number(data.createdCount) || 0}，更新${Number(data.updatedCount) || 0}，补记${Number(data.replayCount) || 0}`;
-    const historyText = Number(data.historySkippedCount) > 0 ? `；${data.historySkippedCount}条历史记录未写入今日时间` : '';
     const errorText = Array.isArray(data.errors) && data.errors.length > 0 ? `；${data.errors.length}条处理失败` : '';
-    return `已处理 ${results.length} 条：${titlePreview}${tail}；${countsText}${historyText}${errorText}`;
+    return `已录入 ${results.length} 部：${titlePreview}${tail}${errorText}`;
   }
 
   const title = data.entry?.title || data.recognition?.matchedTitle || '番剧';
-  const progress = data.entry?.progress;
   const standardTitle = typeof data.recognition?.standardTitle === 'string' ? data.recognition.standardTitle : data.parsed?.animeTitle;
   const originalTitle = typeof data.recognition?.originalTitle === 'string' ? data.recognition.originalTitle : data.parsed?.originalTitle;
   const enriched = Boolean(data.recognition?.enriched);
-  const historyWritten = data.recognition?.historyWritten !== false;
   const rewatchTag = typeof data.rewatchTag === 'string' ? data.rewatchTag : '';
-  const stateText = data.created ? (rewatchTag ? `${rewatchTag}已新建并记录` : '已新建并记录') : (data.replay ? '已补记' : '已记录');
+  const stateText = rewatchTag ? `${rewatchTag}已录入` : '已录入';
   const recognizedText = standardTitle ? `；识别：${standardTitle}${originalTitle ? ` / ${originalTitle}` : ''}` : '';
   const enrichedText = enriched ? '（已AI补全）' : '';
-  const historyText = historyWritten ? '' : '；历史补录未写入今日观看时间';
-  return `${stateText}：${title}${Number.isFinite(progress) ? `（EP ${progress}）` : ''}${recognizedText}${enrichedText}${historyText}`;
+  return `${stateText}：${title}${recognizedText}${enrichedText}`;
 }
 
 export function buildVoiceActorSuggestions(items: AnimeListItem[]) {

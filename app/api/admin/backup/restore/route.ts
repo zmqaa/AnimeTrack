@@ -6,6 +6,7 @@ import path from 'path';
 import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
 import { getRawDb } from '@/lib/db';
 import { getBackupsDirectory, getDatabasePath } from '@/lib/runtime-paths';
+import { clearAllCoverImages } from '@/lib/cover-image';
 
 const execFileAsync = promisify(execFile);
 
@@ -119,7 +120,9 @@ export async function POST(request: NextRequest) {
     const db = getRawDb();
     db.transaction(() => {
       db.exec(sql);
+      db.prepare('UPDATE anime SET localCoverUrl = NULL').run();
     })();
+    await clearAllCoverImages();
 
     const animeCount = (db.prepare('SELECT COUNT(*) AS count FROM anime').get() as { count: number }).count;
     const historyCount = (db.prepare('SELECT COUNT(*) AS count FROM watch_history').get() as { count: number }).count;

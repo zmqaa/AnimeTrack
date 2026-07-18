@@ -1,5 +1,6 @@
 import 'server-only';
 import { getRawDb } from './db';
+import { clearAllCoverImages } from './cover-image';
 import type { AnimeStatus, CreateAnimeDTO } from './anime';
 import { nowISO } from './date-utils';
 
@@ -109,9 +110,7 @@ function normalizeAnime(item: ImportAnimeItem, index: number): NormalizedAnime {
 
   const now = nowISO();
   const importedCoverUrl = optionalString(item.coverUrl, 2000, `${title} 的封面地址`);
-  const importedLocalCoverUrl = optionalString(item.localCoverUrl, 2000, `${title} 的本地封面地址`);
-  const legacyLocalCoverUrl = importedCoverUrl?.startsWith('/covers/')
-    || importedCoverUrl?.startsWith('/api/local-covers/')
+  const portableCoverUrl = importedCoverUrl && /^https?:\/\//i.test(importedCoverUrl)
     ? importedCoverUrl
     : undefined;
   return {
@@ -119,8 +118,8 @@ function normalizeAnime(item: ImportAnimeItem, index: number): NormalizedAnime {
     payload: {
       title,
       originalTitle: optionalString(item.originalTitle, 500, `${title} 的原标题`),
-      coverUrl: legacyLocalCoverUrl ? undefined : importedCoverUrl,
-      localCoverUrl: importedLocalCoverUrl || legacyLocalCoverUrl,
+      coverUrl: portableCoverUrl,
+      localCoverUrl: undefined,
       status: statusValue as AnimeStatus,
       score: optionalNumber(item.score, `${title} 的评分`, { min: 0, max: 10 }),
       progress: optionalNumber(item.progress, `${title} 的进度`, { min: 0, integer: true }) ?? 0,
@@ -254,6 +253,7 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
   });
 
   replaceTransaction();
+  await clearAllCoverImages();
   return {
     success: true,
     mode: 'replace',

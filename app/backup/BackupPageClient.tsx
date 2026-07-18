@@ -35,6 +35,12 @@ interface RestoreResult {
   historyCount: number;
 }
 
+interface CoverBatchResult {
+  total: number;
+  downloaded: number;
+  failed: number;
+}
+
 type PendingImport = {
   payload: unknown;
   animeCount: number;
@@ -51,6 +57,7 @@ export default function BackupPageClient() {
   const [creating, setCreating] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [downloadingCovers, setDownloadingCovers] = useState(false);
   const [restoring, setRestoring] = useState<string | null>(null);
   const [restoreConfirm, setRestoreConfirm] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -169,6 +176,29 @@ export default function BackupPageClient() {
       setPendingImport({ payload, animeCount: animeRecords.length, historyCount: historyRecords.length });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '读取导入文件失败');
+    }
+  };
+
+  const handleDownloadCovers = async () => {
+    if (downloadingCovers) return;
+
+    setDownloadingCovers(true);
+    try {
+      const result = await fetchJson<CoverBatchResult>('/api/admin/covers/download', {
+        method: 'POST',
+      }, '批量下载封面失败');
+      if (result.total === 0) {
+        toast('没有可下载的远程封面');
+      } else if (result.failed > 0) {
+        toast.success(`封面下载完成：成功 ${result.downloaded} 张，失败 ${result.failed} 张`);
+      } else {
+        toast.success(`已下载 ${result.downloaded} 张封面`);
+      }
+      globalMutate(ANIME_LIST_KEY);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '批量下载封面失败');
+    } finally {
+      setDownloadingCovers(false);
     }
   };
 
@@ -291,6 +321,17 @@ export default function BackupPageClient() {
             </svg>
             {importing ? '导入中...' : '导入 JSON'}
           </button>
+          <button
+            type="button"
+            onClick={handleDownloadCovers}
+            disabled={downloadingCovers || importing}
+            className="theme-accent-soft flex items-center gap-2.5 rounded-2xl px-5 py-3 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            {downloadingCovers ? '下载中...' : '批量下载封面'}
+          </button>
         </div>
         <input
           ref={importInputRef}
@@ -300,7 +341,7 @@ export default function BackupPageClient() {
           onChange={handleImportFile}
         />
         <p className="text-xs text-[var(--text-muted)] mt-4">
-          支持导入当前系统导出的 JSON 文件。导入会完整覆盖现有番剧与观看历史；写入失败时会自动回滚，不会保留半份数据。
+          支持导入当前系统导出的 JSON 文件。导入会完整覆盖现有番剧与观看历史，并清空旧的本地封面；导入后可点击“批量下载封面”重新获取。写入失败时会自动回滚，不会保留半份数据。
         </p>
       </section>
 
@@ -391,7 +432,7 @@ export default function BackupPageClient() {
       <ConfirmDialog
         open={pendingImport !== null}
         title="覆盖现有数据"
-        message={pendingImport ? `将用文件中的 ${pendingImport.animeCount} 部番剧和 ${pendingImport.historyCount} 条观看历史替换当前全部数据。此操作不会合并旧数据，建议先导出一份 JSON 备份。` : ''}
+        message={pendingImport ? `将用文件中的 ${pendingImport.animeCount} 部番剧和 ${pendingImport.historyCount} 条观看历史替换当前全部数据，并清空全部本地封面。此操作不会合并旧数据，建议先导出一份 JSON 备份。` : ''}
         confirmText={importing ? '导入中...' : '确认覆盖'}
         variant="danger"
         onConfirm={handleConfirmImport}
@@ -401,7 +442,7 @@ export default function BackupPageClient() {
       <ConfirmDialog
         open={restoreConfirm !== null}
         title="恢复 SQL 备份"
-        message={`确定恢复到「${restoreConfirm || ''}」吗？当前番剧和观看历史会被替换；系统会先自动创建一份“恢复前备份”。`}
+        message={`确定恢复到「${restoreConfirm || ''}」吗？当前番剧、观看历史和本地封面会被替换；系统会先自动创建一份“恢复前备份”。`}
         confirmText={restoring ? '恢复中...' : '确认恢复'}
         variant="warning"
         onConfirm={() => restoreConfirm && handleRestoreBackup(restoreConfirm)}

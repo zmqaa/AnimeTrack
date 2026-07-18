@@ -3,7 +3,7 @@
 import { memo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { CheckIcon, PlusIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
+import { CheckIcon, PlusIcon } from '@heroicons/react/24/outline';
 import type { AnimeCardItem, AnimeStatus } from '@/lib/anime-shared';
 import { statusLabels } from '@/lib/dashboard-types';
 import ProgressBar from '@/components/shared/ProgressBar';
@@ -17,7 +17,6 @@ const statusSoftClass: Record<AnimeStatus, string> = {
 
 interface AnimeCardProps {
   item: AnimeCardItem;
-  onEdit: (item: AnimeCardItem) => void;
   updateProgress: (id: number, current: number, total?: number | null) => Promise<void>;
   isAdmin?: boolean;
   detailReturnTo: string;
@@ -34,7 +33,7 @@ function resolveRewatchTag(tags?: string[]): string | undefined {
     .find((tag) => /^([0-9]{1,3}|[一二两三四五六七八九十]+)刷$/i.test(tag));
 }
 
-export default memo(function AnimeCard({ item, onEdit, updateProgress, isAdmin = false, detailReturnTo, onOpenDetail }: AnimeCardProps) {
+export default memo(function AnimeCard({ item, updateProgress, isAdmin = false, detailReturnTo, onOpenDetail }: AnimeCardProps) {
   const isCompleted = item.status === 'completed';
   const progressPercent = item.totalEpisodes
     ? (item.progress / item.totalEpisodes) * 100
@@ -107,16 +106,6 @@ export default memo(function AnimeCard({ item, onEdit, updateProgress, isAdmin =
           </div>
         </Link>
 
-        {/* 快速编辑按钮 */}
-        {isAdmin && (
-          <button 
-            onClick={() => onEdit(item)}
-            className="surface-pill absolute top-2 right-2 p-1.5 rounded-full text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--color-surface-hover)] opacity-0 group-hover:opacity-100 transition-all"
-            aria-label="编辑"
-          >
-            <EllipsisHorizontalIcon className="w-4 h-4" />
-          </button>
-        )}
       </div>
 
       {/* 详情部分 */}
@@ -160,7 +149,7 @@ export default memo(function AnimeCard({ item, onEdit, updateProgress, isAdmin =
             ) : (
                <button
                   onClick={() => updateProgress(item.id, item.progress + 1, item.totalEpisodes)}
-                  className="theme-accent-button flex-[2] py-1.5 rounded-lg transition text-[10px] font-bold flex items-center justify-center gap-1 shadow-sm"
+                  className="anime-watch-button flex-[2] py-1.5 rounded-lg transition text-[10px] font-bold flex items-center justify-center gap-1 shadow-sm"
                   aria-label="看一集"
                 >
                   <PlusIcon className="w-3 h-3" /> 看一集

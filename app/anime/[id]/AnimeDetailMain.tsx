@@ -83,6 +83,10 @@ export default function AnimeDetailMain({
                     className="surface-pill rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] transition hover:bg-[var(--color-surface-hover)] disabled:opacity-50">
                     {isAiEnriching ? 'AI补充中...' : 'AI补充'}
                   </button>
+                  <button onClick={onDelete}
+                    className="danger-soft flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition hover:brightness-95">
+                    <TrashIcon className="h-4 w-4" />删除此番剧
+                  </button>
                   <button onClick={onCancel} className="rounded-xl px-4 py-2.5 text-sm text-[var(--text-secondary)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--text-primary)]">
                     取消
                   </button>
@@ -97,7 +101,13 @@ export default function AnimeDetailMain({
                     className="surface-pill rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] transition hover:bg-[var(--color-surface-hover)] disabled:opacity-50">
                     {isAiEnriching ? 'AI补充中...' : 'AI补充'}
                   </button>
+                  <button onClick={onDelete}
+                    className="danger-soft flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition hover:brightness-95">
+                    <TrashIcon className="h-4 w-4" />删除此番剧
+                  </button>
                   <button onClick={onEdit}
+                    aria-label="编辑番剧"
+                    title="编辑番剧"
                     className="surface-pill rounded-xl p-2.5 text-[var(--text-secondary)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--text-primary)]">
                     <PencilSquareIcon className="h-5 w-5" />
                   </button>
@@ -249,15 +259,6 @@ export default function AnimeDetailMain({
           </div>
         </div>
       </div>
-
-      {/* Delete section */}
-      {canEdit && (
-        <div className="rounded-[24px] border border-[var(--color-danger)]/20 bg-[var(--color-danger)]/5 p-5 backdrop-blur-xl">
-          <button onClick={onDelete} className="flex items-center gap-2 text-sm text-danger transition hover:text-danger">
-            <TrashIcon className="h-4 w-4" />删除此番剧
-          </button>
-        </div>
-      )}
     </section>
   );
 }
