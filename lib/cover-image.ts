@@ -2,7 +2,6 @@ import 'server-only';
 import { existsSync, mkdirSync, unlinkSync } from 'fs';
 import { writeFile, unlink, readdir } from 'fs/promises';
 import { basename, join } from 'path';
-import { isDesktopRuntime } from '@/lib/runtime-mode';
 import { getCoversDirectory } from '@/lib/runtime-paths';
 
 const LEGACY_COVERS_PUBLIC_PREFIX = '/covers';
@@ -88,7 +87,12 @@ export function resolveDisplayCoverUrl(
     ? join(getCoversDirectory(), fileName)
     : join(process.cwd(), 'public', 'covers', fileName);
 
-  return existsSync(localFilePath) ? local : (remote || undefined);
+  // public/ 下运行时新增的文件不会被 Next.js 生产服务稳定识别。
+  // 无论数据库保存的是旧版 /covers 路径还是新版动态路径，展示时都
+  // 统一通过 Route Handler 读取磁盘，因此重新下载封面后无需重启服务。
+  return existsSync(localFilePath)
+    ? `${DATA_COVERS_PUBLIC_PREFIX}/${fileName}`
+    : (remote || undefined);
 }
 
 /** 判断是否为系统生成的本地占位封面 */
@@ -105,10 +109,7 @@ function coverFilePath(animeId: number): string {
 
 /** 获取封面文件的公开 URL 路径 */
 function coverPublicPath(animeId: number): string {
-  const prefix = isDesktopRuntime()
-    ? DATA_COVERS_PUBLIC_PREFIX
-    : LEGACY_COVERS_PUBLIC_PREFIX;
-  return `${prefix}/${animeId}.jpg`;
+  return `${DATA_COVERS_PUBLIC_PREFIX}/${animeId}.jpg`;
 }
 
 /**

@@ -20,6 +20,7 @@ interface MigrationFile {
   fileName: string;
   sql: string;
   checksum: string;
+  compatibleChecksums: Set<string>;
 }
 
 interface AppliedMigration {
@@ -46,12 +47,22 @@ function loadMigrationFiles(): MigrationFile[] {
       if (!match) return null;
 
       const sql = fs.readFileSync(path.join(migrationsDirectory, fileName), 'utf8');
+      const normalizedSql = sql.replace(/\r\n?/g, '\n');
+      const legacyCrLfSql = normalizedSql.replace(/\n/g, '\r\n');
+      const checksum = createHash('sha256').update(normalizedSql).digest('hex');
       return {
         version: Number(match[1]),
         name: match[2],
         fileName,
         sql,
-        checksum: createHash('sha256').update(sql).digest('hex'),
+        // Git may check the same SQL out with LF on Linux and CRLF on Windows.
+        // Store a platform-independent checksum while accepting records created
+        // by older releases that hashed the checkout's raw line endings.
+        checksum,
+        compatibleChecksums: new Set([
+          checksum,
+          createHash('sha256').update(legacyCrLfSql).digest('hex'),
+        ]),
       };
     })
     .filter((migration): migration is MigrationFile => migration !== null)
@@ -95,7 +106,7 @@ function assertAppliedMigrationMatches(
   migration: MigrationFile,
   applied: AppliedMigration,
 ): void {
-  if (applied.name !== migration.name || applied.checksum !== migration.checksum) {
+  if (applied.name !== migration.name || !migration.compatibleChecksums.has(applied.checksum)) {
     throw new Error(
       `已执行迁移 ${migration.fileName} 的名称或校验和发生变化，请新增迁移文件而不是修改历史迁移`,
     );
