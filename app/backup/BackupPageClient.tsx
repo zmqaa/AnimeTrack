@@ -194,7 +194,7 @@ export default function BackupPageClient() {
       } else {
         toast.success(`已下载 ${result.downloaded} 张封面`);
       }
-      globalMutate(ANIME_LIST_KEY);
+      await globalMutate((key) => typeof key === 'string' && key.startsWith('/api/anime'));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '批量下载封面失败');
     } finally {
@@ -246,7 +246,7 @@ export default function BackupPageClient() {
         `覆盖完成：${result.anime.replaced} 部番剧，${result.watchHistory.replaced} 条历史${result.watchHistory.skipped ? `，跳过 ${result.watchHistory.skipped} 条无法匹配的历史` : ''}`
       );
       // 全局刷新缓存：番剧列表 + Dashboard 数据同步更新
-      globalMutate(ANIME_LIST_KEY);
+      await globalMutate((key) => typeof key === 'string' && key.startsWith('/api/anime'));
       globalMutate(HISTORY_KEY);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '导入失败');
