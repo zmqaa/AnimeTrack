@@ -3,7 +3,7 @@
 import { memo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { CheckIcon, PlusIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
+import { CheckIcon, PlusIcon } from '@heroicons/react/24/outline';
 import type { AnimeCardItem, AnimeStatus } from '@/lib/anime-shared';
 import { statusLabels } from '@/lib/dashboard-types';
 import ProgressBar from '@/components/shared/ProgressBar';
@@ -17,14 +17,13 @@ const statusDotClass: Record<AnimeStatus, string> = {
 
 interface AnimeListViewProps {
   items: AnimeCardItem[];
-  onEdit: (item: AnimeCardItem) => void;
   updateProgress: (id: number, current: number, total?: number | null) => Promise<void>;
   isAdmin?: boolean;
   detailReturnTo: string;
   onOpenDetail: () => void;
 }
 
-export default memo(function AnimeListView({ items, onEdit, updateProgress, isAdmin = false, detailReturnTo, onOpenDetail }: AnimeListViewProps) {
+export default memo(function AnimeListView({ items, updateProgress, isAdmin = false, detailReturnTo, onOpenDetail }: AnimeListViewProps) {
   return (
     <div className="space-y-2.5">
       {items.map((item) => {
@@ -113,19 +112,12 @@ export default memo(function AnimeListView({ items, onEdit, updateProgress, isAd
                 ) : (
                   <button
                     onClick={() => updateProgress(item.id, item.progress + 1, item.totalEpisodes)}
-                    className="p-1.5 rounded-lg bg-[var(--text-primary)] text-[var(--bg-page)] hover:opacity-90 transition"
+                    className="anime-watch-button p-1.5 rounded-lg transition"
                     aria-label="加一集"
                   >
                     <PlusIcon className="w-4 h-4" />
                   </button>
                 )}
-                <button
-                  onClick={() => onEdit(item)}
-                  className="surface-pill p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--color-surface-hover)] transition opacity-0 group-hover:opacity-100"
-                  aria-label="编辑"
-                >
-                  <EllipsisHorizontalIcon className="w-4 h-4" />
-                </button>
               </div>
             )}
           </div>

@@ -342,6 +342,25 @@ export async function fetchAnimeMetadata(title: string): Promise<AnimeMetadata |
     return fetchAnimeMetadataByQueries(title);
 }
 
+/** 仅查询 Bangumi 封面地址，供批量封面恢复使用，避免额外请求详情和角色数据。 */
+export async function fetchAnimeCoverByQueries(
+    ...queries: Array<string | undefined | null>
+): Promise<string | undefined> {
+    const validQueries = Array.from(new Set(
+        queries.map(query => (query ?? '').trim()).filter(Boolean),
+    )).slice(0, 2);
+    if (validQueries.length === 0) return undefined;
+
+    const queryResults: Array<{ queryIndex: number; candidates: ScoredBangumiCandidate[] }> = [];
+    for (const [queryIndex, keyword] of validQueries.entries()) {
+        const candidates = await searchBangumiV0(keyword);
+        queryResults.push({ queryIndex, candidates: scoreBangumiCandidates(candidates, keyword) });
+    }
+
+    const selected = aggregateBangumiCandidates(queryResults)[0]?.subject;
+    return selected?.images?.large ?? selected?.images?.common ?? selected?.images?.medium;
+}
+
 export async function fetchAnimeMetadataByQueriesWithTrace(
     ...queries: Array<string | undefined | null>
 ): Promise<AnimeMetadataLookupResult> {

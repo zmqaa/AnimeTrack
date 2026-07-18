@@ -3,9 +3,9 @@
  * 从 quick-record/route.ts 拆出的纯函数层
  */
 
-import { parseChineseNumberToken } from '@/lib/chinese-parser';
+import { extractSeasonNumber, hasSeasonMarker, parseChineseNumberToken } from '@/lib/chinese-parser';
 import { uniqueStrings } from '@/lib/anime-cast';
-import type { CreateAnimeDTO, AnimeRecord } from '@/lib/anime';
+import type { AnimeRecord } from '@/lib/anime';
 import type { ParsedQuickRecordIntent } from '@/lib/ai';
 
 // ── 重刷 (rewatch) 工具 ──
@@ -60,62 +60,25 @@ export function resolveNextRewatchTag(records: Pick<AnimeRecord, 'tags'>[]): str
   return formatRewatchTag(Math.max(2, highestCount + 1, baselineCount + 1));
 }
 
-export function isCompletedAnimeRecord(record: Pick<AnimeRecord, 'status' | 'progress' | 'totalEpisodes'>): boolean {
-  const finishedByProgress = Boolean(record.totalEpisodes) && record.progress >= Number(record.totalEpisodes);
-  return record.status === 'completed' || finishedByProgress;
-}
+export function validateSeasonSelection(rawText: string, parsed: Pick<ParsedQuickRecordIntent, 'animeTitle' | 'originalTitle' | 'season'>): void {
+  const parsedSeason = parsed.season
+    || extractSeasonNumber(parsed.animeTitle)
+    || extractSeasonNumber(parsed.originalTitle);
+  if (!parsedSeason || parsedSeason <= 1 || hasSeasonMarker(rawText)) return;
 
-export function shouldAutoResolveRewatch(
-  parsed: Pick<ParsedQuickRecordIntent, 'status' | 'episode' | 'progress'>,
-  anime: Pick<AnimeRecord, 'status' | 'progress' | 'totalEpisodes'>,
-): boolean {
-  if (!isCompletedAnimeRecord(anime)) {
-    return false;
+  // Keep punctuation because symbols such as NEW GAME! / NEW GAME!! distinguish seasons.
+  const compact = (value: string | undefined) => (value || '').toLowerCase().replace(/\s+/g, '');
+  const rawToken = compact(rawText);
+  const parsedTitleToken = compact(parsed.animeTitle);
+  const parsedOriginalToken = compact(parsed.originalTitle);
+  const userNamedOfficialEntry = Boolean(
+    (parsedTitleToken && rawToken.includes(parsedTitleToken))
+    || (parsedOriginalToken && rawToken.includes(parsedOriginalToken))
+  );
+
+  if (!userNamedOfficialEntry) {
+    throw new Error('没有明确指定季度，已停止录入，避免误识别为续作');
   }
-
-  if (parsed.status === 'completed') {
-    return true;
-  }
-
-  if (parsed.episode === 1 || parsed.progress === 1) {
-    return true;
-  }
-
-  const hasExplicitProgress = parsed.episode !== undefined || parsed.progress !== undefined;
-  return !hasExplicitProgress && (parsed.status === 'watching' || parsed.status === undefined);
-}
-
-// ── 日期 / 进度推导 ──
-
-export function normalizeDate(value: string | undefined): Date | undefined {
-  if (!value) return undefined;
-  const parsed = new Date(`${value}T12:00:00`);
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
-}
-
-export function toDateString(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-export function resolveRecordedDateString(parsed: ParsedQuickRecordIntent): string | undefined {
-  return parsed.watchedAt || (!parsed.isHistorical ? toDateString(new Date()) : undefined);
-}
-
-export function resolveIntentStatus(parsed: ParsedQuickRecordIntent, progress: number) {
-  if (parsed.status) return parsed.status;
-  if (progress > 0) return 'watching' as const;
-  return 'plan_to_watch' as const;
-}
-
-export function resolveTargetProgress(parsed: ParsedQuickRecordIntent, currentProgress: number, totalEpisodes?: number): number {
-  if (parsed.status === 'completed' && totalEpisodes && totalEpisodes > 0) return totalEpisodes;
-  if (parsed.progress !== undefined && parsed.progress > 0) return parsed.progress;
-  if (parsed.episode !== undefined && parsed.episode > 0) return parsed.episode;
-  if (parsed.status === 'plan_to_watch' || parsed.status === 'completed') return currentProgress;
-  return currentProgress > 0 ? currentProgress + 1 : 1;
 }
 
 // ── 数组合并 ──
@@ -123,14 +86,6 @@ export function resolveTargetProgress(parsed: ParsedQuickRecordIntent, currentPr
 export function mergeStringArrays(...arrays: Array<string[] | undefined>): string[] | undefined {
   const merged = uniqueStrings(arrays.flatMap((items) => items || []));
   return merged.length > 0 ? merged : undefined;
-}
-
-export function sameStringArray(left: string[] | undefined, right: string[] | undefined): boolean {
-  return JSON.stringify(left || []) === JSON.stringify(right || []);
-}
-
-export function hasPatchChanges(patch: Partial<CreateAnimeDTO>): boolean {
-  return Object.keys(patch).length > 0;
 }
 
 // ── Recognition 结构 ──

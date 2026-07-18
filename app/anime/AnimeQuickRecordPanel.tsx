@@ -21,7 +21,7 @@ export default function AnimeQuickRecordPanel({
     <section className="surface-card rounded-2xl p-5 shadow-xl">
       <div className="flex items-center gap-2 text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider">
         <SparklesIcon className="theme-accent-text w-4 h-4" />
-        AI 一句话录入
+        AI录入
       </div>
 
       <form
@@ -35,7 +35,7 @@ export default function AnimeQuickRecordPanel({
           type="text"
           value={quickInput}
           onChange={(event) => onInputChange(event.target.value)}
-          placeholder="例如：今天看了 间谍过家家第三季 第1集"
+          placeholder="例如：摇曳露营第三季"
           className="surface-input theme-focus-accent flex-1 rounded-xl px-4 py-2.5 text-sm"
         />
         <button
@@ -47,7 +47,7 @@ export default function AnimeQuickRecordPanel({
         </button>
       </form>
 
-      <p className="text-xs text-[var(--text-muted)] mt-2">支持自然语言拆成多条记录；AI 会补齐缺失的作品资料，但不会改开始观看和看完日期。</p>
+      <p className="text-xs text-[var(--text-muted)] mt-2">输入动漫名称，AI 会搜索并补全作品资料。默认状态为追番中，进度为 0。</p>
       {quickMessage && (
         <p className={`text-xs mt-2 ${quickMessage.includes('失败') || quickMessage.includes('请输入') ? 'text-danger' : 'theme-accent-text'}`}>
           {quickMessage}

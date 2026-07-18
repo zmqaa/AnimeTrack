@@ -1,6 +1,6 @@
 import 'server-only';
 import { existsSync, mkdirSync, unlinkSync } from 'fs';
-import { writeFile, unlink } from 'fs/promises';
+import { writeFile, unlink, readdir } from 'fs/promises';
 import { basename, join } from 'path';
 import { isDesktopRuntime } from '@/lib/runtime-mode';
 import { getCoversDirectory } from '@/lib/runtime-paths';
@@ -197,6 +197,17 @@ export function deleteCoverImageSync(animeId: number): void {
       console.warn(`[cover] 删除封面文件失败 id=${animeId}:`, err.message);
     }
   }
+}
+
+/** 清空系统管理的本地封面文件，保留封面目录本身。 */
+export async function clearAllCoverImages(): Promise<number> {
+  const coversDirectory = getCoversDirectory();
+  if (!existsSync(coversDirectory)) return 0;
+
+  const entries = await readdir(coversDirectory, { withFileTypes: true });
+  const files = entries.filter((entry) => entry.isFile());
+  await Promise.all(files.map((entry) => unlink(join(coversDirectory, entry.name))));
+  return files.length;
 }
 
 /**

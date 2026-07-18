@@ -1,14 +1,12 @@
 import { NextRequest } from 'next/server';
-import { createAnimeRecordWithHistory, findAnimeByTitle, updateAnimeRecord, updateAnimeRecordWithHistory, CreateAnimeDTO, listAnimeRecordsByExactTitle, AnimeRecord, animeRecordToDTO } from '@/lib/anime';
+import { createAnimeRecordWithHistory, updateAnimeRecord, CreateAnimeDTO, listAnimeRecordsByExactTitle, AnimeRecord } from '@/lib/anime';
 import { parseQuickRecordBatch, type ParsedQuickRecordIntent } from '@/lib/ai';
 import { enrichAnimeInput } from '@/lib/anime-enrichment';
 import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
-import { DEFAULT_METADATA_FIELDS, buildMetadataPatch } from '@/lib/metadata/merge-policy';
-import { isPlaceholderCoverPath, resolveLocalCoverImage } from '@/lib/cover-image';
+import { resolveLocalCoverImage } from '@/lib/cover-image';
 import {
-  detectRewatchTag, resolveNextRewatchTag, shouldAutoResolveRewatch,
-  normalizeDate, resolveRecordedDateString, resolveIntentStatus, resolveTargetProgress,
-  mergeStringArrays, sameStringArray, hasPatchChanges, buildRecognition,
+  detectRewatchTag, resolveNextRewatchTag, validateSeasonSelection,
+  mergeStringArrays, buildRecognition,
 } from './_helpers';
 
 type QuickRecordResult = {
@@ -31,171 +29,58 @@ async function processQuickRecordIntent(
     premiereDate: undefined,
   };
 
-  const recordedDateString = resolveRecordedDateString(parsed);
-  const watchedAt = normalizeDate(recordedDateString);
-  let rewatchTag = parsed.rewatchTag || options.manualRewatchTag || detectRewatchTag(options.rawText) || (options.forceRewatch ? '二刷' : undefined);
+  validateSeasonSelection(options.rawText, parsed);
 
-  const anime = await findAnimeByTitle(parsed.animeTitle);
-  const sameTitleRecords = anime ? await listAnimeRecordsByExactTitle(anime.title) : [];
+  let input: CreateAnimeDTO = {
+    title: parsed.animeTitle,
+    status: 'watching',
+    progress: 0,
+    startDate: undefined,
+    endDate: undefined,
+  };
 
-  if (!rewatchTag && anime && shouldAutoResolveRewatch(parsed, anime)) {
-    rewatchTag = resolveNextRewatchTag(sameTitleRecords);
-  }
-
-  const forceCreateDuplicate = Boolean(rewatchTag);
-
-  // ── 新建 ──
-  if (!anime || forceCreateDuplicate) {
-    let input: CreateAnimeDTO = {
-      title: anime?.title || parsed.animeTitle,
-      originalTitle: parsed.originalTitle || anime?.originalTitle,
-      coverUrl: parsed.coverUrl || anime?.coverUrl,
-      status: parsed.status || 'watching',
-      score: parsed.score ?? anime?.score,
-      progress: 0,
-      totalEpisodes: parsed.totalEpisodes || anime?.totalEpisodes,
-      durationMinutes: parsed.durationMinutes || anime?.durationMinutes,
-      notes: parsed.notes || anime?.notes,
-      tags: mergeStringArrays(anime?.tags, parsed.tags),
-      cast: parsed.cast && parsed.cast.length > 0 ? parsed.cast : anime?.cast,
-      castAliases: mergeStringArrays(anime?.castAliases, parsed.castAliases, parsed.cast),
-      summary: parsed.summary || anime?.summary,
-      startDate: undefined,
-      endDate: undefined,
-      premiereDate: anime?.premiereDate,
-      isFinished: parsed.isFinished ?? anime?.isFinished,
-    };
-
-    if (!anime) {
-      input = await enrichAnimeInput(input, {
-        mode: 'create',
-        originalUserTitle: parsed.originalTitle || parsed.animeTitle,
-        skipVoiceActorAliases: true,
-        providerQueryLimit: 2,
-      });
-    }
-
-    const metadataEnriched = !anime && Boolean(
-      (!parsed.originalTitle && input.originalTitle) ||
-      (!parsed.coverUrl && input.coverUrl) ||
-      (!parsed.summary && input.summary) ||
-      (!parsed.totalEpisodes && input.totalEpisodes) ||
-      (!parsed.durationMinutes && input.durationMinutes) ||
-      (!(parsed.tags && parsed.tags.length > 0) && input.tags && input.tags.length > 0) ||
-      (!(parsed.cast && parsed.cast.length > 0) && input.cast && input.cast.length > 0) ||
-      (!parsed.premiereDate && input.premiereDate) ||
-      (parsed.isFinished === undefined && input.isFinished !== undefined)
-    );
-
-    if (rewatchTag) {
-      input.tags = mergeStringArrays(input.tags, [rewatchTag]);
-    }
-
-    const targetProgress = resolveTargetProgress(parsed, 0, input.totalEpisodes);
-    input.progress = targetProgress;
-    input.status = resolveIntentStatus(parsed, targetProgress);
-
-    if (input.status === 'completed' && input.totalEpisodes) {
-      input.progress = input.totalEpisodes;
-    } else if (input.status === 'completed' && input.progress === 0) {
-      input.progress = 1;
-    }
-
-    const shouldWriteHistory = Boolean(recordedDateString) && input.progress > 0 && input.status !== 'plan_to_watch';
-    const created = createAnimeRecordWithHistory(input, shouldWriteHistory
-      ? { episode: input.progress, watchedAt }
-      : undefined);
-    // 下载封面图到本地
-    if (created.coverUrl) {
-      const localCoverUrl = await resolveLocalCoverImage(created.coverUrl, created.id);
-      await updateAnimeRecord(created.id, { localCoverUrl });
-      created.localCoverUrl = localCoverUrl ?? undefined;
-      created.displayCoverUrl = localCoverUrl || created.coverUrl;
-    }
-    const entry = created;
-    return {
-      created: true, replay: false, rewatchTag, historyWritten: shouldWriteHistory, parsed,
-      recognition: buildRecognition(parsed, entry, entry.progress, metadataEnriched, shouldWriteHistory, recordedDateString, entry.status),
-      entry,
-    };
-  }
-
-  // ── 更新已有作品 ──
-  const enriched = await enrichAnimeInput(animeRecordToDTO(anime), {
-    mode: 'fill-missing',
-    originalUserTitle: parsed.originalTitle || parsed.animeTitle || anime.originalTitle || anime.title,
+  input = await enrichAnimeInput(input, {
+    mode: 'create',
+    originalUserTitle: parsed.originalTitle || parsed.animeTitle,
     skipVoiceActorAliases: true,
     providerQueryLimit: 2,
+    expectedSeason: parsed.season,
   });
-  const metadataPatch = buildMetadataPatch(anime, enriched, {
-    fields: DEFAULT_METADATA_FIELDS,
-    allowCastAliasAugment: true,
-    allowIsFinishedUpgrade: true,
-  }).patch;
-  const effectiveTotalEpisodes = parsed.totalEpisodes || enriched.totalEpisodes || anime.totalEpisodes;
-  const targetProgress = resolveTargetProgress(parsed, anime.progress, effectiveTotalEpisodes);
-  const mergedTags = mergeStringArrays(
-    anime.tags,
-    Array.isArray(metadataPatch.tags) ? metadataPatch.tags : undefined,
-    parsed.tags,
-    rewatchTag ? [rewatchTag] : undefined,
-  );
-  const mergedCast = mergeStringArrays(
-    anime.cast,
-    Array.isArray(metadataPatch.cast) ? metadataPatch.cast : undefined,
-    parsed.cast,
-  );
-  const mergedCastAliases = mergeStringArrays(
-    anime.castAliases,
-    Array.isArray(metadataPatch.castAliases) ? metadataPatch.castAliases : undefined,
-    parsed.castAliases,
-    parsed.cast,
-    mergedCast,
-  );
-  const patch: Partial<CreateAnimeDTO> = { ...metadataPatch };
-  const metadataEnriched = Object.keys(metadataPatch).length > 0;
 
-  if (parsed.originalTitle && !anime.originalTitle) patch.originalTitle = parsed.originalTitle;
-  if (parsed.score !== undefined && anime.score === undefined) patch.score = parsed.score;
-  if (parsed.totalEpisodes && !anime.totalEpisodes) patch.totalEpisodes = parsed.totalEpisodes;
-  if (parsed.durationMinutes && !anime.durationMinutes) patch.durationMinutes = parsed.durationMinutes;
-  if (parsed.notes && !anime.notes) patch.notes = parsed.notes;
-  if (parsed.summary && !anime.summary) patch.summary = parsed.summary;
-  if (parsed.coverUrl && (!anime.coverUrl || isPlaceholderCoverPath(anime.coverUrl))) patch.coverUrl = parsed.coverUrl;
-  if (!sameStringArray(mergedCast, anime.cast)) patch.cast = mergedCast;
-  if (!sameStringArray(mergedTags, anime.tags)) patch.tags = mergedTags;
-  if (!sameStringArray(mergedCastAliases, anime.castAliases)) patch.castAliases = mergedCastAliases;
-  if (parsed.isFinished !== undefined && anime.isFinished === undefined) patch.isFinished = parsed.isFinished;
-  if (targetProgress > anime.progress) patch.progress = targetProgress;
+  input.title = input.title.trim();
+  if (!input.title) throw new Error('资料搜索未返回有效标题');
 
-  const resolvedStatus = parsed.status || ((effectiveTotalEpisodes && targetProgress >= effectiveTotalEpisodes) ? 'completed' : undefined);
-  if (resolvedStatus && resolvedStatus !== anime.status) patch.status = resolvedStatus;
+  const sameTitleRecords = await listAnimeRecordsByExactTitle(input.title);
+  const explicitRewatchTag = parsed.rewatchTag
+    || options.manualRewatchTag
+    || detectRewatchTag(options.rawText)
+    || (options.forceRewatch ? '二刷' : undefined);
+  const rewatchTag = sameTitleRecords.length > 0
+    ? resolveNextRewatchTag(sameTitleRecords)
+    : explicitRewatchTag;
 
-  if (patch.coverUrl !== undefined) {
-    patch.localCoverUrl = await resolveLocalCoverImage(patch.coverUrl, anime.id);
+  if (rewatchTag) input.tags = mergeStringArrays(input.tags, [rewatchTag]);
+
+  const metadataEnriched = Boolean(
+    input.title !== parsed.animeTitle ||
+    input.originalTitle || input.coverUrl || input.summary || input.totalEpisodes ||
+    input.durationMinutes || (input.tags && input.tags.length > 0) ||
+    (input.cast && input.cast.length > 0) || input.premiereDate ||
+    input.isFinished !== undefined
+  );
+  const created = createAnimeRecordWithHistory(input);
+
+  if (created.coverUrl) {
+    const localCoverUrl = await resolveLocalCoverImage(created.coverUrl, created.id);
+    await updateAnimeRecord(created.id, { localCoverUrl });
+    created.localCoverUrl = localCoverUrl ?? undefined;
+    created.displayCoverUrl = localCoverUrl || created.coverUrl;
   }
 
-  const shouldWriteHistory = Boolean(recordedDateString) && targetProgress > 0;
-  const shouldWriteReplay = shouldWriteHistory
-    && targetProgress <= anime.progress
-    && (parsed.episode !== undefined || parsed.progress !== undefined || parsed.status === 'watching' || parsed.status === 'completed');
-  const historyWritten = shouldWriteHistory && (targetProgress > anime.progress || shouldWriteReplay);
-  let entry = anime;
-  if (hasPatchChanges(patch) || historyWritten) {
-    const updated = updateAnimeRecordWithHistory(anime.id, patch, {
-      recordHistory: historyWritten,
-      watchedAt,
-      replayEpisode: shouldWriteReplay ? targetProgress : undefined,
-    });
-    if (!updated) throw new Error('更新失败');
-    entry = updated;
-  }
-
-  const finalEntry = entry;
   return {
-    created: false, replay: historyWritten && targetProgress <= anime.progress, rewatchTag, historyWritten, parsed,
-    recognition: buildRecognition(parsed, finalEntry, finalEntry.progress, metadataEnriched, historyWritten, recordedDateString, finalEntry.status),
-    entry: finalEntry,
+    created: true, replay: false, rewatchTag, historyWritten: false, parsed,
+    recognition: buildRecognition(parsed, created, 0, metadataEnriched, false, undefined, 'watching'),
+    entry: created,
   };
 }
 
@@ -209,7 +94,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const text = typeof body?.text === 'string' ? body.text.trim() : '';
     if (!text) {
-      return apiError('请输入一句话记录', 400);
+      return apiError('请输入动漫名称', 400);
     }
 
     const parsedBatch = await parseQuickRecordBatch(text);
@@ -240,7 +125,7 @@ export async function POST(request: NextRequest) {
       createdCount: results.filter((r) => r.created).length,
       updatedCount: results.filter((r) => !r.created && !r.replay).length,
       replayCount: results.filter((r) => r.replay).length,
-      historySkippedCount: results.filter((r) => !r.historyWritten).length,
+      historySkippedCount: 0,
       results, errors,
       created: first.created, replay: first.replay, rewatchTag: first.rewatchTag,
       parsed: first.parsed, recognition: first.recognition, entry: first.entry,

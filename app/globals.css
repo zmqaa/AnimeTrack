@@ -946,6 +946,22 @@ body {
   background: var(--accent-hover);
 }
 
+.anime-watch-button {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+.anime-watch-button:hover {
+  background: var(--accent-hover);
+}
+[data-theme='lumen'] .anime-watch-button {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-control));
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border-light));
+  color: var(--accent-hover);
+}
+[data-theme='lumen'] .anime-watch-button:hover {
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-control));
+}
+
 /* ===== Focus ===== */
 
 .theme-focus-accent:focus {
