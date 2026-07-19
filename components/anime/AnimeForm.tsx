@@ -134,7 +134,7 @@ export default function AnimeForm({
                    {(coverUrl || initialData.displayCoverUrl) && (
                        <div className="surface-card-muted w-10 h-11 rounded-md overflow-hidden shrink-0">
                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                           <img src={coverUrl || initialData.displayCoverUrl} alt="Cover" className="w-full h-full object-cover" />
+                           <img key={coverUrl || initialData.displayCoverUrl} src={coverUrl || initialData.displayCoverUrl} alt="Cover" className="w-full h-full object-cover" />
                        </div>
                    )}
                </div>

@@ -1,4 +1,4 @@
-import { extractSeasonNumber, normalizeTitleToken, stripSeasonToken } from './chinese-parser';
+import { extractSeasonNumber } from './chinese-parser';
 
 export interface AnimeMetadata {
     coverUrl?: string;
@@ -19,8 +19,9 @@ export interface AnimeMetadataCandidate {
     id: number;
     title: string;
     originalTitle?: string;
-    score: number;
     season?: number;
+    premiereDate?: string;
+    totalEpisodes?: number;
 }
 
 export interface AnimeMetadataQueryTrace {
@@ -35,20 +36,6 @@ export interface AnimeMetadataLookupResult {
     trace: AnimeMetadataQueryTrace[];
     selected?: AnimeMetadataCandidate;
 }
-
-type ScoredBangumiCandidate = {
-    subject: BangumiV0Subject;
-    score: number;
-};
-
-type AggregatedBangumiCandidate = {
-    subject: BangumiV0Subject;
-    totalScore: number;
-    bestScore: number;
-    matchedQueryCount: number;
-    firstQueryIndex: number;
-};
-
 
 function normalizeDateString(value: Date | string | number | null | undefined) {
     if (!value) {
@@ -158,10 +145,17 @@ async function searchBangumiV0(keyword: string): Promise<BangumiV0Subject[]> {
             headers: { 'User-Agent': USER_AGENT, 'Content-Type': 'application/json' },
             body: JSON.stringify({ keyword, filter: { type: [2] }, sort: 'match' }),
         });
-        if (!res.ok) return [];
+        if (!res.ok) {
+            console.warn(`[anime-provider] Bangumi search failed HTTP ${res.status}`, { keyword });
+            return [];
+        }
         const data = await res.json() as { data?: BangumiV0Subject[] };
         return data?.data ?? [];
-    } catch {
+    } catch (error) {
+        console.warn('[anime-provider] Bangumi search failed', {
+            keyword,
+            error: error instanceof Error ? error.message : String(error),
+        });
         return [];
     }
 }
@@ -190,103 +184,14 @@ async function fetchSubjectCharacters(subjectId: number): Promise<BangumiV0Chara
     }
 }
 
-function scoreBangumiCandidates(candidates: BangumiV0Subject[], keyword: string): ScoredBangumiCandidate[] {
-    if (candidates.length === 0) return [];
-    const keywordToken = normalizeTitleToken(keyword);
-    const keywordBaseToken = normalizeTitleToken(stripSeasonToken(keyword));
-    const keywordSeason = extractSeasonNumber(keyword);
-
-    return candidates
-        .map((subject) => {
-            const titleToken = normalizeTitleToken(subject.name);
-            const titleCnToken = normalizeTitleToken(subject.name_cn);
-            const baseTitleToken = normalizeTitleToken(stripSeasonToken(subject.name));
-            const baseTitleCnToken = normalizeTitleToken(stripSeasonToken(subject.name_cn));
-            const subjectSeason = extractSeasonNumber(subject.name_cn) ?? extractSeasonNumber(subject.name);
-
-            let score = 0;
-            if (subject.name === keyword || subject.name_cn === keyword) score += 1000;
-            if (keywordToken && (titleToken === keywordToken || titleCnToken === keywordToken)) score += 800;
-            if (keywordBaseToken && (baseTitleToken === keywordBaseToken || baseTitleCnToken === keywordBaseToken)) score += 200;
-            if (keywordToken && (
-                titleToken.includes(keywordToken)
-                || keywordToken.includes(titleToken)
-                || titleCnToken.includes(keywordToken)
-                || keywordToken.includes(titleCnToken)
-            )) score += 80;
-
-            if (keywordSeason && subjectSeason === keywordSeason) {
-                score += 300;
-            } else if (keywordSeason && subjectSeason && subjectSeason !== keywordSeason) {
-                score -= 400;
-            }
-
-            return { subject, score };
-        })
-        .sort((left, right) => right.score - left.score);
-}
-
-function aggregateBangumiCandidates(
-    queryResults: Array<{ queryIndex: number; candidates: ScoredBangumiCandidate[] }>,
-): AggregatedBangumiCandidate[] {
-    const aggregated = new Map<number, AggregatedBangumiCandidate>();
-
-    for (const result of queryResults) {
-        const priorityBonus = Math.max(0, 30 - result.queryIndex * 5);
-
-        for (const candidate of result.candidates) {
-            if (candidate.score <= 0) {
-                continue;
-            }
-
-            const existing = aggregated.get(candidate.subject.id);
-            if (existing) {
-                existing.totalScore += candidate.score + priorityBonus;
-                existing.bestScore = Math.max(existing.bestScore, candidate.score);
-                existing.matchedQueryCount += 1;
-                existing.firstQueryIndex = Math.min(existing.firstQueryIndex, result.queryIndex);
-                continue;
-            }
-
-            aggregated.set(candidate.subject.id, {
-                subject: candidate.subject,
-                totalScore: candidate.score + priorityBonus,
-                bestScore: candidate.score,
-                matchedQueryCount: 1,
-                firstQueryIndex: result.queryIndex,
-            });
-        }
-    }
-
-    return Array.from(aggregated.values())
-        .map((candidate) => ({
-            ...candidate,
-            totalScore: candidate.totalScore + candidate.matchedQueryCount * 500,
-        }))
-        .sort((left, right) => {
-            if (left.totalScore !== right.totalScore) {
-                return right.totalScore - left.totalScore;
-            }
-
-            if (left.matchedQueryCount !== right.matchedQueryCount) {
-                return right.matchedQueryCount - left.matchedQueryCount;
-            }
-
-            if (left.bestScore !== right.bestScore) {
-                return right.bestScore - left.bestScore;
-            }
-
-            return left.firstQueryIndex - right.firstQueryIndex;
-        });
-}
-
-function toAnimeMetadataCandidate(candidate: { subject: BangumiV0Subject; score: number }): AnimeMetadataCandidate {
+function toAnimeMetadataCandidate(subject: BangumiV0Subject): AnimeMetadataCandidate {
     return {
-        id: candidate.subject.id,
-        title: candidate.subject.name_cn || candidate.subject.name,
-        originalTitle: candidate.subject.name,
-        score: candidate.score,
-        season: extractSeasonNumber(candidate.subject.name_cn) ?? extractSeasonNumber(candidate.subject.name),
+        id: subject.id,
+        title: subject.name_cn || subject.name,
+        originalTitle: subject.name,
+        season: extractSeasonNumber(subject.name_cn) ?? extractSeasonNumber(subject.name),
+        premiereDate: normalizeDate(subject.date),
+        totalEpisodes: subject.eps && subject.eps > 0 ? subject.eps : undefined,
     };
 }
 
@@ -351,14 +256,62 @@ export async function fetchAnimeCoverByQueries(
     )).slice(0, 2);
     if (validQueries.length === 0) return undefined;
 
-    const queryResults: Array<{ queryIndex: number; candidates: ScoredBangumiCandidate[] }> = [];
-    for (const [queryIndex, keyword] of validQueries.entries()) {
-        const candidates = await searchBangumiV0(keyword);
-        queryResults.push({ queryIndex, candidates: scoreBangumiCandidates(candidates, keyword) });
+    for (const keyword of validQueries) {
+        const selected = (await searchBangumiV0(keyword))[0];
+        const coverUrl = selected?.images?.large ?? selected?.images?.common ?? selected?.images?.medium;
+        if (coverUrl) return coverUrl;
+    }
+    return undefined;
+}
+
+/**
+ * 返回 Bangumi 自己按 match 排序后的候选列表，不进行本地字符串评分。
+ * 多个查询词只做去重和数量限制，最终语义选择由 AI 完成。
+ */
+export async function searchAnimeMetadataCandidatesByQueries(
+    queries: Array<string | undefined | null>,
+    limit = 15,
+): Promise<AnimeMetadataCandidate[]> {
+    const validQueries = Array.from(new Set(
+        queries.map(query => (query ?? '').trim()).filter(Boolean),
+    ));
+    const byId = new Map<number, AnimeMetadataCandidate>();
+
+    for (const keyword of validQueries) {
+        const subjects = await searchBangumiV0(keyword);
+        for (const subject of subjects) {
+            if (!byId.has(subject.id)) byId.set(subject.id, toAnimeMetadataCandidate(subject));
+            if (byId.size >= limit) return Array.from(byId.values());
+        }
     }
 
-    const selected = aggregateBangumiCandidates(queryResults)[0]?.subject;
-    return selected?.images?.large ?? selected?.images?.common ?? selected?.images?.medium;
+    return Array.from(byId.values());
+}
+
+/** 根据 AI 选中的 Bangumi subject ID 获取权威详情。 */
+export async function fetchAnimeMetadataBySubjectId(subjectId: number): Promise<AnimeMetadata | null> {
+    if (!Number.isInteger(subjectId) || subjectId <= 0) return null;
+    const [detail, characters] = await Promise.all([
+        fetchSubjectDetail(subjectId),
+        fetchSubjectCharacters(subjectId),
+    ]);
+    if (!detail) return null;
+
+    return {
+        title: detail.name_cn || detail.name,
+        originalTitle: detail.name,
+        coverUrl: detail.images?.large ?? detail.images?.common ?? detail.images?.medium,
+        score: detail.rating?.score && detail.rating.score > 0
+            ? Math.round(detail.rating.score * 10) / 10
+            : undefined,
+        durationMinutes: extractDurationMinutes(detail),
+        totalEpisodes: extractSubjectTotalEpisodes(detail),
+        description: detail.summary?.trim() || undefined,
+        premiereDate: normalizeDate(detail.date),
+        tags: extractSubjectTags(detail),
+        isFinished: extractIsFinished(detail),
+        cast: extractCast(characters),
+    };
 }
 
 export async function fetchAnimeMetadataByQueriesWithTrace(
@@ -371,59 +324,33 @@ export async function fetchAnimeMetadataByQueriesWithTrace(
 
     const trace: AnimeMetadataQueryTrace[] = [];
 
-    const queryResults: Array<{ queryIndex: number; candidates: ScoredBangumiCandidate[] }> = [];
-
-    for (const [queryIndex, keyword] of validQueries.entries()) {
+    const mergedCandidates: AnimeMetadataCandidate[] = [];
+    const seenIds = new Set<number>();
+    for (const keyword of validQueries) {
         const candidates = await searchBangumiV0(keyword);
-        const scoredCandidates = scoreBangumiCandidates(candidates, keyword);
-        const selected = scoredCandidates[0] && scoredCandidates[0].score > 0 ? scoredCandidates[0] : null;
-
-        queryResults.push({ queryIndex, candidates: scoredCandidates });
+        const mappedCandidates = candidates.slice(0, 4).map(toAnimeMetadataCandidate);
+        for (const candidate of mappedCandidates) {
+            if (!seenIds.has(candidate.id)) {
+                seenIds.add(candidate.id);
+                mergedCandidates.push(candidate);
+            }
+        }
 
         trace.push({
             query: keyword,
             candidateCount: candidates.length,
-            candidates: scoredCandidates.slice(0, 4).map(toAnimeMetadataCandidate),
-            selected: selected ? toAnimeMetadataCandidate(selected) : undefined,
+            candidates: mappedCandidates,
+            selected: mappedCandidates[0],
         });
     }
 
-    const aggregatedCandidates = aggregateBangumiCandidates(queryResults);
-    const selected = aggregatedCandidates[0];
-    if (!selected || selected.totalScore <= 0) {
+    const selectedCandidate = mergedCandidates[0];
+    if (!selectedCandidate) {
         return { metadata: null, trace, selected: undefined };
     }
-
-    const selectedCandidate = toAnimeMetadataCandidate({ subject: selected.subject, score: selected.totalScore });
-
-    const [detail, characters] = await Promise.all([
-        fetchSubjectDetail(selected.subject.id),
-        fetchSubjectCharacters(selected.subject.id),
-    ]);
-
-    if (!detail) {
-        return { metadata: null, trace, selected: selectedCandidate };
-    }
-
-    const tags = extractSubjectTags(detail);
-    const totalEpisodes = extractSubjectTotalEpisodes(detail);
-
+    const metadata = await fetchAnimeMetadataBySubjectId(selectedCandidate.id);
     return {
-        metadata: {
-            title: detail.name_cn || detail.name,
-            originalTitle: detail.name,
-            coverUrl: detail.images?.large ?? detail.images?.common ?? detail.images?.medium,
-            score: detail.rating?.score && detail.rating.score > 0
-                ? Math.round(detail.rating.score * 10) / 10
-                : undefined,
-            durationMinutes: extractDurationMinutes(detail),
-            totalEpisodes,
-            description: detail.summary?.trim() || undefined,
-            premiereDate: normalizeDate(detail.date),
-            tags,
-            isFinished: extractIsFinished(detail),
-            cast: extractCast(characters),
-        },
+        metadata,
         trace,
         selected: selectedCandidate,
     };
@@ -435,4 +362,3 @@ export async function fetchAnimeMetadataByQueries(
     const result = await fetchAnimeMetadataByQueriesWithTrace(...queries);
     return result.metadata;
 }
-

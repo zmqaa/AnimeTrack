@@ -1,11 +1,12 @@
 import 'server-only';
-import { existsSync, mkdirSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync, statSync, unlinkSync } from 'fs';
 import { writeFile, unlink, readdir } from 'fs/promises';
-import { basename, join } from 'path';
+import { basename, join, resolve } from 'path';
 import { getCoversDirectory } from '@/lib/runtime-paths';
 
 const LEGACY_COVERS_PUBLIC_PREFIX = '/covers';
 const DATA_COVERS_PUBLIC_PREFIX = '/api/local-covers';
+const COVER_FILE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'] as const;
 
 /** 封面存放的公开路径前缀 */
 const MAX_COVER_BYTES = 8 * 1024 * 1024;
@@ -90,9 +91,19 @@ export function resolveDisplayCoverUrl(
   // public/ 下运行时新增的文件不会被 Next.js 生产服务稳定识别。
   // 无论数据库保存的是旧版 /covers 路径还是新版动态路径，展示时都
   // 统一通过 Route Handler 读取磁盘，因此重新下载封面后无需重启服务。
-  return existsSync(localFilePath)
-    ? `${DATA_COVERS_PUBLIC_PREFIX}/${fileName}`
-    : (remote || undefined);
+  if (!existsSync(localFilePath)) {
+    return remote || undefined;
+  }
+
+  // 文件名基于番剧 ID，覆盖图片时路径本身不会改变。附加修改时间可避免
+  // 浏览器继续复用同一路径下的旧封面（也能淘汰修复前已缓存的响应）。
+  try {
+    const version = Math.trunc(statSync(localFilePath).mtimeMs).toString(36);
+    return `${DATA_COVERS_PUBLIC_PREFIX}/${fileName}?v=${version}`;
+  } catch {
+    // 文件可能恰好在 existsSync 与 statSync 之间被删除。
+    return remote || undefined;
+  }
 }
 
 /** 判断是否为系统生成的本地占位封面 */
@@ -105,6 +116,18 @@ export function isPlaceholderCoverPath(value: string | null | undefined): boolea
 /** 获取封面文件的磁盘绝对路径 */
 function coverFilePath(animeId: number): string {
   return join(getCoversDirectory(), `${animeId}.jpg`);
+}
+
+/** 获取某个番剧可能拥有的全部本地封面路径（含旧版 public/covers 目录）。 */
+function coverFilePaths(animeId: number): string[] {
+  const directories = new Set([
+    resolve(getCoversDirectory()),
+    resolve(process.cwd(), 'public', 'covers'),
+  ]);
+
+  return [...directories].flatMap((directory) =>
+    COVER_FILE_EXTENSIONS.map((extension) => join(directory, `${animeId}.${extension}`)),
+  );
 }
 
 /** 获取封面文件的公开 URL 路径 */
@@ -177,25 +200,29 @@ export async function downloadCoverImage(
  * 删除本地封面文件（如果存在）
  */
 export async function deleteCoverImage(animeId: number): Promise<void> {
-  try {
-    await unlink(coverFilePath(animeId));
-  } catch (error) {
-    const err = error as NodeJS.ErrnoException;
-    // 文件不存在不算错误
-    if (err.code !== 'ENOENT') {
-      console.warn(`[cover] 删除封面文件失败 id=${animeId}:`, err.message);
+  await Promise.all(coverFilePaths(animeId).map(async (filePath) => {
+    try {
+      await unlink(filePath);
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      // 文件不存在不算错误
+      if (err.code !== 'ENOENT') {
+        console.warn(`[cover] 删除封面文件失败 id=${animeId}:`, err.message);
+      }
     }
-  }
+  }));
 }
 
 /** 同步删除封面文件 */
 export function deleteCoverImageSync(animeId: number): void {
-  try {
-    unlinkSync(coverFilePath(animeId));
-  } catch (error) {
-    const err = error as NodeJS.ErrnoException;
-    if (err.code !== 'ENOENT') {
-      console.warn(`[cover] 删除封面文件失败 id=${animeId}:`, err.message);
+  for (const filePath of coverFilePaths(animeId)) {
+    try {
+      unlinkSync(filePath);
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code !== 'ENOENT') {
+        console.warn(`[cover] 删除封面文件失败 id=${animeId}:`, err.message);
+      }
     }
   }
 }

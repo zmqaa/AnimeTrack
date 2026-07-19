@@ -4,7 +4,7 @@ import { parseJsonStringArray } from './anime-cast';
 import { extractSeasonNumber, hasSeasonMarker, normalizeTitleToken } from './chinese-parser';
 import { nowISO } from './date-utils';
 import type { AnimeStatus } from './anime-shared';
-import { resolveDisplayCoverUrl } from './cover-image';
+import { deleteCoverImage, resolveDisplayCoverUrl } from './cover-image';
 
 export type { AnimeStatus };
 
@@ -634,8 +634,23 @@ export function updateAnimeRecordWithHistory(
   return transaction();
 }
 
-export async function deleteAnimeRecord(id: number): Promise<void> {
-  await query('DELETE FROM anime WHERE id = ?', [id]);
+export async function deleteAnimeRecords(ids: number[]): Promise<number> {
+  const uniqueIds = [...new Set(ids)];
+  if (uniqueIds.length === 0) return 0;
+
+  const placeholders = uniqueIds.map(() => '?').join(',');
+  const db = getRawDb();
+  const result = db.transaction(() => db.prepare(
+    `DELETE FROM anime WHERE id IN (${placeholders})`,
+  ).run(...uniqueIds))();
+
+  // 数据库删除成功后同步清理文件系统；不存在的文件可安全忽略。
+  await Promise.all(uniqueIds.map((id) => deleteCoverImage(id)));
+  return result.changes;
+}
+
+export async function deleteAnimeRecord(id: number): Promise<boolean> {
+  return (await deleteAnimeRecords([id])) > 0;
 }
 
 export async function findAnimeByTitle(title: string): Promise<AnimeRecord | null> {

@@ -115,7 +115,7 @@ export default function AnimeSidebar({
             >
               <div className="surface-card-muted w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 group-hover/item:border-[var(--color-watching)]/30 transition-colors shadow-lg relative">
                 {item.displayCoverUrl ? (
-                  <Image src={item.displayCoverUrl} fill unoptimized sizes="40px" className="object-cover transition-transform group-hover/item:scale-110" alt="" />
+                  <Image key={item.displayCoverUrl} src={item.displayCoverUrl} fill unoptimized sizes="40px" className="object-cover transition-transform group-hover/item:scale-110" alt="" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-[9px] text-[var(--text-muted)]">无封面</div>
                 )}
