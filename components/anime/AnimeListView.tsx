@@ -40,6 +40,7 @@ export default memo(function AnimeListView({ items, updateProgress, isAdmin = fa
             <Link href={detailHref} onClick={onOpenDetail} className="flex-shrink-0 w-14 h-[74px] rounded-xl overflow-hidden bg-[var(--tag-bg)] relative">
               {item.displayCoverUrl ? (
                 <Image
+                  key={item.displayCoverUrl}
                   src={item.displayCoverUrl}
                   alt={item.title}
                   fill
@@ -50,6 +51,11 @@ export default memo(function AnimeListView({ items, updateProgress, isAdmin = fa
                     const target = e.currentTarget;
                     target.style.display = 'none';
                     target.parentElement!.classList.add('anime-cover-fallback');
+                  }}
+                  onLoad={(e) => {
+                    const target = e.currentTarget;
+                    target.style.display = '';
+                    target.parentElement?.classList.remove('anime-cover-fallback');
                   }}
                 />
               ) : (

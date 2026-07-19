@@ -36,7 +36,8 @@ export async function GET(
     return new NextResponse(content, {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400',
+        // 封面文件名基于番剧 ID，图片更新时 URL 不变，因此不允许客户端复用旧图。
+        'Cache-Control': 'no-store',
       },
     });
   } catch (error) {

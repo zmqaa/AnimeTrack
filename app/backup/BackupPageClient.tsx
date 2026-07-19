@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { fetchBlob, fetchJson } from '@/lib/client-api';
 import { buildExportFilename } from '@/lib/export-filename';
-import { ANIME_LIST_KEY, HISTORY_KEY } from '@/lib/swr-config';
+import { HISTORY_KEY } from '@/lib/swr-config';
 import { useRuntimeAccess } from '@/hooks/useRuntimeAccess';
 
 interface BackupFile {

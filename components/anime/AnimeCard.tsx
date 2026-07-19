@@ -48,6 +48,7 @@ export default memo(function AnimeCard({ item, updateProgress, isAdmin = false, 
         <Link href={detailHref} className="block h-full" onClick={onOpenDetail}>
           {item.displayCoverUrl ? (
             <Image
+              key={item.displayCoverUrl}
               src={item.displayCoverUrl}
               alt={item.title}
               fill
@@ -58,6 +59,11 @@ export default memo(function AnimeCard({ item, updateProgress, isAdmin = false, 
                 const target = e.currentTarget;
                 target.style.display = 'none';
                 target.parentElement!.classList.add('anime-cover-fallback');
+              }}
+              onLoad={(e) => {
+                const target = e.currentTarget;
+                target.style.display = '';
+                target.parentElement?.classList.remove('anime-cover-fallback');
               }}
             />
           ) : (

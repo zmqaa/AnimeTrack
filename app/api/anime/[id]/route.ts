@@ -2,8 +2,9 @@ import { deleteAnimeRecord, getAnimeRecord, updateAnimeRecordWithHistory, AnimeR
 import { buildVoiceActorAliases } from '@/lib/ai';
 import { normalizeStringArray, areStringArraysEqual } from '@/lib/anime-cast';
 import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
-import { resolveLocalCoverImage, deleteCoverImage } from '@/lib/cover-image';
+import { resolveLocalCoverImage } from '@/lib/cover-image';
 import { patchAnimeBodySchema } from '@/lib/validations';
+import { nowISO } from '@/lib/date-utils';
 
 function areAllowedFieldValuesEqual(key: string, nextValue: unknown, currentValue: unknown) {
   if (key === 'tags' || key === 'cast' || key === 'castAliases') {
@@ -44,9 +45,8 @@ export async function DELETE(
   const id = parseAnimeId(context.params.id);
   if (!id) return apiError('Invalid ID', 400);
 
-  await deleteAnimeRecord(id);
-  // watch_history 由外键级联删除；封面属于文件系统，单独清理。
-  await deleteCoverImage(id);
+  const deleted = await deleteAnimeRecord(id);
+  if (!deleted) return apiError('Not found', 404);
   
   return apiSuccess({ ok: true });
 }
@@ -115,15 +115,21 @@ export async function PATCH(
   const newTotal = updateData.totalEpisodes !== undefined ? updateData.totalEpisodes : before?.totalEpisodes;
   const newStatus = updateData.status !== undefined ? updateData.status : before?.status;
 
-  // 1. If progress hits max, auto-complete
+  // 进度拉满时自动标记为已看完；只有确实记录了最后一集观看历史时，
+  // 才把当天写入看完日期。详情页的纯资料编辑不会伪造看完时间。
   if (newTotal && newProgress !== undefined && newProgress >= newTotal) {
-      if (newStatus !== 'completed') {
-           updateData.status = 'completed';
-      }
-      // If closing today and no end date set
-      if (!updateData.endDate && !before?.endDate) {
-          updateData.endDate = new Date().toISOString().split('T')[0];
-      }
+    if (newStatus !== 'completed') {
+      updateData.status = 'completed';
+    }
+
+    const crossedCompletionWithHistory = Boolean(
+      body.recordHistory
+      && Number(before.progress || 0) < newTotal
+      && newProgress >= newTotal,
+    );
+    if (crossedCompletionWithHistory && updateData.endDate === undefined && !before.endDate) {
+      updateData.endDate = nowISO().slice(0, 10);
+    }
   }
 
   // 如果更新了 coverUrl，同步下载封面到本地

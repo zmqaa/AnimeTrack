@@ -4,6 +4,7 @@ import { createAiRuntimeConfig, requestAiJson as requestSharedAiJson } from './a
 import { containsCjkText, uniqueStrings } from './anime-cast';
 import { parseChineseNumberToken, appendSeasonToTitle, stripSeasonToken } from './chinese-parser';
 import { fetchAiAnimeMetadata } from './metadata/ai-metadata-source';
+import type { AnimeMetadataCandidate } from './anime-provider';
 import {
   toOptionalString, toOptionalNumber, toOptionalFiniteNumber, toOptionalNonNegativeNumber,
   toOptionalBoolean, toOptionalDateString, toStringArray, toOptionalQuickRecordStatus,
@@ -58,6 +59,14 @@ export interface ParsedQuickRecordIntent {
 
 export interface ParsedQuickRecordBatch {
   records: ParsedQuickRecordIntent[];
+}
+
+export interface AnimeCandidateSelectionInput {
+  userTitle: string;
+  recognizedTitle?: string;
+  recognizedOriginalTitle?: string;
+  expectedSeason?: number;
+  candidates: AnimeMetadataCandidate[];
 }
 
 type AiMessage = {
@@ -371,6 +380,68 @@ export async function enrichAnimeData(queryName: string): Promise<EnrichedAnimeD
     isFinished: metadata.isFinished,
     coverUrl: metadata.coverUrl,
   };
+}
+
+/**
+ * 让 AI 在 Bangumi 返回的真实候选中做语义选择。
+ * 返回值必须来自传入的候选 ID；AI 不能在这里创造新条目。
+ */
+export async function selectAnimeMetadataCandidate(
+  input: AnimeCandidateSelectionInput,
+): Promise<AnimeMetadataCandidate | null> {
+  const candidates = Array.isArray(input.candidates) ? input.candidates.slice(0, 20) : [];
+  if (candidates.length === 0) return null;
+
+  const payload = await requestSharedAiJson<Record<string, unknown>>({
+    ...createAiRuntimeConfig(),
+    messages: [
+      {
+        role: 'system',
+        content: '你是动画数据库候选匹配助手。根据语义、别名、人物名、副标题、季度和首播信息，从给定 Bangumi 候选中选择同一具体动画条目。只输出 JSON，绝不创造候选 ID。',
+      },
+      {
+        role: 'user',
+        content: `
+请判断下面的用户作品意图对应哪一个 Bangumi 候选。
+
+用户输入标题：${input.userTitle}
+前置 AI 识别标题：${input.recognizedTitle || '未提供'}
+前置 AI 识别原名：${input.recognizedOriginalTitle || '未提供'}
+用户明确季度：${input.expectedSeason || '未明确'}
+
+候选列表：
+${JSON.stringify(candidates.map((candidate) => ({
+  id: candidate.id,
+  title: candidate.title,
+  originalTitle: candidate.originalTitle || null,
+  season: candidate.season || null,
+  premiereDate: candidate.premiereDate || null,
+  totalEpisodes: candidate.totalEpisodes || null,
+})), null, 2)}
+
+返回 JSON：
+{
+  "selectedId": 12345,
+  "confidence": 0.98,
+  "reason": "简短说明"
+}
+
+规则：
+1. selectedId 只能是候选列表中的 ID；没有合适候选时返回 null。
+2. 重点理解不同中文译名和省略表达，不要只比较文字是否相同。
+3. 必须选择同一部具体动画，不能因为共享“反派大小姐”等泛化词就选到另一部作品。
+4. 用户明确指定季度、续作、剧场版、OVA 或副标题时，必须选择对应条目；候选标题未直接写“第几季”时，应结合原名、副标题和首播日期判断。
+5. 若前置识别与用户输入冲突，以用户真正表达的作品意图为准。
+6. 不确定时返回 selectedId: null，不要猜。`,
+      },
+    ],
+    temperature: 0,
+    timeoutMs: 20_000,
+    cache: 'no-store',
+  });
+
+  const selectedId = toOptionalNumber(payload?.selectedId);
+  return selectedId ? candidates.find((candidate) => candidate.id === selectedId) || null : null;
 }
 
 export async function buildVoiceActorAliases(cast: string[], existingAliases: string[] = []): Promise<string[]> {

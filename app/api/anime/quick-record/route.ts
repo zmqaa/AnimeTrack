@@ -3,7 +3,7 @@ import { createAnimeRecordWithHistory, updateAnimeRecord, CreateAnimeDTO, listAn
 import { parseQuickRecordBatch, type ParsedQuickRecordIntent } from '@/lib/ai';
 import { enrichAnimeInput } from '@/lib/anime-enrichment';
 import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
-import { resolveLocalCoverImage } from '@/lib/cover-image';
+import { resolveDisplayCoverUrl, resolveLocalCoverImage } from '@/lib/cover-image';
 import {
   detectRewatchTag, resolveNextRewatchTag, validateSeasonSelection,
   mergeStringArrays, buildRecognition,
@@ -33,6 +33,7 @@ async function processQuickRecordIntent(
 
   let input: CreateAnimeDTO = {
     title: parsed.animeTitle,
+    originalTitle: parsed.originalTitle,
     status: 'watching',
     progress: 0,
     startDate: undefined,
@@ -41,7 +42,10 @@ async function processQuickRecordIntent(
 
   input = await enrichAnimeInput(input, {
     mode: 'create',
-    originalUserTitle: parsed.originalTitle || parsed.animeTitle,
+    // The recognized display title is the identity anchor.  The parsed original
+    // title is still passed in `input` as an additional provider query, but it
+    // must not replace the user's recognized work as the enrichment anchor.
+    originalUserTitle: parsed.animeTitle,
     skipVoiceActorAliases: true,
     providerQueryLimit: 2,
     expectedSeason: parsed.season,
@@ -74,7 +78,7 @@ async function processQuickRecordIntent(
     const localCoverUrl = await resolveLocalCoverImage(created.coverUrl, created.id);
     await updateAnimeRecord(created.id, { localCoverUrl });
     created.localCoverUrl = localCoverUrl ?? undefined;
-    created.displayCoverUrl = localCoverUrl || created.coverUrl;
+    created.displayCoverUrl = resolveDisplayCoverUrl(localCoverUrl, created.coverUrl);
   }
 
   return {
