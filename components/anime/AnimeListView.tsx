@@ -17,19 +17,21 @@ const statusDotClass: Record<AnimeStatus, string> = {
 
 interface AnimeListViewProps {
   items: AnimeCardItem[];
-  updateProgress: (id: number, current: number, total?: number | null) => Promise<void>;
+  updateProgress: (id: number, delta: -1 | 1) => Promise<void>;
+  updatingProgressIds: ReadonlySet<number>;
   isAdmin?: boolean;
   detailReturnTo: string;
   onOpenDetail: () => void;
 }
 
-export default memo(function AnimeListView({ items, updateProgress, isAdmin = false, detailReturnTo, onOpenDetail }: AnimeListViewProps) {
+export default memo(function AnimeListView({ items, updateProgress, updatingProgressIds, isAdmin = false, detailReturnTo, onOpenDetail }: AnimeListViewProps) {
   return (
     <div className="space-y-2.5">
       {items.map((item) => {
         const isCompleted = item.status === 'completed';
         const progressPercent = item.totalEpisodes ? (item.progress / item.totalEpisodes) * 100 : 0;
         const detailHref = `/anime/${item.id}?returnTo=${encodeURIComponent(detailReturnTo)}`;
+        const isUpdatingProgress = updatingProgressIds.has(item.id);
 
         return (
           <div
@@ -104,10 +106,11 @@ export default memo(function AnimeListView({ items, updateProgress, isAdmin = fa
             {isAdmin && (
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 <button
-                  onClick={() => updateProgress(item.id, item.progress - 1, item.totalEpisodes)}
-                  disabled={item.progress <= 0}
+                  onClick={() => updateProgress(item.id, -1)}
+                  disabled={item.progress <= 0 || isUpdatingProgress}
                   className="surface-pill p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--color-surface-hover)] transition text-[10px] disabled:opacity-30"
                   aria-label="减一集"
+                  aria-busy={isUpdatingProgress}
                 >
                   -1
                 </button>
@@ -117,11 +120,15 @@ export default memo(function AnimeListView({ items, updateProgress, isAdmin = fa
                   </div>
                 ) : (
                   <button
-                    onClick={() => updateProgress(item.id, item.progress + 1, item.totalEpisodes)}
-                    className="anime-watch-button p-1.5 rounded-lg transition"
+                    onClick={() => updateProgress(item.id, 1)}
+                    disabled={isUpdatingProgress}
+                    className="anime-watch-button min-w-8 p-1.5 rounded-lg transition disabled:opacity-60"
                     aria-label="加一集"
+                    aria-busy={isUpdatingProgress}
                   >
-                    <PlusIcon className="w-4 h-4" />
+                    {isUpdatingProgress
+                      ? <span className="text-[10px]">…</span>
+                      : <PlusIcon className="w-4 h-4" />}
                   </button>
                 )}
               </div>

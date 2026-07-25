@@ -34,8 +34,33 @@ export const createAnimeSchema = z.object({
 export const updateAnimeSchema = createAnimeSchema.partial();
 
 export const patchAnimeBodySchema = updateAnimeSchema.extend({
+  progressDelta: z.union([z.literal(-1), z.literal(1)]).optional(),
   recordHistory: z.boolean().optional(),
   trimHistoryOnProgressDecrease: z.boolean().optional(),
+}).superRefine((value, context) => {
+  if (value.progressDelta !== undefined && value.progress !== undefined) {
+    context.addIssue({
+      code: 'custom',
+      message: 'progress 与 progressDelta 不能同时提交',
+      path: ['progressDelta'],
+    });
+  }
+
+  if (value.progressDelta !== undefined) {
+    const deltaControlKeys = new Set([
+      'progressDelta',
+      'recordHistory',
+      'trimHistoryOnProgressDecrease',
+    ]);
+    const mixedField = Object.keys(value).find((key) => !deltaControlKeys.has(key));
+    if (mixedField) {
+      context.addIssue({
+        code: 'custom',
+        message: 'progressDelta 不能与其他番剧字段同时提交',
+        path: [mixedField],
+      });
+    }
+  }
 });
 
 export type CreateAnimeInput = z.infer<typeof createAnimeSchema>;

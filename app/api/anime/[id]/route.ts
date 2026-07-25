@@ -1,4 +1,4 @@
-import { deleteAnimeRecord, getAnimeRecord, updateAnimeRecordWithHistory, AnimeRecord, parseAnimeId } from '@/lib/anime';
+import { adjustAnimeProgressWithHistory, deleteAnimeRecord, getAnimeRecord, updateAnimeRecordWithHistory, AnimeRecord, parseAnimeId } from '@/lib/anime';
 import { buildVoiceActorAliases } from '@/lib/ai';
 import { normalizeStringArray, areStringArraysEqual } from '@/lib/anime-cast';
 import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
@@ -70,6 +70,16 @@ export async function PATCH(
     return apiError(parsedBody.error.issues[0]?.message || '参数校验失败', 400);
   }
   const body = parsedBody.data;
+
+  if (body.progressDelta !== undefined) {
+    const updated = adjustAnimeProgressWithHistory(id, body.progressDelta, {
+      recordHistory: Boolean(body.recordHistory),
+      trimHistoryOnProgressDecrease: Boolean(body.trimHistoryOnProgressDecrease),
+    });
+    if (!updated) return apiError('Not found', 404);
+    return apiSuccess({ ok: true, entry: updated });
+  }
+
   const normalizedBody = {
     ...body,
     tags: normalizeStringArray(body.tags) ?? body.tags,

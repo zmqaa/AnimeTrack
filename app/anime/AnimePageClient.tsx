@@ -51,6 +51,7 @@ export default function AnimePageClient() {
   const [sortBy, setSortBy] = useState<AnimeSortBy>('lastWatchedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const progressMutationIdsRef = useRef(new Set<number>());
   const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('search') || '');
   const hasSyncedUrlFilters = useRef(false);
   const lastFilterKeyRef = useRef('');
@@ -65,6 +66,7 @@ export default function AnimePageClient() {
   const [quickProgress, setQuickProgress] = useState<QuickRecordProgressEvent[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; title: string } | null>(null);
+  const [updatingProgressIds, setUpdatingProgressIds] = useState<Set<number>>(() => new Set());
 
   const [formData, setFormData] = useState({
     title: '',
@@ -297,16 +299,24 @@ export default function AnimePageClient() {
   }, []);
 
   // ── 进度更新（乐观更新 + API） ──────────────────────────────────────
-  const updateProgress = useCallback(async (id: number, current: number, total?: number | null) => {
-    if (current < 0) return;
-    const isFinishing = total && current >= total;
-    const newStatus = isFinishing ? 'completed' : undefined;
+  const updateProgress = useCallback(async (id: number, delta: -1 | 1) => {
+    if (progressMutationIdsRef.current.has(id)) return;
+    progressMutationIdsRef.current.add(id);
+    setUpdatingProgressIds(new Set(progressMutationIdsRef.current));
 
     // 乐观更新函数
     const applyProgressPatch = (item: AnimeListItem): AnimeListItem => {
       if (item.id !== id) return item;
-      const updated: AnimeListItem = { ...item, progress: current };
-      if (newStatus) updated.status = newStatus;
+      const upperBound = item.totalEpisodes && item.totalEpisodes > 0
+        ? item.totalEpisodes
+        : Number.MAX_SAFE_INTEGER;
+      const progress = Math.min(upperBound, Math.max(0, item.progress + delta));
+      const updated: AnimeListItem = { ...item, progress };
+      if (item.totalEpisodes && progress >= item.totalEpisodes) {
+        updated.status = 'completed';
+      } else if (delta < 0 && item.status === 'completed') {
+        updated.status = 'watching';
+      }
       return updated;
     };
 
@@ -340,8 +350,7 @@ export default function AnimePageClient() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          progress: current,
-          status: newStatus,
+          progressDelta: delta,
           recordHistory: true,
           trimHistoryOnProgressDecrease: true,
         }),
@@ -363,10 +372,14 @@ export default function AnimePageClient() {
       if (swrPageKey) globalMutate(swrPageKey);
       globalMutate(isHistoryKey);
 
+      const isFinishing = Boolean(
+        result.entry.totalEpisodes
+        && result.entry.progress >= result.entry.totalEpisodes,
+      );
       if (isFinishing) {
         toast.success('🎉 恭喜完结！');
       } else {
-        toast.success(`已更新进度至 EP ${current}`);
+        toast.success(`已更新进度至 EP ${result.entry.progress}`);
       }
     } catch (err) {
       console.error('Update failed:', err);
@@ -375,6 +388,9 @@ export default function AnimePageClient() {
       if (swrPageKey) globalMutate(swrPageKey);
       globalMutate(isHistoryKey);
       toast.error(err instanceof Error ? err.message : '更新失败，请重试');
+    } finally {
+      progressMutationIdsRef.current.delete(id);
+      setUpdatingProgressIds(new Set(progressMutationIdsRef.current));
     }
   }, [mutateAll, swrPageKey]);
 
@@ -629,6 +645,7 @@ export default function AnimePageClient() {
           <AnimeGrid
             items={pagedItems}
             updateProgress={updateProgress}
+            updatingProgressIds={updatingProgressIds}
             loading={loading || pageLoading}
             isAdmin={isAdmin}
             viewMode={viewMode}

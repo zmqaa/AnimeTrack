@@ -17,7 +17,8 @@ const statusSoftClass: Record<AnimeStatus, string> = {
 
 interface AnimeCardProps {
   item: AnimeCardItem;
-  updateProgress: (id: number, current: number, total?: number | null) => Promise<void>;
+  updateProgress: (id: number, delta: -1 | 1) => Promise<void>;
+  isUpdatingProgress: boolean;
   isAdmin?: boolean;
   detailReturnTo: string;
   onOpenDetail: () => void;
@@ -33,7 +34,7 @@ function resolveRewatchTag(tags?: string[]): string | undefined {
     .find((tag) => /^([0-9]{1,3}|[一二两三四五六七八九十]+)刷$/i.test(tag));
 }
 
-export default memo(function AnimeCard({ item, updateProgress, isAdmin = false, detailReturnTo, onOpenDetail }: AnimeCardProps) {
+export default memo(function AnimeCard({ item, updateProgress, isUpdatingProgress, isAdmin = false, detailReturnTo, onOpenDetail }: AnimeCardProps) {
   const isCompleted = item.status === 'completed';
   const progressPercent = item.totalEpisodes
     ? (item.progress / item.totalEpisodes) * 100
@@ -141,10 +142,11 @@ export default memo(function AnimeCard({ item, updateProgress, isAdmin = false, 
         {isAdmin && (
           <div className="flex items-center gap-2 pt-1">
             <button 
-              onClick={() => updateProgress(item.id, item.progress - 1, item.totalEpisodes)}
-              disabled={item.progress <= 0}
+              onClick={() => updateProgress(item.id, -1)}
+              disabled={item.progress <= 0 || isUpdatingProgress}
               className="surface-pill flex-1 py-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--color-surface-hover)] transition text-[10px] disabled:opacity-30"
               aria-label="减一集"
+              aria-busy={isUpdatingProgress}
             >
               -1
             </button>
@@ -154,11 +156,15 @@ export default memo(function AnimeCard({ item, updateProgress, isAdmin = false, 
               </div>
             ) : (
                <button
-                  onClick={() => updateProgress(item.id, item.progress + 1, item.totalEpisodes)}
+                  onClick={() => updateProgress(item.id, 1)}
+                  disabled={isUpdatingProgress}
                   className="anime-watch-button flex-[2] py-1.5 rounded-lg transition text-[10px] font-bold flex items-center justify-center gap-1 shadow-sm"
                   aria-label="看一集"
+                  aria-busy={isUpdatingProgress}
                 >
-                  <PlusIcon className="w-3 h-3" /> 看一集
+                  {isUpdatingProgress
+                    ? '保存中…'
+                    : <><PlusIcon className="w-3 h-3" /> 看一集</>}
                 </button>
             )}
           </div>

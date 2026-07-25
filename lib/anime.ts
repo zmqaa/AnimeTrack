@@ -2,7 +2,7 @@ import 'server-only';
 import { getRawDb, query, type DbResult } from './db';
 import { parseJsonStringArray } from './anime-cast';
 import { pickBestAnimeTitleCandidate } from './anime-title-matching';
-import { nowISO } from './date-utils';
+import { formatAppDateKey, nowISO } from './date-utils';
 import type { AnimeStatus } from './anime-shared';
 import { deleteCoverImage, resolveDisplayCoverUrl } from './cover-image';
 
@@ -537,6 +537,71 @@ export function updateAnimeRecordWithHistory(
       db.prepare('DELETE FROM watch_history WHERE animeId = ? AND episode > ?').run(id, updatedProgress);
     }
 
+    return mapRowToAnimeRecord(updatedRow);
+  });
+
+  return transaction();
+}
+
+/**
+ * 在单个数据库事务内按增量调整进度并同步观看历史。
+ * 进度计算以事务读取到的最新值为准，避免并发请求用旧进度互相覆盖。
+ */
+export function adjustAnimeProgressWithHistory(
+  id: number,
+  delta: -1 | 1,
+  options: {
+    recordHistory: boolean;
+    trimHistoryOnProgressDecrease?: boolean;
+    watchedAt?: Date;
+  },
+): AnimeRecord | null {
+  const db = getRawDb();
+  const transaction = db.transaction(() => {
+    const beforeRow = db.prepare('SELECT * FROM anime WHERE id = ?').get(id) as AnimeRow | undefined;
+    if (!beforeRow) return null;
+
+    const beforeProgress = Number(beforeRow.progress) || 0;
+    const totalEpisodes = beforeRow.totalEpisodes == null ? undefined : Number(beforeRow.totalEpisodes);
+    const upperBound = totalEpisodes && totalEpisodes > 0 ? totalEpisodes : Number.MAX_SAFE_INTEGER;
+    const nextProgress = Math.min(upperBound, Math.max(0, beforeProgress + delta));
+    if (nextProgress === beforeProgress) return mapRowToAnimeRecord(beforeRow);
+
+    let nextStatus = beforeRow.status;
+    if (totalEpisodes && nextProgress >= totalEpisodes) {
+      nextStatus = 'completed';
+    } else if (delta < 0 && beforeRow.status === 'completed') {
+      nextStatus = 'watching';
+    }
+
+    const crossedCompletion = Boolean(
+      totalEpisodes
+      && beforeProgress < totalEpisodes
+      && nextProgress >= totalEpisodes,
+    );
+    const watchedAt = options.watchedAt || new Date();
+    const nextEndDate = crossedCompletion && !beforeRow.end_date
+      ? formatAppDateKey(watchedAt)
+      : beforeRow.end_date;
+
+    db.prepare(`
+      UPDATE anime
+      SET progress = ?, status = ?, end_date = ?, updatedAt = ?
+      WHERE id = ?
+    `).run(nextProgress, nextStatus, nextEndDate, nowISO(), id);
+
+    if (delta > 0 && options.recordHistory) {
+      db.prepare(`
+        INSERT INTO watch_history (animeId, animeTitle, episode, watchedAt)
+        VALUES (?, ?, ?, ?)
+      `).run(id, beforeRow.title, nextProgress, watchedAt.toISOString());
+    } else if (delta < 0 && options.trimHistoryOnProgressDecrease) {
+      db.prepare(
+        'DELETE FROM watch_history WHERE animeId = ? AND episode > ?',
+      ).run(id, nextProgress);
+    }
+
+    const updatedRow = db.prepare('SELECT * FROM anime WHERE id = ?').get(id) as AnimeRow;
     return mapRowToAnimeRecord(updatedRow);
   });
 

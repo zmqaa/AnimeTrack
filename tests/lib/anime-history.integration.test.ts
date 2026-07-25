@@ -77,6 +77,83 @@ describe('anime progress and watch history transaction', () => {
     ]);
   });
 
+  it('applies repeated progress increments to the latest stored value', async () => {
+    const anime = await createWatchingAnime();
+
+    const first = animeModule.adjustAnimeProgressWithHistory(
+      anime.id,
+      1,
+      { recordHistory: true },
+    );
+    const second = animeModule.adjustAnimeProgressWithHistory(
+      anime.id,
+      1,
+      { recordHistory: true },
+    );
+
+    expect(first?.progress).toBe(1);
+    expect(second?.progress).toBe(2);
+    expect(readHistory(anime.id).map((row) => row.episode)).toEqual([1, 2]);
+  });
+
+  it('clamps progress at the total and restores watching status after decrementing', async () => {
+    const anime = await createWatchingAnime();
+    animeModule.updateAnimeRecordWithHistory(
+      anime.id,
+      { progress: 11 },
+      { recordHistory: true },
+    );
+
+    const completed = animeModule.adjustAnimeProgressWithHistory(
+      anime.id,
+      1,
+      { recordHistory: true },
+    );
+    const clamped = animeModule.adjustAnimeProgressWithHistory(
+      anime.id,
+      1,
+      { recordHistory: true },
+    );
+    const resumed = animeModule.adjustAnimeProgressWithHistory(
+      anime.id,
+      -1,
+      { recordHistory: false, trimHistoryOnProgressDecrease: true },
+    );
+
+    expect(completed?.progress).toBe(12);
+    expect(completed?.status).toBe('completed');
+    expect(clamped?.progress).toBe(12);
+    expect(resumed?.progress).toBe(11);
+    expect(resumed?.status).toBe('watching');
+    expect(readHistory(anime.id).map((row) => row.episode)).toEqual(
+      Array.from({ length: 11 }, (_, index) => index + 1),
+    );
+  });
+
+  it('rolls back an atomic increment when writing its history fails', async () => {
+    const anime = await createWatchingAnime();
+    const db = dbModule.getRawDb();
+    db.exec(`
+      CREATE TRIGGER reject_watch_history_insert
+      BEFORE INSERT ON watch_history
+      BEGIN
+        SELECT RAISE(ABORT, 'simulated atomic increment failure');
+      END;
+    `);
+
+    expect(() => animeModule.adjustAnimeProgressWithHistory(
+      anime.id,
+      1,
+      { recordHistory: true },
+    )).toThrow('simulated atomic increment failure');
+
+    const stored = db.prepare('SELECT progress FROM anime WHERE id = ?').get(anime.id) as {
+      progress: number;
+    };
+    expect(stored.progress).toBe(0);
+    expect(readHistory(anime.id)).toEqual([]);
+  });
+
   it('can update progress without creating watch history', async () => {
     const anime = await createWatchingAnime();
 

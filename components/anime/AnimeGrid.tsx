@@ -10,7 +10,8 @@ export type ViewMode = 'grid' | 'list';
 
 interface AnimeGridProps {
   items: AnimeCardItem[];
-  updateProgress: (id: number, current: number, total?: number | null) => Promise<void>;
+  updateProgress: (id: number, delta: -1 | 1) => Promise<void>;
+  updatingProgressIds: ReadonlySet<number>;
   loading: boolean;
   isAdmin?: boolean;
   viewMode?: ViewMode;
@@ -23,6 +24,7 @@ interface AnimeGridProps {
 export default function AnimeGrid({
   items,
   updateProgress,
+  updatingProgressIds,
   loading,
   isAdmin = false,
   viewMode = 'grid',
@@ -50,6 +52,7 @@ export default function AnimeGrid({
       <AnimeListView
         items={items}
         updateProgress={updateProgress}
+        updatingProgressIds={updatingProgressIds}
         isAdmin={isAdmin}
         detailReturnTo={detailReturnTo}
         onOpenDetail={onOpenDetail}
@@ -64,6 +67,7 @@ export default function AnimeGrid({
           key={item.id} 
           item={item} 
           updateProgress={updateProgress}
+          isUpdatingProgress={updatingProgressIds.has(item.id)}
           isAdmin={isAdmin}
           detailReturnTo={detailReturnTo}
           onOpenDetail={onOpenDetail}
