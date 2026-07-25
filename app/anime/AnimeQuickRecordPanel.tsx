@@ -2,6 +2,7 @@
 
 import { SparklesIcon } from '@heroicons/react/24/outline';
 import type { QuickRecordProgressEvent } from '@/lib/quick-record-progress';
+import AsyncButton from '@/components/shared/AsyncButton';
 
 type AnimeQuickRecordPanelProps = {
   quickInput: string;
@@ -41,6 +42,7 @@ export default function AnimeQuickRecordPanel({
           onSubmit();
         }}
         className="mt-3 flex flex-col md:flex-row gap-2"
+        aria-busy={quickLoading}
       >
         <input
           type="text"
@@ -49,13 +51,14 @@ export default function AnimeQuickRecordPanel({
           placeholder="例如：摇曳露营第三季"
           className="surface-input theme-focus-accent flex-1 rounded-xl px-4 py-2.5 text-sm"
         />
-        <button
+        <AsyncButton
           type="submit"
-          disabled={quickLoading}
+          busy={quickLoading}
+          busyLabel="正在录入…"
           className="theme-accent-button rounded-xl px-4 py-2.5 text-sm font-bold disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {quickLoading ? '录入中...' : 'AI录入'}
-        </button>
+          AI录入
+        </AsyncButton>
       </form>
 
       <p className="text-xs text-[var(--text-muted)] mt-2">输入动漫名称，AI 会搜索并补全作品资料。默认状态为追番中，进度为 0。</p>

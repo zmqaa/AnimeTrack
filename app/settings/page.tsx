@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 
 import { fetchJson } from '@/lib/client-api';
 import { useManageAccess } from '@/hooks/useManageAccess';
+import AsyncButton from '@/components/shared/AsyncButton';
 
 type AiSettingsResponse = {
   source: 'environment';
@@ -108,9 +109,15 @@ export default function SettingsPage() {
           </label>
 
           <div className="flex flex-wrap gap-3 pt-2">
-            <button onClick={handleTest} disabled={testing || !hasApiKey} className="rounded-2xl border border-[var(--border)] px-5 py-3 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--tag-bg)] disabled:opacity-50">
-              {testing ? '测试中...' : '测试连接'}
-            </button>
+            <AsyncButton
+              onClick={handleTest}
+              busy={testing}
+              busyLabel="正在测试连接…"
+              disabled={!hasApiKey}
+              className="rounded-2xl border border-[var(--border)] px-5 py-3 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--tag-bg)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              测试连接
+            </AsyncButton>
           </div>
         </section>
       </div>

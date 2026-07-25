@@ -7,6 +7,7 @@ import type { AnimeDetailItem, AnimeStatus } from '@/lib/anime-shared';
 import { statusMap, toTagInputValue, formatDateLabel, formatTimestampLabel } from './anime-detail-helpers';
 import ProgressBar from '@/components/shared/ProgressBar';
 import StatTile from '@/components/shared/StatTile';
+import AsyncButton from '@/components/shared/AsyncButton';
 import SectionTitle from '@/components/shared/SectionTitle';
 
 type Props = {
@@ -79,28 +80,28 @@ export default function AnimeDetailMain({
             <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
               {canEdit ? (
                 <>
-                  <button onClick={onEnrich} disabled={isAiEnriching}
+                  <AsyncButton onClick={onEnrich} busy={isAiEnriching} busyLabel="AI 补充中…" disabled={saving}
                     className="surface-pill rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] transition hover:bg-[var(--color-surface-hover)] disabled:opacity-50">
-                    {isAiEnriching ? 'AI补充中...' : 'AI补充'}
-                  </button>
-                  <button onClick={onDelete}
-                    className="danger-soft flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition hover:brightness-95">
+                    AI 补充
+                  </AsyncButton>
+                  <button onClick={onDelete} disabled={saving || isAiEnriching}
+                    className="danger-soft flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50">
                     <TrashIcon className="h-4 w-4" />删除此番剧
                   </button>
-                  <button onClick={onCancel} className="rounded-xl px-4 py-2.5 text-sm text-[var(--text-secondary)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--text-primary)]">
+                  <button onClick={onCancel} disabled={saving || isAiEnriching} className="rounded-xl px-4 py-2.5 text-sm text-[var(--text-secondary)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50">
                     取消
                   </button>
-                  <button onClick={onSave} disabled={saving}
+                  <AsyncButton onClick={onSave} busy={saving} busyLabel="正在保存…" disabled={isAiEnriching}
                     className="theme-accent-button rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50">
-                    {saving ? '保存中...' : '保存更改'}
-                  </button>
+                    保存更改
+                  </AsyncButton>
                 </>
               ) : (
                 <>
-                  <button onClick={onEnrich} disabled={isAiEnriching}
+                  <AsyncButton onClick={onEnrich} busy={isAiEnriching} busyLabel="AI 补充中…"
                     className="surface-pill rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] transition hover:bg-[var(--color-surface-hover)] disabled:opacity-50">
-                    {isAiEnriching ? 'AI补充中...' : 'AI补充'}
-                  </button>
+                    AI 补充
+                  </AsyncButton>
                   <button onClick={onDelete}
                     className="danger-soft flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition hover:brightness-95">
                     <TrashIcon className="h-4 w-4" />删除此番剧

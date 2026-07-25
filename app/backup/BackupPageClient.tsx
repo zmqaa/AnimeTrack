@@ -9,6 +9,7 @@ import { fetchBlob, fetchJson } from '@/lib/client-api';
 import { buildExportFilename } from '@/lib/export-filename';
 import { isHistoryKey } from '@/lib/swr-config';
 import { useManageAccess } from '@/hooks/useManageAccess';
+import AsyncButton from '@/components/shared/AsyncButton';
 
 interface BackupFile {
   name: string;
@@ -59,6 +60,7 @@ export default function BackupPageClient() {
   const [importing, setImporting] = useState(false);
   const [downloadingCovers, setDownloadingCovers] = useState(false);
   const [restoring, setRestoring] = useState<string | null>(null);
+  const [deletingBackup, setDeletingBackup] = useState(false);
   const [restoreConfirm, setRestoreConfirm] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [pendingImport, setPendingImport] = useState<PendingImport | null>(null);
@@ -103,6 +105,8 @@ export default function BackupPageClient() {
   };
 
   const handleDeleteBackup = async (name: string) => {
+    if (deletingBackup) return;
+    setDeletingBackup(true);
     try {
       await fetchJson<{ success: true }>('/api/admin/backup', {
         method: 'DELETE',
@@ -114,6 +118,7 @@ export default function BackupPageClient() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '删除失败');
     } finally {
+      setDeletingBackup(false);
       setDeleteConfirm(null);
     }
   };
@@ -288,50 +293,53 @@ export default function BackupPageClient() {
           导出全部番剧列表和观看记录。CSV 格式可以直接用 Excel 打开，JSON 适合程序处理、备份后回导或迁移。
         </p>
         <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
+          <AsyncButton
             onClick={() => handleExport('csv')}
+            busy={exporting === 'csv'}
+            busyLabel="正在导出 CSV…"
             disabled={exporting !== null}
             className="theme-accent-soft flex items-center gap-2.5 rounded-2xl px-5 py-3 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            {exporting === 'csv' ? '导出中...' : '导出 CSV（Excel）'}
-          </button>
-          <button
-            type="button"
+            导出 CSV（Excel）
+          </AsyncButton>
+          <AsyncButton
             onClick={() => handleExport('json')}
+            busy={exporting === 'json'}
+            busyLabel="正在导出 JSON…"
             disabled={exporting !== null}
             className="theme-accent-soft flex items-center gap-2.5 rounded-2xl px-5 py-3 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            {exporting === 'json' ? '导出中...' : '导出 JSON'}
-          </button>
-          <button
-            type="button"
+            导出 JSON
+          </AsyncButton>
+          <AsyncButton
             onClick={handleImportClick}
-            disabled={importing}
+            busy={importing}
+            busyLabel="正在导入…"
             className="theme-accent-soft flex items-center gap-2.5 rounded-2xl px-5 py-3 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20V10m0 0l-4 4m4-4l4 4M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1" />
             </svg>
-            {importing ? '导入中...' : '导入 JSON'}
-          </button>
-          <button
-            type="button"
+            导入 JSON
+          </AsyncButton>
+          <AsyncButton
             onClick={handleDownloadCovers}
-            disabled={downloadingCovers || importing}
+            busy={downloadingCovers}
+            busyLabel="正在下载封面…"
+            disabled={importing}
             className="theme-accent-soft flex items-center gap-2.5 rounded-2xl px-5 py-3 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            {downloadingCovers ? '下载中...' : '批量下载封面'}
-          </button>
+            批量下载封面
+          </AsyncButton>
         </div>
         <input
           ref={importInputRef}
@@ -349,17 +357,17 @@ export default function BackupPageClient() {
       <section className="glass-panel rounded-3xl border border-[var(--border)] p-6 md:p-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
           <h2 className="text-lg font-medium text-[var(--text-primary)]">SQL 备份</h2>
-          <button
-            type="button"
+          <AsyncButton
             onClick={handleCreateBackup}
-            disabled={creating}
+            busy={creating}
+            busyLabel="正在备份…"
             className="theme-accent-button flex w-fit items-center gap-2.5 rounded-2xl px-5 py-3 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            {creating ? '备份中...' : '立即备份'}
-          </button>
+            立即备份
+          </AsyncButton>
         </div>
         <p className="text-sm text-[var(--text-muted)] mb-6">
           将 anime 和 watch_history 表保存到应用的备份目录，常规备份默认保留最近 10 份。可以直接恢复到某个备份时间点；恢复前会自动保存当前状态。跨设备迁移仍优先使用 JSON。
@@ -404,6 +412,7 @@ export default function BackupPageClient() {
                     type="button"
                     onClick={() => setRestoreConfirm(backup.name)}
                     disabled={restoring !== null}
+                    aria-busy={restoring === backup.name}
                     className="p-2.5 rounded-xl text-[var(--text-secondary)] transition-all hover:bg-[var(--accent-light)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40"
                     title={restoring === backup.name ? '恢复中...' : '恢复'}
                   >
@@ -435,6 +444,7 @@ export default function BackupPageClient() {
         message={pendingImport ? `将用文件中的 ${pendingImport.animeCount} 部番剧和 ${pendingImport.historyCount} 条观看历史替换当前全部数据，并清空全部本地封面。此操作不会合并旧数据，建议先导出一份 JSON 备份。` : ''}
         confirmText={importing ? '导入中...' : '确认覆盖'}
         variant="danger"
+        busy={importing}
         onConfirm={handleConfirmImport}
         onCancel={() => !importing && setPendingImport(null)}
       />
@@ -445,6 +455,7 @@ export default function BackupPageClient() {
         message={`确定恢复到「${restoreConfirm || ''}」吗？当前番剧、观看历史和本地封面会被替换；系统会先自动创建一份“恢复前备份”。`}
         confirmText={restoring ? '恢复中...' : '确认恢复'}
         variant="warning"
+        busy={restoring !== null}
         onConfirm={() => restoreConfirm && handleRestoreBackup(restoreConfirm)}
         onCancel={() => !restoring && setRestoreConfirm(null)}
       />
@@ -453,10 +464,11 @@ export default function BackupPageClient() {
         open={deleteConfirm !== null}
         title="删除备份"
         message={`确定要删除备份文件 ${deleteConfirm} 吗？`}
-        confirmText="删除"
+        confirmText={deletingBackup ? '正在删除…' : '删除'}
         variant="danger"
+        busy={deletingBackup}
         onConfirm={() => deleteConfirm && handleDeleteBackup(deleteConfirm)}
-        onCancel={() => setDeleteConfirm(null)}
+        onCancel={() => !deletingBackup && setDeleteConfirm(null)}
       />
     </main>
   );

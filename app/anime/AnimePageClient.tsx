@@ -66,6 +66,7 @@ export default function AnimePageClient() {
   const [quickProgress, setQuickProgress] = useState<QuickRecordProgressEvent[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; title: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [updatingProgressIds, setUpdatingProgressIds] = useState<Set<number>>(() => new Set());
 
   const [formData, setFormData] = useState({
@@ -401,9 +402,9 @@ export default function AnimePageClient() {
   }, [allItems]);
 
   const confirmDelete = useCallback(async () => {
-    if (!deleteConfirm) return;
+    if (!deleteConfirm || deleting) return;
     const { id } = deleteConfirm;
-    setDeleteConfirm(null);
+    setDeleting(true);
     try {
       await fetchJson<{ ok: true }>(`/api/anime/${id}`, { method: 'DELETE' }, '删除失败');
       resetForm();
@@ -415,8 +416,11 @@ export default function AnimePageClient() {
     } catch (err) {
       console.error('Delete failed:', err);
       toast.error(err instanceof Error ? err.message : '删除失败，请重试');
+    } finally {
+      setDeleting(false);
+      setDeleteConfirm(null);
     }
-  }, [deleteConfirm, resetForm, swrPageKey]);
+  }, [deleteConfirm, deleting, resetForm, swrPageKey]);
 
   // ── AI 快捷录入 ─────────────────────────────────────────────────────
   const handleQuickRecord = useCallback(async () => {
@@ -681,11 +685,12 @@ export default function AnimePageClient() {
         open={deleteConfirm !== null}
         title="删除番剧"
         message={`确定要删除「${deleteConfirm?.title || ''}」吗？删除后其观看历史也会一并清除，无法恢复。`}
-        confirmText="确认删除"
+        confirmText={deleting ? '正在删除…' : '确认删除'}
         cancelText="再想想"
         variant="danger"
+        busy={deleting}
         onConfirm={confirmDelete}
-        onCancel={() => setDeleteConfirm(null)}
+        onCancel={() => !deleting && setDeleteConfirm(null)}
       />
     </PageContainer>
   );

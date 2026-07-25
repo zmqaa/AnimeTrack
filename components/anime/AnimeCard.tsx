@@ -145,10 +145,10 @@ export default memo(function AnimeCard({ item, updateProgress, isUpdatingProgres
               onClick={() => updateProgress(item.id, -1)}
               disabled={item.progress <= 0 || isUpdatingProgress}
               className="surface-pill flex-1 py-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--color-surface-hover)] transition text-[10px] disabled:opacity-30"
-              aria-label="减一集"
+              aria-label={isUpdatingProgress ? '正在更新观看进度' : '减一集'}
               aria-busy={isUpdatingProgress}
             >
-              -1
+              {isUpdatingProgress ? '保存中…' : '-1'}
             </button>
             {isCompleted ? (
               <div className="flex-[2] py-1.5 rounded-lg success-soft text-[10px] font-medium text-center flex items-center justify-center gap-1 border">
@@ -159,7 +159,7 @@ export default memo(function AnimeCard({ item, updateProgress, isUpdatingProgres
                   onClick={() => updateProgress(item.id, 1)}
                   disabled={isUpdatingProgress}
                   className="anime-watch-button flex-[2] py-1.5 rounded-lg transition text-[10px] font-bold flex items-center justify-center gap-1 shadow-sm"
-                  aria-label="看一集"
+                  aria-label={isUpdatingProgress ? '正在更新观看进度' : '看一集'}
                   aria-busy={isUpdatingProgress}
                 >
                   {isUpdatingProgress

@@ -7,6 +7,7 @@ import { signOut, useSession } from 'next-auth/react';
 import { navigationItems } from '@/lib/config';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { useManageAccess } from '@/hooks/useManageAccess';
+import AsyncButton from '@/components/shared/AsyncButton';
 
 interface TopNavProps {
   children: React.ReactNode;
@@ -104,13 +105,14 @@ export default function TopNav({ children }: TopNavProps) {
             </button>
 
             {isAuthenticated && (
-              <button
+              <AsyncButton
                 onClick={handleSignOut}
-                disabled={isSigningOut}
+                busy={isSigningOut}
+                busyLabel="退出中…"
                 className="hidden md:inline-flex text-base text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50"
               >
-                {isSigningOut ? '退出中...' : '退出'}
-              </button>
+                退出
+              </AsyncButton>
             )}
 
             {/* Mobile menu button */}
@@ -153,13 +155,14 @@ export default function TopNav({ children }: TopNavProps) {
                 );
               })}
               {isAuthenticated && (
-                <button
+                <AsyncButton
                   onClick={handleSignOut}
-                  disabled={isSigningOut}
+                  busy={isSigningOut}
+                  busyLabel="退出中…"
                   className="w-full text-left px-4 py-3 rounded-lg text-base text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--tag-bg)] transition-colors disabled:opacity-50"
                 >
-                  {isSigningOut ? '退出中...' : '退出登录'}
-                </button>
+                  退出登录
+                </AsyncButton>
               )}
               <button
                 onClick={() => {

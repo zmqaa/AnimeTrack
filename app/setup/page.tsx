@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { fetchJson } from '@/lib/client-api';
+import AsyncButton from '@/components/shared/AsyncButton';
 
 type SetupStatus = {
   allowed: boolean;
@@ -198,22 +199,24 @@ export default function SetupPage() {
           )}
 
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
+            <AsyncButton
               onClick={handleBootstrap}
-              disabled={isSubmitting || !status.allowed}
+              busy={isSubmitting}
+              busyLabel="正在初始化…"
+              disabled={!status.allowed || isLoading}
               className="theme-accent-button rounded-full px-5 py-3 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isSubmitting ? '正在初始化...' : '一键初始化数据库与示例数据'}
-            </button>
-            <button
-              type="button"
+              一键初始化数据库与示例数据
+            </AsyncButton>
+            <AsyncButton
               onClick={loadStatus}
-              disabled={isLoading}
+              busy={isLoading}
+              busyLabel="正在刷新…"
+              disabled={isSubmitting}
               className="surface-pill rounded-full px-5 py-3 text-sm text-[var(--text-primary)] transition hover:bg-[var(--color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               刷新状态
-            </button>
+            </AsyncButton>
             <Link href="/login" className="surface-pill rounded-full px-5 py-3 text-sm text-[var(--text-secondary)] transition hover:border-[var(--border-light)] hover:text-[var(--text-primary)]">
               打开管理员登录页
             </Link>

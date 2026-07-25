@@ -1071,7 +1071,8 @@ body {
   display: inline-block;
   width: 1rem; height: 1rem;
   border-radius: 9999px;
-  border: 2px solid currentColor;
+  border: 2px solid color-mix(in srgb, currentColor 28%, transparent);
+  border-top-color: currentColor;
   animation: spin 0.7s linear infinite;
 }
 

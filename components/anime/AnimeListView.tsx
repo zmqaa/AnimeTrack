@@ -109,10 +109,10 @@ export default memo(function AnimeListView({ items, updateProgress, updatingProg
                   onClick={() => updateProgress(item.id, -1)}
                   disabled={item.progress <= 0 || isUpdatingProgress}
                   className="surface-pill p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--color-surface-hover)] transition text-[10px] disabled:opacity-30"
-                  aria-label="减一集"
+                  aria-label={isUpdatingProgress ? '正在更新观看进度' : '减一集'}
                   aria-busy={isUpdatingProgress}
                 >
-                  -1
+                  {isUpdatingProgress ? <span className="loading-spinner" aria-hidden="true" /> : '-1'}
                 </button>
                 {isCompleted ? (
                   <div className="p-1.5 rounded-lg success-soft border" aria-label="已完成">
@@ -123,11 +123,11 @@ export default memo(function AnimeListView({ items, updateProgress, updatingProg
                     onClick={() => updateProgress(item.id, 1)}
                     disabled={isUpdatingProgress}
                     className="anime-watch-button min-w-8 p-1.5 rounded-lg transition disabled:opacity-60"
-                    aria-label="加一集"
+                    aria-label={isUpdatingProgress ? '正在更新观看进度' : '加一集'}
                     aria-busy={isUpdatingProgress}
                   >
                     {isUpdatingProgress
-                      ? <span className="text-[10px]">…</span>
+                      ? <span className="loading-spinner" aria-hidden="true" />
                       : <PlusIcon className="w-4 h-4" />}
                   </button>
                 )}

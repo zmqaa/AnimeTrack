@@ -9,6 +9,7 @@ interface ConfirmDialogProps {
   confirmText?: string;
   cancelText?: string;
   variant?: 'danger' | 'warning' | 'default';
+  busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -41,6 +42,7 @@ export default function ConfirmDialog({
   confirmText = '确认',
   cancelText = '取消',
   variant = 'default',
+  busy = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -50,23 +52,24 @@ export default function ConfirmDialog({
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
+      if (e.key === 'Escape' && !busy) onCancel();
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [open, onCancel]);
+  }, [busy, open, onCancel]);
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="theme-modal-backdrop absolute inset-0 backdrop-blur-sm" onClick={onCancel} />
+      <div className="theme-modal-backdrop absolute inset-0 backdrop-blur-sm" onClick={() => !busy && onCancel()} />
       <div
         ref={dialogRef}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-title"
         aria-describedby="confirm-message"
+        aria-busy={busy}
         className="relative glass-panel-strong rounded-[24px] p-6 max-w-sm w-full space-y-5 animate-fade-in"
       >
         <div className={`w-12 h-12 mx-auto rounded-2xl border flex items-center justify-center ${style.icon}`}>
@@ -81,15 +84,21 @@ export default function ConfirmDialog({
         <div className="flex items-center gap-3">
           <button
             onClick={onCancel}
-            className="surface-pill flex-1 px-4 py-2.5 rounded-xl text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--color-surface-hover)] transition-all"
+            disabled={busy}
+            className="surface-pill flex-1 px-4 py-2.5 rounded-xl text-[var(--text-secondary)] text-sm font-medium hover:bg-[var(--color-surface-hover)] transition-all disabled:cursor-wait disabled:opacity-60"
           >
             {cancelText}
           </button>
           <button
             onClick={onConfirm}
-            className={`flex-1 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${style.button}`}
+            disabled={busy}
+            aria-busy={busy}
+            className={`flex-1 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all disabled:cursor-wait disabled:opacity-60 ${style.button}`}
           >
-            {confirmText}
+            <span className="inline-flex items-center justify-center gap-2">
+              {busy && <span className="loading-spinner" aria-hidden="true" />}
+              {confirmText}
+            </span>
           </button>
         </div>
       </div>

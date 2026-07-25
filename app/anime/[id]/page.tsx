@@ -27,6 +27,7 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isAiEnriching, setIsAiEnriching] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const returnTo = useMemo(() => resolveReturnTo(searchParams.get('returnTo')), [searchParams]);
   const canEdit = isAdmin && isEditing;
@@ -100,7 +101,8 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
   };
 
   const confirmDelete = async () => {
-    setShowDeleteConfirm(false);
+    if (deleting) return;
+    setDeleting(true);
     try {
       await fetchJson<{ ok: true }>(`/api/anime/${params.id}`, { method: 'DELETE' }, '删除失败');
       toast.success('已删除');
@@ -110,6 +112,9 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
       router.push(returnTo, { scroll: false });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '删除失败');
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -198,11 +203,12 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
         open={showDeleteConfirm}
         title="删除番剧"
         message={`确定要删除「${item.title}」吗？删除后其观看历史也会一并清除，无法恢复。`}
-        confirmText="确认删除"
+        confirmText={deleting ? '正在删除…' : '确认删除'}
         cancelText="再想想"
         variant="danger"
+        busy={deleting}
         onConfirm={confirmDelete}
-        onCancel={() => setShowDeleteConfirm(false)}
+        onCancel={() => !deleting && setShowDeleteConfirm(false)}
       />
     </PageContainer>
   );

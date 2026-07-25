@@ -7,6 +7,7 @@ import { fetchJson } from '@/lib/client-api';
 import type { AnimeStatus, AnimeFormInitialData } from '@/lib/anime-shared';
 import { statusLabels } from '@/lib/dashboard-types';
 import FormField from '@/components/shared/FormField';
+import AsyncButton from '@/components/shared/AsyncButton';
 
 interface AnimeFormProps {
   editingId: number | null;
@@ -36,6 +37,7 @@ export default function AnimeForm({
   const [endDate, setEndDate] = useState(initialData.endDate || '');
   const [isFinished, setIsFinished] = useState(initialData.isFinished || false);
   const [isFetchingCover, setIsFetchingCover] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchCover = async (silent = false) => {
     if (!title) {
@@ -61,8 +63,9 @@ export default function AnimeForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title) return;
+    if (!title || isSubmitting) return;
 
+    setIsSubmitting(true);
     try {
             const payload: Record<string, unknown> = {
         title,
@@ -90,16 +93,18 @@ export default function AnimeForm({
             onSaved();
             resetForm();
             toast.success(editingId ? '已保存' : '已添加');
-                } catch (error) {
-            toast.error(error instanceof Error ? error.message : '操作失败');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '操作失败');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="surface-card p-6 rounded-2xl mb-8 animate-in fade-in slide-in-from-top-4 shadow-lg ring-1 ring-[var(--border)]">
+    <form onSubmit={handleSubmit} aria-busy={isSubmitting} className="surface-card p-6 rounded-2xl mb-8 animate-in fade-in slide-in-from-top-4 shadow-lg ring-1 ring-[var(--border)]">
       <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-medium text-[var(--text-primary)]">{editingId ? '编辑番剧' : '新番入库'}</h2>
-          <button type="button" onClick={resetForm} className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)]">取消</button>
+          <button type="button" onClick={resetForm} disabled={isSubmitting} className="text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-50">取消</button>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 mb-6">
@@ -121,9 +126,15 @@ export default function AnimeForm({
             <FormField
               label="封面链接 (可选)"
               action={(
-                   <button type="button" onClick={() => fetchCover(false)} disabled={isFetchingCover} className="text-[10px] text-[var(--color-watching)] hover:text-[var(--color-watching)]/80">
-                       {isFetchingCover ? '搜索中...' : '自动获取封面'}
-                   </button>
+                   <AsyncButton
+                     onClick={() => fetchCover(false)}
+                     busy={isFetchingCover}
+                     busyLabel="搜索中…"
+                     disabled={isSubmitting}
+                     className="text-[10px] text-[var(--color-watching)] hover:text-[var(--color-watching)]/80 disabled:cursor-not-allowed disabled:opacity-50"
+                   >
+                     自动获取封面
+                   </AsyncButton>
               )}
             >
                <div className="flex gap-2">
@@ -221,12 +232,18 @@ export default function AnimeForm({
 
       <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border)]">
          {editingId && (
-             <button type="button" onClick={() => deleteAnime(editingId)} className="px-4 py-2 hover:bg-[var(--color-danger-bg)] text-danger rounded-lg text-sm mr-auto">删除此番剧</button>
+             <button type="button" onClick={() => deleteAnime(editingId)} disabled={isSubmitting} className="px-4 py-2 hover:bg-[var(--color-danger-bg)] text-danger rounded-lg text-sm mr-auto disabled:cursor-not-allowed disabled:opacity-50">删除此番剧</button>
          )}
-        <button type="button" onClick={resetForm} className="px-4 py-2 hover:bg-[var(--color-surface-hover)] rounded-lg transition text-sm text-[var(--text-muted)]">取消</button>
-        <button type="submit" className="px-6 py-2 bg-[var(--text-primary)] text-[var(--bg-page)] rounded-lg hover:opacity-90 transition text-sm font-medium shadow-sm">
+        <button type="button" onClick={resetForm} disabled={isSubmitting} className="px-4 py-2 hover:bg-[var(--color-surface-hover)] rounded-lg transition text-sm text-[var(--text-muted)] disabled:cursor-not-allowed disabled:opacity-50">取消</button>
+        <AsyncButton
+          type="submit"
+          busy={isSubmitting}
+          busyLabel={editingId ? '正在保存…' : '正在添加…'}
+          disabled={isFetchingCover}
+          className="px-6 py-2 bg-[var(--text-primary)] text-[var(--bg-page)] rounded-lg hover:opacity-90 transition text-sm font-medium shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+        >
           {editingId ? '保存修改' : '立即添加'}
-        </button>
+        </AsyncButton>
       </div>
     </form>
   );

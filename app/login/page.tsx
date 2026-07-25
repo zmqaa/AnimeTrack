@@ -4,6 +4,7 @@ import { signIn, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from 'next/link';
+import AsyncButton from '@/components/shared/AsyncButton';
 
 function resolveCallbackUrl(rawValue: string | null) {
   if (!rawValue || !rawValue.startsWith('/')) {
@@ -109,16 +110,15 @@ export default function LoginPage() {
             </div>
           )}
 
-          <button
+          <AsyncButton
             type="submit"
+            busy={isSubmitting}
+            busyLabel="正在进入管理模式…"
             disabled={isSubmitting}
             className="w-full py-3 bg-[var(--text-primary)] text-[var(--bg-page)] rounded-xl font-semibold hover:bg-[var(--bg-card)] transition-all shadow-lg shadow-[var(--text-primary)]/5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            <span className="flex items-center justify-center gap-2">
-              {isSubmitting && <span className="loading-spinner border-[var(--bg-page)]/30 border-t-[var(--bg-page)]" aria-hidden="true" />}
-              {isSubmitting ? '正在进入管理模式...' : '进入管理模式'}
-            </span>
-          </button>
+            进入管理模式
+          </AsyncButton>
 
           <div className="text-center mt-6">
             <p className="text-[var(--text-muted)] text-sm">
