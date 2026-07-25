@@ -21,6 +21,9 @@
 # IDE / Editor
 .vscode/
 
+# Local Codex project instructions
+/AGENTS.md
+
 # Database / Backup (个人数据不上传到 GitHub)
 /backups/
 /data/*.db
