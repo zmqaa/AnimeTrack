@@ -9,7 +9,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { fetchJson } from '@/lib/client-api';
 import type { AnimeStatus, AnimeDetailItem } from '@/lib/anime-shared';
 import { useRuntimeAccess } from '@/hooks/useRuntimeAccess';
-import { ANIME_LIST_KEY, HISTORY_KEY, animeDetailKey, swrFetcher } from '@/lib/swr-config';
+import { ANIME_LIST_KEY, isHistoryKey, animeDetailKey, swrFetcher } from '@/lib/swr-config';
 import {
   buildChangedPayload, resolveReturnTo,
   type AnimeMutationResponse,
@@ -105,7 +105,7 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
       toast.success('已删除');
       // 全局刷新番剧列表
       globalMutate(ANIME_LIST_KEY);
-      globalMutate(HISTORY_KEY);
+      globalMutate(isHistoryKey);
       router.push(returnTo, { scroll: false });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '删除失败');

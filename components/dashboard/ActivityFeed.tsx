@@ -4,6 +4,7 @@
 import { memo } from 'react';
 import { WatchHistoryRecord } from '@/lib/dashboard-types';
 import EmptyState from '@/components/shared/EmptyState';
+import { APP_TIME_ZONE } from '@/lib/date-utils';
 
 export default memo(function ActivityFeed({ history }: { history: WatchHistoryRecord[] }) {
     if (history.length === 0) {
@@ -18,7 +19,7 @@ export default memo(function ActivityFeed({ history }: { history: WatchHistoryRe
 
     const grouped: Record<string, WatchHistoryRecord[]> = {};
     history.slice(0, 15).forEach(item => {
-        const dateStr = new Date(item.watchedAt).toLocaleDateString('zh-CN');
+        const dateStr = new Date(item.watchedAt).toLocaleDateString('zh-CN', { timeZone: APP_TIME_ZONE });
         if (!grouped[dateStr]) grouped[dateStr] = [];
         grouped[dateStr].push(item);
     });

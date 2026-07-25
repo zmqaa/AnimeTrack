@@ -7,6 +7,7 @@ import { EnrichedEntry } from './TimelineEnhancedList';
 import { TimelineSortBy } from './TimelineControls';
 import ProgressBar from '@/components/shared/ProgressBar';
 import EmptyState from '@/components/shared/EmptyState';
+import { APP_TIME_ZONE } from '@/lib/date-utils';
 
 interface TimelineTableProps {
   entries: EnrichedEntry[];
@@ -107,10 +108,10 @@ export default memo(function TimelineTable({ entries, searchQuery, sortBy, onSor
                 <td className="px-4 py-3 whitespace-nowrap">
                   <div className="flex flex-col">
                     <span className="text-sm text-[var(--text-primary)] font-mono">
-                      {h.dateObj.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })}
+                      {h.dateObj.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', timeZone: APP_TIME_ZONE })}
                     </span>
                     <span className="text-[11px] text-[var(--text-muted)] font-mono">
-                      {h.dateObj.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                      {h.dateObj.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', timeZone: APP_TIME_ZONE })}
                     </span>
                   </div>
                 </td>

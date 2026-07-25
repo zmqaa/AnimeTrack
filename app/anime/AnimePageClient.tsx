@@ -15,7 +15,7 @@ import PageContainer from '@/components/shared/PageContainer';
 import { fetchJson } from '@/lib/client-api';
 import type { AnimeStatus, AnimeSortBy, AnimeListItem, AnimeCardItem } from '@/lib/anime-shared';
 import { useRuntimeAccess } from '@/hooks/useRuntimeAccess';
-import { ANIME_LIST_KEY, HISTORY_KEY, animePageKey, swrFetcher } from '@/lib/swr-config';
+import { ANIME_LIST_KEY, isHistoryKey, animePageKey, swrFetcher } from '@/lib/swr-config';
 import AnimePagination from './AnimePagination';
 import AnimeQuickRecordPanel from './AnimeQuickRecordPanel';
 import AnimeSidebar from './AnimeSidebar';
@@ -359,7 +359,7 @@ export default function AnimePageClient() {
 
       mutateAll();
       if (swrPageKey) globalMutate(swrPageKey);
-      globalMutate(HISTORY_KEY);
+      globalMutate(isHistoryKey);
 
       if (isFinishing) {
         toast.success('🎉 恭喜完结！');
@@ -371,7 +371,7 @@ export default function AnimePageClient() {
       // 回滚：直接重验证
       mutateAll();
       if (swrPageKey) globalMutate(swrPageKey);
-      globalMutate(HISTORY_KEY);
+      globalMutate(isHistoryKey);
       toast.error(err instanceof Error ? err.message : '更新失败，请重试');
     }
   }, [mutateAll, swrPageKey]);
@@ -393,7 +393,7 @@ export default function AnimePageClient() {
       // 全局重验证：全量列表 + 当前分页 + Dashboard
       globalMutate(ANIME_LIST_KEY);
       if (swrPageKey) globalMutate(swrPageKey);
-      globalMutate(HISTORY_KEY);
+      globalMutate(isHistoryKey);
     } catch (err) {
       console.error('Delete failed:', err);
       toast.error(err instanceof Error ? err.message : '删除失败，请重试');
@@ -424,7 +424,7 @@ export default function AnimePageClient() {
       // 刷新全量列表 + 当前分页
       mutateAll();
       if (swrPageKey) globalMutate(swrPageKey);
-      globalMutate(HISTORY_KEY);
+      globalMutate(isHistoryKey);
     } catch (error) {
       console.error('Quick record failed:', error);
       const message = error instanceof Error ? error.message : 'AI录入失败，请稍后重试';

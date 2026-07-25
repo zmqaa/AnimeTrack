@@ -5,6 +5,7 @@ import { ParsedWatchHistory } from '@/lib/dashboard-types';
 import ChartTooltip from '@/components/shared/ChartTooltip';
 import Panel from '@/components/shared/Panel';
 import { getBoundedTooltipPosition } from '@/components/shared/chart-utils';
+import { dateKeyToAppDate, formatAppDateKey, shiftDateKey } from '@/lib/date-utils';
 
 interface TimelineHeatmapProps {
   history: ParsedWatchHistory[];
@@ -44,18 +45,18 @@ export default memo(function TimelineHeatmap({ history, months = 12 }: TimelineH
       countMap[h.dateStr] = (countMap[h.dateStr] || 0) + 1;
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const todayStr = formatAppDateKey(new Date());
+    const [todayYear, todayMonth] = todayStr.split('-').map(Number);
 
-    // Start from N months ago, align to Monday
-    const startDate = new Date(today);
-    startDate.setMonth(startDate.getMonth() - months);
-    startDate.setDate(1);
-    const startDay = startDate.getDay();
+    // 从 N 个月前的 1 日开始，并按周一对齐。日历计算固定使用日期键，
+    // 避免浏览器所在时区改变热力图的日期归属。
+    const monthStart = new Date(Date.UTC(todayYear, todayMonth - 1 - months, 1));
+    const monthStartKey = `${monthStart.getUTCFullYear()}-${String(monthStart.getUTCMonth() + 1).padStart(2, '0')}-01`;
+    const startDay = monthStart.getUTCDay();
     const mondayOffset = startDay === 0 ? -6 : 1 - startDay;
-    startDate.setDate(startDate.getDate() + mondayOffset);
+    const startDateKey = shiftDateKey(monthStartKey, mondayOffset);
 
-    const weeks = Math.ceil((today.getTime() - startDate.getTime()) / (7 * 86400000)) + 1;
+    const weeks = Math.ceil((dateKeyToAppDate(todayStr).getTime() - dateKeyToAppDate(startDateKey).getTime()) / (7 * 86400000)) + 1;
     const cellsArr: { date: Date; dateStr: string; count: number; level: number; weekIdx: number; dayIdx: number; isToday: boolean }[] = [];
     const monthMarkersArr: { label: string; weekIdx: number }[] = [];
     let lastMonth = -1;
@@ -63,16 +64,13 @@ export default memo(function TimelineHeatmap({ history, months = 12 }: TimelineH
     let active = 0;
     let total = 0;
     let maxCount = 0;
-    const todayStr = today.toISOString().split('T')[0];
-
     for (let w = 0; w < weeks; w++) {
       for (let d = 0; d < 7; d++) {
-        const date = new Date(startDate);
-        date.setDate(startDate.getDate() + w * 7 + d);
-        const dateStr = date.toISOString().split('T')[0];
+        const dateStr = shiftDateKey(startDateKey, w * 7 + d);
+        const date = dateKeyToAppDate(dateStr);
         const count = countMap[dateStr] || 0;
 
-        if (date > today) {
+        if (dateStr > todayStr) {
           cellsArr.push({ date, dateStr, count: -1, level: -1, weekIdx: w, dayIdx: d, isToday: false });
           continue;
         }
@@ -81,7 +79,7 @@ export default memo(function TimelineHeatmap({ history, months = 12 }: TimelineH
         if (count > 0) active++;
         if (count > maxCount) maxCount = count;
 
-        const month = date.getMonth();
+        const month = Number(dateStr.slice(5, 7)) - 1;
         if (month !== lastMonth) {
           monthMarkersArr.push({ label: MONTH_LABELS[month], weekIdx: w });
           lastMonth = month;

@@ -6,6 +6,7 @@ import SegmentedControl from '@/components/shared/SegmentedControl';
 import StatTile from '@/components/shared/StatTile';
 import ActivityLineChart from '@/components/shared/ActivityLineChart';
 import Panel from '@/components/shared/Panel';
+import { APP_TIME_ZONE, dateKeyToAppDate, formatAppDateKey, getAppDateTimeParts, shiftDateKey } from '@/lib/date-utils';
 
 interface TimelineChartProps {
   history: ParsedWatchHistory[];
@@ -16,6 +17,8 @@ export default memo(function TimelineChart({ history }: TimelineChartProps) {
 
   const { chartData, peakDay, activeDays, coveragePercent } = useMemo(() => {
     const now = new Date();
+    const todayKey = formatAppDateKey(now);
+    const nowParts = getAppDateTimeParts(now);
     const data: { label: string; value: number }[] = [];
     let total = 0;
 
@@ -23,18 +26,17 @@ export default memo(function TimelineChart({ history }: TimelineChartProps) {
       const historyMap: Record<string, number> = {};
       history.forEach(h => { historyMap[h.dateStr] = (historyMap[h.dateStr] || 0) + 1; });
       for (let i = 6; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(now.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = shiftDateKey(todayKey, -i);
+        const d = dateKeyToAppDate(dateStr);
         const count = historyMap[dateStr] || 0;
         total += count;
-        data.push({ label: d.toLocaleDateString('zh-CN', { weekday: 'short' }), value: count });
+        data.push({ label: d.toLocaleDateString('zh-CN', { weekday: 'short', timeZone: APP_TIME_ZONE }), value: count });
       }
     } else if (scale === 'month') {
       const historyMap: Record<string, number> = {};
       history.forEach(h => { historyMap[h.dateStr] = (historyMap[h.dateStr] || 0) + 1; });
-      const year = now.getFullYear();
-      const month = now.getMonth();
+      const year = nowParts.year;
+      const month = nowParts.month - 1;
       const daysInMonth = new Date(year, month + 1, 0).getDate();
       for (let i = 1; i <= daysInMonth; i++) {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
@@ -44,7 +46,7 @@ export default memo(function TimelineChart({ history }: TimelineChartProps) {
       }
     } else {
       const monthlyMap: Record<string, number> = {};
-      const year = now.getFullYear();
+      const year = nowParts.year;
       history.forEach(h => {
         if (h.year === year) {
           const monthKey = `${h.year}-${String(h.month + 1).padStart(2, '0')}`;

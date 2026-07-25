@@ -22,7 +22,7 @@ const TimelineTable = dynamic(() => import('@/components/timeline/TimelineTable'
 const PAGE_SIZE = 10;
 
 export default function AnimeTimelinePage() {
-  const { parsedHistory, isLoading: hLoading } = useHistoryData();
+  const { parsedHistory, isLoading: hLoading } = useHistoryData('all');
   const { animeList, isLoading: aLoading } = useAnimeData(parsedHistory);
 
   const isLoading = aLoading || hLoading;

@@ -85,9 +85,35 @@ npm run desktop:dist
 | `npm run desktop:pack` | 生成 Windows unpacked 目录 |
 | `npm run desktop:dist` | 构建、验证并生成桌面 ZIP |
 | `npm run db:full-backup` | 导出完整 SQL 备份 |
+| `npm run db:scheduled-json-backup` | 生成可回导的 JSON 备份并自动轮转 |
 | `npm run user:create-admin -- <用户名> <密码> [显示名]` | 创建或更新管理员 |
 
 其他数据库、封面和元数据维护命令见 `package.json`。
+
+## 服务器定时 JSON 备份
+
+`db:scheduled-json-backup` 生成与 Web 页面“导出 JSON”相同格式的完整便携备份，默认保存到 `backups/json/`，并保留最近 30 份：
+
+```bash
+npm run db:scheduled-json-backup
+npm run db:scheduled-json-backup -- --keep 60
+```
+
+服务器可以通过 `crontab -e` 每天执行一次。下面示例每天北京时间 03:20 备份；请按实际项目路径和 `npm` 路径调整：
+
+```cron
+CRON_TZ=Asia/Shanghai
+20 3 * * * cd /home/ubuntu/projects/animetrack && /usr/bin/npm run db:scheduled-json-backup >> /home/ubuntu/projects/animetrack/logs/json-backup.log 2>&1
+```
+
+首次配置前先创建日志目录，并手动运行一次命令确认数据库路径和写入权限正确：
+
+```bash
+mkdir -p logs
+npm run db:scheduled-json-backup
+```
+
+可通过 `ANIMETRACK_JSON_BACKUPS_DIR` 修改保存目录，通过 `ANIMETRACK_JSON_BACKUP_KEEP` 修改默认保留份数。JSON 备份包含全部番剧和观看历史，不包含用户账号或本地封面文件。
 
 ## 数据与安全
 

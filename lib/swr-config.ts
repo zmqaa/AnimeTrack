@@ -39,8 +39,15 @@ export function animeDetailKey(id: number | string): string {
   return `/api/anime/${id}`;
 }
 
-/** Dashboard 观看历史 */
-export const HISTORY_KEY = '/api/history?days=370&limit=800';
+/** Dashboard 近期观看历史，避免总览随数据增长而加载全部明细。 */
+export const DASHBOARD_HISTORY_KEY = '/api/history?days=370&limit=800';
+
+/** 时间线使用完整观看历史。 */
+export const TIMELINE_HISTORY_KEY = '/api/history?scope=all';
+
+export function isHistoryKey(key: unknown): boolean {
+  return typeof key === 'string' && key.startsWith('/api/history');
+}
 
 /** 管理页番剧列表 */
 export function adminAnimeKey(params: Record<string, string | number>): string {

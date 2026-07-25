@@ -6,6 +6,7 @@ import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/reac
 import { ParsedWatchHistory, AnimeRecord } from '@/lib/dashboard-types';
 import ProgressBar from '@/components/shared/ProgressBar';
 import EmptyState from '@/components/shared/EmptyState';
+import { APP_TIME_ZONE } from '@/lib/date-utils';
 
 export interface EnrichedEntry {
   history: ParsedWatchHistory;
@@ -21,23 +22,23 @@ interface TimelineEnhancedListProps {
   onPageChange: (page: number) => void;
 }
 
-function getWeekKey(date: Date): string {
-  const d = new Date(date);
-  const dayOfWeek = d.getDay();
+function getWeekKey(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  const dayOfWeek = d.getUTCDay();
   // Monday of this week
   const monday = new Date(d);
-  monday.setDate(d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
+  monday.setUTCDate(d.getUTCDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1));
 
   // ISO week: the week containing Thursday determines the year
   const thursday = new Date(monday);
-  thursday.setDate(monday.getDate() + 3);
-  const year = thursday.getFullYear();
+  thursday.setUTCDate(monday.getUTCDate() + 3);
+  const year = thursday.getUTCFullYear();
 
   // Jan 4 is always in ISO week 1
-  const jan4 = new Date(year, 0, 4);
-  const jan4Day = jan4.getDay();
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const jan4Day = jan4.getUTCDay();
   const week1Monday = new Date(jan4);
-  week1Monday.setDate(4 - jan4Day + (jan4Day === 0 ? -6 : 1));
+  week1Monday.setUTCDate(4 - jan4Day + (jan4Day === 0 ? -6 : 1));
 
   const daysDiff = Math.round((monday.getTime() - week1Monday.getTime()) / 86400000);
   const weekNum = Math.floor(daysDiff / 7) + 1;
@@ -51,9 +52,9 @@ function getWeekLabel(weekKey: string): string {
 }
 
 function getDayLabel(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
+  const d = new Date(dateStr + 'T00:00:00Z');
   const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${weekdays[d.getDay()]}`;
+  return `${d.getUTCFullYear()}年${d.getUTCMonth() + 1}月${d.getUTCDate()}日 ${weekdays[d.getUTCDay()]}`;
 }
 
 function getMonthLabel(dateStr: string): string {
@@ -145,7 +146,7 @@ export default memo(function TimelineEnhancedList({ entries, groupBy, searchQuer
       if (groupBy === 'day') {
         key = entry.history.dateStr;
       } else if (groupBy === 'week') {
-        key = getWeekKey(entry.history.dateObj);
+        key = getWeekKey(entry.history.dateStr);
       } else {
         key = entry.history.dateStr.substring(0, 7);
       }
@@ -207,7 +208,7 @@ export default memo(function TimelineEnhancedList({ entries, groupBy, searchQuer
 
                   {/* Time */}
                   <span className="block text-xs font-mono text-[var(--text-muted)] mb-2">
-                    {h.dateObj.toLocaleDateString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                    {h.dateObj.toLocaleDateString('zh-CN', { hour: '2-digit', minute: '2-digit', timeZone: APP_TIME_ZONE })}
                   </span>
 
                   {/* Card */}

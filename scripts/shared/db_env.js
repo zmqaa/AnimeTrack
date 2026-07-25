@@ -22,7 +22,6 @@ function resolveProjectRoot() {
 }
 
 const projectRoot = resolveProjectRoot();
-const DB_PATH = process.env.DB_PATH || path.join(projectRoot, 'data', 'animetrack.db');
 
 let loaded = false;
 
@@ -46,13 +45,14 @@ function loadDatabaseEnv() {
 function getDb() {
   loadDatabaseEnv();
 
-  const dbDir = path.dirname(DB_PATH);
+  const dbPath = getDbPath();
+  const dbDir = path.dirname(dbPath);
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
   }
 
   const Database = require('better-sqlite3');
-  const db = new Database(DB_PATH);
+  const db = new Database(dbPath);
 
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
@@ -94,7 +94,10 @@ function nowCSTReadable() {
 
 /** Returns the path to the SQLite database file */
 function getDbPath() {
-  return DB_PATH;
+  loadDatabaseEnv();
+  const configured = String(process.env.DB_PATH || '').trim();
+  if (!configured) return path.join(projectRoot, 'data', 'animetrack.db');
+  return path.isAbsolute(configured) ? path.normalize(configured) : path.resolve(projectRoot, configured);
 }
 
 module.exports = {

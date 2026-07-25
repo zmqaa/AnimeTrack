@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { fetchBlob, fetchJson } from '@/lib/client-api';
 import { buildExportFilename } from '@/lib/export-filename';
-import { HISTORY_KEY } from '@/lib/swr-config';
+import { isHistoryKey } from '@/lib/swr-config';
 import { useRuntimeAccess } from '@/hooks/useRuntimeAccess';
 
 interface BackupFile {
@@ -247,7 +247,7 @@ export default function BackupPageClient() {
       );
       // 全局刷新缓存：番剧列表 + Dashboard 数据同步更新
       await globalMutate((key) => typeof key === 'string' && key.startsWith('/api/anime'));
-      globalMutate(HISTORY_KEY);
+      globalMutate(isHistoryKey);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '导入失败');
     } finally {

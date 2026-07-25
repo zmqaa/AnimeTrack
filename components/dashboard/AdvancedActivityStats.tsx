@@ -6,6 +6,7 @@ import SegmentedControl from '@/components/shared/SegmentedControl';
 import StatTile from '@/components/shared/StatTile';
 import ActivityLineChart from '@/components/shared/ActivityLineChart';
 import SectionTitle from '@/components/shared/SectionTitle';
+import { APP_TIME_ZONE, dateKeyToAppDate, formatAppDateKey, getAppDateTimeParts, shiftDateKey } from '@/lib/date-utils';
 
 export default memo(function AdvancedActivityStats({ history, animeList }: { history: ParsedWatchHistory[]; animeList: AnimeRecord[] }) {
   const [scale, setScale] = useState<'week' | 'month' | 'year'>('week');
@@ -17,24 +18,25 @@ export default memo(function AdvancedActivityStats({ history, animeList }: { his
     const historyMap: Record<string, number> = {};
     history.forEach((h) => { historyMap[h.dateStr] = (historyMap[h.dateStr] || 0) + 1; });
 
-    let scaleStart = new Date(now);
+    const todayKey = formatAppDateKey(now);
+    const nowParts = getAppDateTimeParts(now);
+    let scaleStart = dateKeyToAppDate(todayKey);
 
     if (scale === 'week') {
-      scaleStart.setHours(0, 0, 0, 0);
-      scaleStart.setDate(scaleStart.getDate() - 6);
+      const firstDayKey = shiftDateKey(todayKey, -6);
+      scaleStart = dateKeyToAppDate(firstDayKey);
       for (let i = 6; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(now.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = shiftDateKey(todayKey, -i);
+        const d = dateKeyToAppDate(dateStr);
         const count = historyMap[dateStr] || 0;
         totalEpisodes += count;
-        data.push({ label: d.toLocaleDateString('zh-CN', { weekday: 'short' }), value: count });
+        data.push({ label: d.toLocaleDateString('zh-CN', { weekday: 'short', timeZone: APP_TIME_ZONE }), value: count });
       }
     } else if (scale === 'month') {
-      const year = now.getFullYear();
-      const month = now.getMonth();
+      const year = nowParts.year;
+      const month = nowParts.month - 1;
       const daysInMonth = new Date(year, month + 1, 0).getDate();
-      scaleStart = new Date(year, month, 1);
+      scaleStart = dateKeyToAppDate(`${year}-${String(month + 1).padStart(2, '0')}-01`);
       for (let i = 1; i <= daysInMonth; i++) {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
         const count = historyMap[dateStr] || 0;
@@ -42,9 +44,9 @@ export default memo(function AdvancedActivityStats({ history, animeList }: { his
         data.push({ label: `${i}`, value: count });
       }
     } else {
-      const year = now.getFullYear();
+      const year = nowParts.year;
       const monthlyMap: Record<string, number> = {};
-      scaleStart = new Date(year, 0, 1);
+      scaleStart = dateKeyToAppDate(`${year}-01-01`);
       history.forEach((h) => {
         if (h.year === year) {
           const monthKey = `${h.year}-${String(h.month + 1).padStart(2, '0')}`;

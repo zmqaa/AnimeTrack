@@ -35,6 +35,13 @@ export async function getWatchHistory(limit = 1000): Promise<WatchHistoryRecord[
   return rows.map(mapRowToHistory);
 }
 
+export async function getAllWatchHistory(): Promise<WatchHistoryRecord[]> {
+  const rows = await query<WatchHistoryRow[]>(
+    'SELECT id, animeId, animeTitle, episode, watchedAt FROM watch_history ORDER BY watchedAt DESC'
+  );
+  return rows.map(mapRowToHistory);
+}
+
 export async function getWatchHistorySince(since: Date, limit = 1000): Promise<WatchHistoryRecord[]> {
   const sinceISO = since instanceof Date ? since.toISOString() : String(since);
   const rows = await query<WatchHistoryRow[]>(

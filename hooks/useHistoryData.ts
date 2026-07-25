@@ -3,11 +3,13 @@
 import { useMemo } from 'react';
 import useSWR from 'swr';
 import { WatchHistoryRecord, ParsedWatchHistory } from '@/lib/dashboard-types';
-import { HISTORY_KEY, swrFetcher } from '@/lib/swr-config';
+import { DASHBOARD_HISTORY_KEY, TIMELINE_HISTORY_KEY, swrFetcher } from '@/lib/swr-config';
+import { getAppDateTimeParts, formatAppDateKey } from '@/lib/date-utils';
 
-export function useHistoryData() {
+export function useHistoryData(scope: 'recent' | 'all' = 'recent') {
+  const key = scope === 'all' ? TIMELINE_HISTORY_KEY : DASHBOARD_HISTORY_KEY;
   const { data: rawData, isLoading, isValidating } = useSWR<Record<string, unknown>>(
-    HISTORY_KEY,
+    key,
     swrFetcher
   );
 
@@ -19,13 +21,14 @@ export function useHistoryData() {
   const parsedHistory = useMemo<ParsedWatchHistory[]>(() => {
     return watchHistory.map(h => {
       const d = new Date(h.watchedAt);
+      const parts = getAppDateTimeParts(d);
       return {
         ...h,
         dateObj: d,
-        dateStr: h.watchedAt.split('T')[0],
-        hour: d.getHours(),
-        month: d.getMonth(),
-        year: d.getFullYear()
+        dateStr: formatAppDateKey(d),
+        hour: parts.hour,
+        month: parts.month - 1,
+        year: parts.year,
       };
     });
   }, [watchHistory]);
