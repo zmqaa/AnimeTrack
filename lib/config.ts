@@ -57,7 +57,7 @@ export const navigationItems: NavigationItem[] = [
   {
     label: 'AI 设置',
     href: '/settings',
-    description: '配置桌面版 AI 服务',
+    description: '配置 AI 辅助服务',
     section: '管理区',
     adminOnly: true,
   },

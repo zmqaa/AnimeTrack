@@ -91,3 +91,49 @@ export async function fetchBlob(input: RequestInfo | URL, init?: RequestInit, fa
 
   return response.blob();
 }
+
+export async function fetchNdjson<T>(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  onEvent: (event: T) => void,
+  fallbackMessage = '请求失败',
+): Promise<void> {
+  const response = await fetch(input, init);
+
+  if (!response.ok) {
+    const payload = await readResponsePayload<ApiErrorPayload>(response);
+    throw new Error(extractErrorMessage(payload, fallbackMessage, response.status));
+  }
+
+  if (!response.body) {
+    throw new Error(`${fallbackMessage}：服务未返回可读取的数据流`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  const consumeLine = (line: string) => {
+    const normalized = line.trim();
+    if (!normalized) return;
+
+    try {
+      onEvent(JSON.parse(normalized) as T);
+    } catch {
+      throw new Error(`${fallbackMessage}：服务返回了无法解析的进度数据`);
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    lines.forEach(consumeLine);
+
+    if (done) break;
+  }
+
+  consumeLine(buffer);
+}

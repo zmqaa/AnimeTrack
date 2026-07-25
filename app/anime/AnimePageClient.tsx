@@ -12,8 +12,9 @@ import AnimeForm from '@/components/anime/AnimeForm';
 import AnimeGrid, { type ViewMode } from '@/components/anime/AnimeGrid';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import PageContainer from '@/components/shared/PageContainer';
-import { fetchJson } from '@/lib/client-api';
+import { fetchJson, fetchNdjson } from '@/lib/client-api';
 import type { AnimeStatus, AnimeSortBy, AnimeListItem, AnimeCardItem } from '@/lib/anime-shared';
+import type { QuickRecordProgressEvent, QuickRecordStreamEvent } from '@/lib/quick-record-progress';
 import { useManageAccess } from '@/hooks/useManageAccess';
 import { ANIME_LIST_KEY, isHistoryKey, animePageKey, swrFetcher } from '@/lib/swr-config';
 import AnimePagination from './AnimePagination';
@@ -61,6 +62,7 @@ export default function AnimePageClient() {
   const [quickInput, setQuickInput] = useState('');
   const [quickLoading, setQuickLoading] = useState(false);
   const [quickMessage, setQuickMessage] = useState('');
+  const [quickProgress, setQuickProgress] = useState<QuickRecordProgressEvent[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; title: string } | null>(null);
 
@@ -410,13 +412,27 @@ export default function AnimePageClient() {
 
     setQuickLoading(true);
     setQuickMessage('');
+    setQuickProgress([]);
 
     try {
-      const data = await fetchJson<QuickRecordResponse>('/api/anime/quick-record', {
+      let data: QuickRecordResponse | undefined;
+      let streamError = '';
+      await fetchNdjson<QuickRecordStreamEvent<QuickRecordResponse>>('/api/anime/quick-record', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, stream: true }),
+      }, (event) => {
+        if (event.type === 'progress') {
+          setQuickProgress((current) => [...current, event]);
+        } else if (event.type === 'result') {
+          data = event.data;
+        } else if (event.type === 'error') {
+          streamError = event.error;
+        }
       }, 'AI录入失败');
+
+      if (streamError) throw new Error(streamError);
+      if (!data) throw new Error('AI录入失败：服务未返回最终结果');
 
       setQuickInput('');
       toast.success('AI 录入成功');
@@ -428,6 +444,16 @@ export default function AnimePageClient() {
     } catch (error) {
       console.error('Quick record failed:', error);
       const message = error instanceof Error ? error.message : 'AI录入失败，请稍后重试';
+      setQuickProgress((current) => [
+        ...current,
+        {
+          type: 'progress',
+          stage: 'complete',
+          status: 'error',
+          message: '录入流程中止',
+          detail: message,
+        },
+      ]);
       setQuickMessage(message);
       toast.error(message);
     } finally {
@@ -523,6 +549,7 @@ export default function AnimePageClient() {
           quickInput={quickInput}
           quickLoading={quickLoading}
           quickMessage={quickMessage}
+          quickProgress={quickProgress}
           onInputChange={setQuickInput}
           onSubmit={handleQuickRecord}
         />

@@ -1,6 +1,8 @@
 import 'server-only';
 
 import { createAiRuntimeConfig, requestAiJson as requestSharedAiJson } from './ai-runtime';
+import { selectAnimeCandidateWithRetry } from './anime-candidate-selection';
+import type { AnimeCandidateSelectionEvent } from './anime-candidate-selection';
 import { containsCjkText, uniqueStrings } from './anime-cast';
 import { parseChineseNumberToken, appendSeasonToTitle, stripSeasonToken } from './chinese-parser';
 import { fetchAiAnimeMetadata } from './metadata/ai-metadata-source';
@@ -61,12 +63,19 @@ export interface ParsedQuickRecordBatch {
   records: ParsedQuickRecordIntent[];
 }
 
+export type QuickRecordParseMethod = 'ai' | 'local-fallback';
+
+export interface ParseQuickRecordBatchOptions {
+  onResolved?: (method: QuickRecordParseMethod) => void;
+}
+
 export interface AnimeCandidateSelectionInput {
   userTitle: string;
   recognizedTitle?: string;
   recognizedOriginalTitle?: string;
   expectedSeason?: number;
   candidates: AnimeMetadataCandidate[];
+  onProgress?: (event: AnimeCandidateSelectionEvent<AnimeMetadataCandidate>) => void;
 }
 
 type AiMessage = {
@@ -392,17 +401,19 @@ export async function selectAnimeMetadataCandidate(
   const candidates = Array.isArray(input.candidates) ? input.candidates.slice(0, 20) : [];
   if (candidates.length === 0) return null;
 
-  const payload = await requestSharedAiJson<Record<string, unknown>>({
-    ...createAiRuntimeConfig(),
-    messages: [
-      {
-        role: 'system',
-        content: '你是动画数据库候选匹配助手。根据语义、别名、人物名、副标题、季度和首播信息，从给定 Bangumi 候选中选择同一具体动画条目。只输出 JSON，绝不创造候选 ID。',
-      },
-      {
-        role: 'user',
-        content: `
+  return selectAnimeCandidateWithRetry(candidates, input, async (attempt) => {
+    const payload = await requestSharedAiJson<Record<string, unknown>>({
+      ...createAiRuntimeConfig(),
+      messages: [
+        {
+          role: 'system',
+          content: '你是动画数据库候选匹配助手。根据语义、别名、人物名、副标题、季度和首播信息，从给定 Bangumi 候选中选择同一具体动画条目。只输出 JSON，绝不创造候选 ID。',
+        },
+        {
+          role: 'user',
+          content: `
 请判断下面的用户作品意图对应哪一个 Bangumi 候选。
+${attempt === 2 ? '\n这是第二次也是最后一次判断。上次没有返回有效候选，请重新核对标题、原名和季度；仍不确定则返回 null。\n' : ''}
 
 用户输入标题：${input.userTitle}
 前置 AI 识别标题：${input.recognizedTitle || '未提供'}
@@ -433,15 +444,15 @@ ${JSON.stringify(candidates.map((candidate) => ({
 4. 用户明确指定季度、续作、剧场版、OVA 或副标题时，必须选择对应条目；候选标题未直接写“第几季”时，应结合原名、副标题和首播日期判断。
 5. 若前置识别与用户输入冲突，以用户真正表达的作品意图为准。
 6. 不确定时返回 selectedId: null，不要猜。`,
-      },
-    ],
-    temperature: 0,
-    timeoutMs: 20_000,
-    cache: 'no-store',
-  });
+        },
+      ],
+      temperature: 0,
+      timeoutMs: 20_000,
+      cache: 'no-store',
+    });
 
-  const selectedId = toOptionalNumber(payload?.selectedId);
-  return selectedId ? candidates.find((candidate) => candidate.id === selectedId) || null : null;
+    return toOptionalNumber(payload?.selectedId);
+  }, input.onProgress);
 }
 
 export async function buildVoiceActorAliases(cast: string[], existingAliases: string[] = []): Promise<string[]> {
@@ -484,7 +495,10 @@ export async function buildVoiceActorAliases(cast: string[], existingAliases: st
   return uniqueStrings([...baseAliases, ...aiAliases]);
 }
 
-export async function parseQuickRecordBatch(inputText: string): Promise<ParsedQuickRecordBatch> {
+export async function parseQuickRecordBatch(
+  inputText: string,
+  options: ParseQuickRecordBatchOptions = {},
+): Promise<ParsedQuickRecordBatch> {
   const normalizedText = inputText.trim();
   if (!normalizedText) {
     return { records: [] };
@@ -587,14 +601,17 @@ status 字段是最重要的判断。请从用户的自然语言中推断观看�
   });
 
   if (!payload) {
+    options.onResolved?.('local-fallback');
     return applyGlobalQuickRecordHints(normalizedText, parseQuickRecordBatchFallback(normalizedText));
   }
 
   const normalized = applyGlobalQuickRecordHints(normalizedText, normalizeQuickRecordBatchPayload(payload));
   if (normalized.records.length > 0) {
+    options.onResolved?.('ai');
     return normalized;
   }
 
+  options.onResolved?.('local-fallback');
   return applyGlobalQuickRecordHints(normalizedText, parseQuickRecordBatchFallback(normalizedText));
 }
 

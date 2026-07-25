@@ -10,6 +10,7 @@ import { DEFAULT_METADATA_FIELDS, applyMetadataPatch, buildMetadataCandidate } f
 import {
   toOptionalString, toOptionalNumber, toOptionalBoolean, toOptionalDateString, toStringArray,
 } from './ai-validation';
+import type { QuickRecordProgressReporter } from './quick-record-progress';
 
 type MetadataSourceInput = Partial<CreateAnimeDTO> & {
   description?: string;
@@ -24,6 +25,7 @@ export interface AnimeEnrichmentOptions {
   skipVoiceActorAliases?: boolean;
   providerQueryLimit?: number;
   expectedSeason?: number;
+  reportProgress?: QuickRecordProgressReporter;
 }
 
 function normalizeTitle(value: string | undefined | null): string | undefined {
@@ -57,6 +59,7 @@ export async function enrichAnimeInput(input: CreateAnimeDTO, options: AnimeEnri
   const expectedSeason = options.expectedSeason
     ?? extractSeasonNumber(input.title)
     ?? extractSeasonNumber(originalUserTitle);
+  const report = options.reportProgress;
 
   let data: CreateAnimeDTO = {
     ...input,
@@ -77,6 +80,13 @@ export async function enrichAnimeInput(input: CreateAnimeDTO, options: AnimeEnri
     .map((item) => normalizeTitle(item))
     .filter((item): item is string => Boolean(item))
     .slice(0, providerQueryLimit);
+  report?.({
+    type: 'progress',
+    stage: 'bangumi-search',
+    status: 'running',
+    message: '正在用识别标题搜索 Bangumi',
+    items: initialProviderQueries,
+  });
 
   let bangumiCandidates: AnimeMetadataCandidate[] = [];
   try {
@@ -86,6 +96,23 @@ export async function enrichAnimeInput(input: CreateAnimeDTO, options: AnimeEnri
   } catch (error) {
     console.error('Bangumi candidate search failed:', error);
   }
+  report?.({
+    type: 'progress',
+    stage: 'bangumi-candidates',
+    status: bangumiCandidates.length > 0 ? 'success' : 'warning',
+    message: bangumiCandidates.length > 0
+      ? `Bangumi 返回 ${bangumiCandidates.length} 个候选`
+      : 'Bangumi 没有返回候选',
+    items: bangumiCandidates.map((candidate) => [
+      `#${candidate.id}`,
+      candidate.title,
+      candidate.originalTitle && candidate.originalTitle !== candidate.title
+        ? `/ ${candidate.originalTitle}`
+        : '',
+      candidate.season ? `· 第 ${candidate.season} 季` : '',
+      candidate.premiereDate ? `· ${candidate.premiereDate}` : '',
+    ].filter(Boolean).join(' ')),
+  });
 
   // ── 第二步：AI 从 Bangumi 候选 ID 中做最终语义选择 ──
   try {
@@ -95,16 +122,85 @@ export async function enrichAnimeInput(input: CreateAnimeDTO, options: AnimeEnri
       recognizedOriginalTitle: input.originalTitle,
       expectedSeason,
       candidates: bangumiCandidates,
+      onProgress: (event) => {
+        if (event.type === 'attempt') {
+          report?.({
+            type: 'progress',
+            stage: 'candidate-selection',
+            status: 'running',
+            message: event.attempt === 1 ? 'AI 正在选择候选' : 'AI 未选中，正在进行最后一次重试',
+          });
+          return;
+        }
+
+        if (event.type === 'invalid-ai-selection') {
+          report?.({
+            type: 'progress',
+            stage: 'candidate-selection',
+            status: 'warning',
+            message: event.selectedId
+              ? `AI 返回了候选列表之外的 ID：${event.selectedId}`
+              : `AI 第 ${event.attempt} 次没有选择候选`,
+          });
+          return;
+        }
+
+        if (event.type === 'selected') {
+          report?.({
+            type: 'progress',
+            stage: 'candidate-selected',
+            status: 'success',
+            message: event.method === 'ai'
+              ? `AI ${event.attempt === 1 ? '首次' : '重试'}选择了 #${event.candidate.id}`
+              : `AI 两次未选中，本地严格匹配选择了 #${event.candidate.id}`,
+            detail: `${event.candidate.title}${event.candidate.originalTitle ? ` / ${event.candidate.originalTitle}` : ''}`,
+          });
+          return;
+        }
+
+        report?.({
+          type: 'progress',
+          stage: 'candidate-selected',
+          status: 'warning',
+          message: 'AI 与本地严格匹配都没有选择候选',
+        });
+      },
     });
     if (selected) {
+      report?.({
+        type: 'progress',
+        stage: 'metadata',
+        status: 'running',
+        message: `正在读取 Bangumi #${selected.id} 的详情和角色资料`,
+      });
       const metadata = await fetchAnimeMetadataBySubjectId(selected.id);
       if (metadata) {
         providerCandidate = sanitizeExternalCandidate(metadata);
+        report?.({
+          type: 'progress',
+          stage: 'metadata',
+          status: 'success',
+          message: 'Bangumi 详情读取完成',
+          detail: metadata.title || selected.title,
+          items: [
+            metadata.originalTitle ? `原名：${metadata.originalTitle}` : '',
+            metadata.premiereDate ? `首播：${metadata.premiereDate}` : '',
+            metadata.totalEpisodes ? `集数：${metadata.totalEpisodes}` : '',
+            metadata.tags?.length ? `标签：${metadata.tags.join('、')}` : '',
+          ].filter(Boolean),
+        });
         console.info('[anime-enrichment] AI selected Bangumi candidate', {
           inputTitle: input.title,
           selectedId: selected.id,
           selectedTitle: selected.title,
           selectedOriginalTitle: selected.originalTitle,
+        });
+      } else {
+        report?.({
+          type: 'progress',
+          stage: 'metadata',
+          status: 'warning',
+          message: `Bangumi #${selected.id} 详情读取失败`,
         });
       }
     } else if (bangumiCandidates.length > 0) {
@@ -141,6 +237,13 @@ export async function enrichAnimeInput(input: CreateAnimeDTO, options: AnimeEnri
     allowCastAliasAugment: true,
     allowIsFinishedUpgrade: true,
   }).data as CreateAnimeDTO;
+  report?.({
+    type: 'progress',
+    stage: 'metadata',
+    status: 'success',
+    message: providerCandidate ? '元数据已合并到待录入记录' : '没有合并 Bangumi 元数据，保留 AI 识别标题',
+    detail: data.title,
+  });
 
   if (!options.skipVoiceActorAliases && Array.isArray(data.cast) && data.cast.length > 0) {
     try {
