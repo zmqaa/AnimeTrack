@@ -20,7 +20,7 @@ AnimeTrack 是一个个人动漫记录 Web 应用。它用来管理想看、在�
 需要 Node.js 20+。
 
 ```bash
-git clone https://github.com/zmqqqa/AnimeTrack.git
+git clone https://github.com/zmqaa/AnimeTrack.git
 cd AnimeTrack
 npm install
 cp .env.example .env.local

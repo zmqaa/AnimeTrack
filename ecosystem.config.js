@@ -1,7 +1,7 @@
 module.exports = {
   apps: [{
     name: 'anime-track',
-    cwd: '/home/ubuntu/projects/animetrack',
+    cwd: __dirname,
     script: 'scripts/deploy/prod_start_guard.js',
     exec_mode: 'fork',
     env: {

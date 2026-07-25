@@ -20,6 +20,7 @@
 
 # IDE / Editor
 .vscode/
+/.claude/settings.local.json
 
 # Local Codex project instructions
 /AGENTS.md
