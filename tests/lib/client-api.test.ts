@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { fetchNdjson } from '../../lib/client-api';
+import { ApiRequestError, fetchJson, fetchNdjson } from '../../lib/client-api';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -43,5 +43,22 @@ describe('fetchNdjson', () => {
       () => undefined,
       'AI录入失败',
     )).rejects.toThrow('只有管理员可以使用 AI 录入');
+  });
+});
+
+describe('fetchJson', () => {
+  it('preserves the HTTP status on API errors', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(
+      { error: 'Not found' },
+      { status: 404 },
+    )));
+
+    const request = fetchJson('/api/anime/999');
+
+    await expect(request).rejects.toMatchObject({
+      name: 'ApiRequestError',
+      message: 'Not found',
+      status: 404,
+    } satisfies Partial<ApiRequestError>);
   });
 });

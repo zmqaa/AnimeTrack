@@ -3,6 +3,16 @@ type ApiErrorPayload = {
   message?: string;
 };
 
+export class ApiRequestError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+  }
+}
+
 function looksLikeHtmlDocument(value: string): boolean {
   return /<!doctype\s+html|<html[\s>]|<head[\s>]|<body[\s>]|<title[\s>]/i.test(value);
 }
@@ -75,7 +85,10 @@ export async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit,
   const payload = await readResponsePayload<T & ApiErrorPayload>(response);
 
   if (!response.ok) {
-    throw new Error(extractErrorMessage(payload, fallbackMessage, response.status));
+    throw new ApiRequestError(
+      extractErrorMessage(payload, fallbackMessage, response.status),
+      response.status,
+    );
   }
 
   return payload as T;
@@ -86,7 +99,10 @@ export async function fetchBlob(input: RequestInfo | URL, init?: RequestInit, fa
 
   if (!response.ok) {
     const payload = await readResponsePayload<ApiErrorPayload>(response);
-    throw new Error(extractErrorMessage(payload, fallbackMessage, response.status));
+    throw new ApiRequestError(
+      extractErrorMessage(payload, fallbackMessage, response.status),
+      response.status,
+    );
   }
 
   return response.blob();
@@ -102,7 +118,10 @@ export async function fetchNdjson<T>(
 
   if (!response.ok) {
     const payload = await readResponsePayload<ApiErrorPayload>(response);
-    throw new Error(extractErrorMessage(payload, fallbackMessage, response.status));
+    throw new ApiRequestError(
+      extractErrorMessage(payload, fallbackMessage, response.status),
+      response.status,
+    );
   }
 
   if (!response.body) {

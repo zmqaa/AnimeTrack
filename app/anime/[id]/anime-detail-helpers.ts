@@ -1,6 +1,7 @@
 import { normalizeStringArray } from '@/lib/anime-cast';
 import type { AnimeStatus, AnimeDetailItem } from '@/lib/anime-shared';
 import { ANIME_STATUS_LABELS } from '@/lib/anime-shared';
+import { ApiRequestError } from '@/lib/client-api';
 
 export const statusMap = ANIME_STATUS_LABELS;
 
@@ -30,6 +31,45 @@ export type AnimeMutationResponse = {
   entry: AnimeDetailItem;
   appliedFields?: string[];
 };
+
+export type AnimeDetailLoadError = {
+  kind: 'not-found' | 'forbidden' | 'unavailable';
+  title: string;
+  description: string;
+  detail?: string;
+};
+
+export function classifyAnimeDetailLoadError(error: unknown): AnimeDetailLoadError {
+  const status = error instanceof ApiRequestError ? error.status : undefined;
+  const detail = error instanceof Error ? error.message : undefined;
+
+  if (status === 400 || status === 404) {
+    return {
+      kind: 'not-found',
+      title: '没有找到这部作品',
+      description: '它可能已经被删除，或者当前详情地址不正确。',
+    };
+  }
+
+  if (status === 401 || status === 403) {
+    return {
+      kind: 'forbidden',
+      title: '当前账号无法查看',
+      description: '你的登录状态可能已过期，或当前账号没有查看这部作品的权限。',
+    };
+  }
+
+  return {
+    kind: 'unavailable',
+    title: '作品详情暂时加载失败',
+    description: '请检查网络连接后重试；如果问题持续出现，可能是服务暂时不可用。',
+    detail,
+  };
+}
+
+export function shouldRetryAnimeDetailLoad(error: unknown) {
+  return classifyAnimeDetailLoadError(error).kind === 'unavailable';
+}
 
 export const OMIT_FIELD = Symbol('omit-field');
 

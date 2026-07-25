@@ -11,11 +11,12 @@ import type { AnimeStatus, AnimeDetailItem } from '@/lib/anime-shared';
 import { useManageAccess } from '@/hooks/useManageAccess';
 import { ANIME_LIST_KEY, isHistoryKey, animeDetailKey, swrFetcher } from '@/lib/swr-config';
 import {
-  buildChangedPayload, resolveReturnTo,
+  buildChangedPayload, resolveReturnTo, shouldRetryAnimeDetailLoad,
   type AnimeMutationResponse,
 } from './anime-detail-helpers';
 import AnimeDetailSidebar from './AnimeDetailSidebar';
 import AnimeDetailMain from './AnimeDetailMain';
+import AnimeDetailLoadError from './AnimeDetailLoadError';
 import PageContainer from '@/components/shared/PageContainer';
 import { AnimeDetailRouteSkeleton } from '@/components/shared/RouteSkeletons';
 
@@ -31,15 +32,14 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
   const canEdit = isAdmin && isEditing;
 
   // SWR 加载详情数据
-  const { data: item, isLoading, error, mutate } = useSWR<AnimeDetailItem>(
+  const { data: item, isLoading, isValidating, error, mutate } = useSWR<AnimeDetailItem>(
     animeDetailKey(params.id),
     swrFetcher,
+    {
+      shouldRetryOnError: shouldRetryAnimeDetailLoad,
+      errorRetryCount: 2,
+    },
   );
-
-  // 加载失败时跳回列表
-  useEffect(() => {
-    if (error) router.push(returnTo);
-  }, [error, returnTo, router]);
 
   // 表单编辑副本（与 SWR 缓存分离）
   const [formData, setFormData] = useState<Partial<AnimeDetailItem>>({});
@@ -127,6 +127,17 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
 
   if (isLoading) {
     return <AnimeDetailRouteSkeleton />;
+  }
+  if (error && !item) {
+    return (
+      <AnimeDetailLoadError
+        error={error}
+        isRetrying={isValidating}
+        onRetry={() => { void mutate(); }}
+        onBack={() => router.push(returnTo, { scroll: false })}
+        onLogin={() => router.push(`/login?callbackUrl=${encodeURIComponent(`/anime/${params.id}`)}`)}
+      />
+    );
   }
   if (!item) return null;
 
