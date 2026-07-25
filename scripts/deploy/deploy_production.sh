@@ -6,7 +6,10 @@ WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BRANCH="${DEPLOY_BRANCH:-main}"
 REMOTE="${DEPLOY_REMOTE:-origin}"
 APP_NAME="${DEPLOY_APP_NAME:-anime-track}"
-HEALTHCHECK_URL="${DEPLOY_HEALTHCHECK_URL:-http://127.0.0.1:3000/login}"
+HEALTHCHECK_URL="${DEPLOY_HEALTHCHECK_URL:-http://127.0.0.1:3000/api/health}"
+HEALTHCHECK_ATTEMPTS="${DEPLOY_HEALTHCHECK_ATTEMPTS:-10}"
+HEALTHCHECK_DELAY_SECONDS="${DEPLOY_HEALTHCHECK_DELAY_SECONDS:-2}"
+HEALTHCHECK_TIMEOUT_SECONDS="${DEPLOY_HEALTHCHECK_TIMEOUT_SECONDS:-15}"
 
 log() {
   printf '[deploy %s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -15,10 +18,6 @@ log() {
 fail() {
   log "ERROR: $*"
   exit 1
-}
-
-run_healthcheck() {
-  curl -fsS -o /dev/null --max-time 15 "$HEALTHCHECK_URL"
 }
 
 cd "$WORKSPACE_ROOT"
@@ -76,6 +75,12 @@ log "Reloading PM2 app $APP_NAME"
 pm2 restart ecosystem.config.js --only "$APP_NAME" --update-env
 
 log "Running local healthcheck: $HEALTHCHECK_URL"
-run_healthcheck
+if ! bash "$WORKSPACE_ROOT/scripts/deploy/wait_for_healthcheck.sh" \
+  "$HEALTHCHECK_URL" \
+  "$HEALTHCHECK_ATTEMPTS" \
+  "$HEALTHCHECK_DELAY_SECONDS" \
+  "$HEALTHCHECK_TIMEOUT_SECONDS"; then
+  fail "Healthcheck failed after $HEALTHCHECK_ATTEMPTS attempts"
+fi
 
 log "Deployment finished successfully at commit $(git rev-parse --short HEAD)"
