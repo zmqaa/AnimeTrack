@@ -25,7 +25,9 @@ import {
   buildRecentWatchItems,
   buildTagPreferences,
   buildVoiceActorSuggestions,
+  buildAnimeListUrlParams,
   filterAndSortAnimeItems,
+  parseAnimeListUrlState,
   QuickRecordResponse,
 } from './anime-page-helpers';
 
@@ -36,6 +38,10 @@ export default function AnimePageClient() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const urlState = useMemo(
+    () => parseAnimeListUrlState(new URLSearchParams(searchParams.toString())),
+    [searchParams],
+  );
 
   // ── SWR: 全量番剧列表（侧边栏统计 + 客户端筛选降级）───────────────────
   const { data: allItems = [], isLoading: listLoading, mutate: mutateAll } = useSWR<AnimeListItem[]>(
@@ -44,17 +50,15 @@ export default function AnimePageClient() {
   );
 
   // ── 筛选/排序/分页状态 ───────────────────────────────────────────────
-  const [filterStatus, setFilterStatus] = useState<AnimeStatus | 'all'>('all');
-  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
-  const [castQuery, setCastQuery] = useState('');
-  const [tagFilter, setTagFilter] = useState('');
-  const [sortBy, setSortBy] = useState<AnimeSortBy>('lastWatchedAt');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [filterStatus, setFilterStatus] = useState<AnimeStatus | 'all'>(() => urlState.status);
+  const [searchQuery, setSearchQuery] = useState(() => urlState.search);
+  const [castQuery, setCastQuery] = useState(() => urlState.cast);
+  const [tagFilter, setTagFilter] = useState(() => urlState.tag);
+  const [sortBy, setSortBy] = useState<AnimeSortBy>(() => urlState.sortBy);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => urlState.sortOrder);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressMutationIdsRef = useRef(new Set<number>());
-  const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('search') || '');
-  const hasSyncedUrlFilters = useRef(false);
-  const lastFilterKeyRef = useRef('');
+  const [debouncedSearch, setDebouncedSearch] = useState(() => urlState.search);
   const hasRestoredScrollRef = useRef(false);
 
   // ── 表单状态 ─────────────────────────────────────────────────────────
@@ -94,50 +98,66 @@ export default function AnimePageClient() {
     }
   }, []);
 
-  // ── URL 页码管理 ─────────────────────────────────────────────────────
-  const currentPage = useMemo(() => {
-    const urlPage = Number(searchParams.get('page'));
-    return Number.isFinite(urlPage) && urlPage > 0 ? urlPage : 1;
-  }, [searchParams]);
+  // ── URL 状态管理 ─────────────────────────────────────────────────────
+  const currentPage = urlState.page;
 
-  const setCurrentPage = useCallback((page: number) => {
-    const nextPage = Math.max(1, page);
-    const params = new URLSearchParams(searchParams.toString());
-    if (nextPage === 1) {
-      params.delete('page');
-    } else {
-      params.set('page', String(nextPage));
-    }
+  const updateListUrl = useCallback((
+    patch: Parameters<typeof buildAnimeListUrlParams>[1],
+    mode: 'push' | 'replace' = 'push',
+  ) => {
+    const params = buildAnimeListUrlParams(
+      new URLSearchParams(searchParams.toString()),
+      patch,
+    );
     const query = params.toString();
-    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
-    sessionStorage.setItem('anime_last_page', String(nextPage));
+    const target = query ? `${pathname}?${query}` : pathname;
+    const current = searchParams.toString();
+    const currentTarget = current ? `${pathname}?${current}` : pathname;
+    if (target === currentTarget) return;
+    router[mode](target, { scroll: false });
   }, [pathname, router, searchParams]);
 
-  // 缺少页码时，用上次停留的页码填充 URL
-  useEffect(() => {
-    if (!searchParams.get('page')) {
-      const cached = sessionStorage.getItem('anime_last_page');
-      if (cached) {
-        const cachedPage = Number(cached);
-        if (Number.isFinite(cachedPage) && cachedPage > 0) {
-          setCurrentPage(cachedPage);
-        }
-      }
-    }
-  }, [searchParams, setCurrentPage]);
+  const setCurrentPage = useCallback((page: number) => {
+    updateListUrl({ page: Math.max(1, page) });
+  }, [updateListUrl]);
+
+  const changeStatus = useCallback((status: AnimeStatus | 'all') => {
+    setFilterStatus(status);
+    updateListUrl({ status, page: 1 });
+  }, [updateListUrl]);
+
+  const changeCast = useCallback((cast: string) => {
+    setCastQuery(cast);
+    updateListUrl({ cast, page: 1 }, 'replace');
+  }, [updateListUrl]);
+
+  const changeSortBy = useCallback((nextSortBy: AnimeSortBy) => {
+    setSortBy(nextSortBy);
+    updateListUrl({ sortBy: nextSortBy, page: 1 });
+  }, [updateListUrl]);
+
+  const changeSortOrder = useCallback((nextSortOrder: 'asc' | 'desc') => {
+    setSortOrder(nextSortOrder);
+    updateListUrl({ sortOrder: nextSortOrder, page: 1 });
+  }, [updateListUrl]);
 
   const pageSize = 12;
   const returnTo = useMemo(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    const trimmedSearch = searchQuery.trim();
-    if (trimmedSearch) {
-      params.set('search', trimmedSearch);
-    } else {
-      params.delete('search');
-    }
+    const params = buildAnimeListUrlParams(
+      new URLSearchParams(searchParams.toString()),
+      {
+        status: filterStatus,
+        search: searchQuery,
+        cast: castQuery,
+        tag: tagFilter,
+        sortBy,
+        sortOrder,
+        page: currentPage,
+      },
+    );
     const query = params.toString();
     return query ? `${pathname}?${query}` : pathname;
-  }, [pathname, searchParams, searchQuery]);
+  }, [castQuery, currentPage, filterStatus, pathname, searchParams, searchQuery, sortBy, sortOrder, tagFilter]);
 
   // ── 搜索防抖 ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -153,17 +173,27 @@ export default function AnimePageClient() {
   // 将搜索词写入 URL，进入详情页后可通过 returnTo 完整恢复列表状态。
   useEffect(() => {
     const trimmedSearch = debouncedSearch.trim();
-    if ((searchParams.get('search') || '') === trimmedSearch) return;
+    if (urlState.search === trimmedSearch) return;
+    updateListUrl({ search: trimmedSearch, page: 1 }, 'replace');
+  }, [debouncedSearch, updateListUrl, urlState.search]);
 
-    const params = new URLSearchParams(searchParams.toString());
-    if (trimmedSearch) {
-      params.set('search', trimmedSearch);
-    } else {
-      params.delete('search');
-    }
-    const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }, [debouncedSearch, pathname, router, searchParams]);
+  // 浏览器前进/后退或外部链接改变 URL 时，恢复完整列表控制状态。
+  useEffect(() => {
+    setFilterStatus(urlState.status);
+    setSearchQuery(urlState.search);
+    setDebouncedSearch(urlState.search);
+    setCastQuery(urlState.cast);
+    setTagFilter(urlState.tag);
+    setSortBy(urlState.sortBy);
+    setSortOrder(urlState.sortOrder);
+  }, [
+    urlState.cast,
+    urlState.search,
+    urlState.sortBy,
+    urlState.sortOrder,
+    urlState.status,
+    urlState.tag,
+  ]);
 
   // ── SWR: 分页列表（cast/tag 筛选时暂停服务端分页，改用客户端过滤）────
   const swrPageKey = useMemo(() => {
@@ -189,39 +219,6 @@ export default function AnimePageClient() {
   const paginatedRecords = useMemo(() => pageResult?.records ?? [], [pageResult?.records]);
   const totalCount = pageResult?.total ?? 0;
   const totalPages = pageResult?.totalPages ?? 1;
-
-  // ── URL 筛选同步（仅首次） ───────────────────────────────────────────
-  useEffect(() => {
-    if (hasSyncedUrlFilters.current) return;
-
-    const castFromUrl = searchParams.get('cast')?.trim();
-    const tagFromUrl = searchParams.get('tag')?.trim();
-    const statusFromUrl = searchParams.get('status')?.trim();
-
-    if (castFromUrl) setCastQuery(castFromUrl);
-    if (tagFromUrl) setTagFilter(tagFromUrl);
-    if (statusFromUrl && ['watching', 'completed', 'dropped', 'plan_to_watch'].includes(statusFromUrl)) {
-      setFilterStatus(statusFromUrl as AnimeStatus);
-    }
-
-    hasSyncedUrlFilters.current = true;
-  }, [searchParams]);
-
-  // ── 筛选变化 → 回到第 1 页 ───────────────────────────────────────────
-  const filterStateKey = useMemo(
-    () => [filterStatus, searchQuery, castQuery, tagFilter, sortBy, sortOrder].join('||'),
-    [filterStatus, searchQuery, castQuery, tagFilter, sortBy, sortOrder],
-  );
-
-  useEffect(() => {
-    if (!lastFilterKeyRef.current) {
-      lastFilterKeyRef.current = filterStateKey;
-      return;
-    }
-    if (lastFilterKeyRef.current === filterStateKey) return;
-    lastFilterKeyRef.current = filterStateKey;
-    if (currentPage !== 1) setCurrentPage(1);
-  }, [currentPage, filterStateKey, setCurrentPage]);
 
   // ── 滚动位置恢复 ─────────────────────────────────────────────────────
   const loading = listLoading;
@@ -491,9 +488,10 @@ export default function AnimePageClient() {
   }, [allItems]);
 
   const toggleTagFilter = useCallback((tag: string) => {
-    setTagFilter((current) => (current === tag ? '' : tag));
-    if (currentPage !== 1) setCurrentPage(1);
-  }, [currentPage, setCurrentPage]);
+    const nextTag = tagFilter === tag ? '' : tag;
+    setTagFilter(nextTag);
+    updateListUrl({ tag: nextTag, page: 1 });
+  }, [tagFilter, updateListUrl]);
 
   const recentWatchItems = useMemo(() => {
     return buildRecentWatchItems(allItems);
@@ -610,14 +608,14 @@ export default function AnimePageClient() {
 
             <AnimeFilterBar
               filterStatus={filterStatus}
-              setFilterStatus={setFilterStatus}
+              setFilterStatus={changeStatus}
               castQuery={castQuery}
-              setCastQuery={setCastQuery}
+              setCastQuery={changeCast}
               voiceActorSuggestions={voiceActorSuggestions}
               sortBy={sortBy}
-              setSortBy={setSortBy}
+              setSortBy={changeSortBy}
               sortOrder={sortOrder}
-              setSortOrder={setSortOrder}
+              setSortOrder={changeSortOrder}
               itemsCount={displayTotal}
             />
 
@@ -626,7 +624,10 @@ export default function AnimePageClient() {
                 <span className="text-xs text-[var(--color-plan)]">已按标签筛选：#{tagFilter}</span>
                 <button
                   type="button"
-                  onClick={() => setTagFilter('')}
+                  onClick={() => {
+                    setTagFilter('');
+                    updateListUrl({ tag: '', page: 1 });
+                  }}
                   className="text-[11px] text-[var(--color-plan)]/80 hover:text-[var(--text-primary)]"
                 >
                   清除

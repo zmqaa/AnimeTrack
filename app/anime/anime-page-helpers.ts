@@ -1,6 +1,82 @@
 import { containsCjkText, matchesTextQuery, uniqueStrings } from '@/lib/anime-cast';
 import type { AnimeListItem, AnimeSortBy, AnimeStatus } from '@/lib/anime-shared';
 
+const animeStatuses: ReadonlySet<string> = new Set([
+  'watching',
+  'completed',
+  'dropped',
+  'plan_to_watch',
+]);
+
+const animeSortFields: ReadonlySet<string> = new Set([
+  'lastWatchedAt',
+  'updatedAt',
+  'createdAt',
+  'startDate',
+  'endDate',
+  'score',
+  'progress',
+  'title',
+]);
+
+export type AnimeListUrlState = {
+  status: AnimeStatus | 'all';
+  search: string;
+  cast: string;
+  tag: string;
+  sortBy: AnimeSortBy;
+  sortOrder: 'asc' | 'desc';
+  page: number;
+};
+
+export function parseAnimeListUrlState(params: URLSearchParams): AnimeListUrlState {
+  const rawStatus = params.get('status')?.trim() || '';
+  const rawSortBy = params.get('sortBy')?.trim() || '';
+  const rawPage = Number(params.get('page'));
+
+  return {
+    status: animeStatuses.has(rawStatus) ? rawStatus as AnimeStatus : 'all',
+    search: params.get('search')?.trim() || '',
+    cast: params.get('cast')?.trim() || '',
+    tag: params.get('tag')?.trim() || '',
+    sortBy: animeSortFields.has(rawSortBy) ? rawSortBy as AnimeSortBy : 'lastWatchedAt',
+    sortOrder: params.get('sortOrder') === 'asc' ? 'asc' : 'desc',
+    page: Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1,
+  };
+}
+
+export function buildAnimeListUrlParams(
+  current: URLSearchParams,
+  patch: Partial<AnimeListUrlState>,
+) {
+  const params = new URLSearchParams(current.toString());
+  const next = { ...parseAnimeListUrlState(params), ...patch };
+
+  const setOptional = (key: string, value: string, defaultValue = '') => {
+    const normalized = value.trim();
+    if (!normalized || normalized === defaultValue) {
+      params.delete(key);
+    } else {
+      params.set(key, normalized);
+    }
+  };
+
+  setOptional('status', next.status, 'all');
+  setOptional('search', next.search);
+  setOptional('cast', next.cast);
+  setOptional('tag', next.tag);
+  setOptional('sortBy', next.sortBy, 'lastWatchedAt');
+  setOptional('sortOrder', next.sortOrder, 'desc');
+
+  if (next.page > 1) {
+    params.set('page', String(Math.trunc(next.page)));
+  } else {
+    params.delete('page');
+  }
+
+  return params;
+}
+
 export type QuickRecordResponse = {
   ok: boolean;
   count?: number;
