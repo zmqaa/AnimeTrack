@@ -31,7 +31,12 @@ export const createAnimeSchema = z.object({
   isFinished: z.boolean().optional().nullable(),
 });
 
-export const updateAnimeSchema = createAnimeSchema.partial();
+// PATCH 字段必须保持真正可选，不能继承创建模型的默认值；否则只提交
+// progressDelta 时也会被自动补出 progress=0，造成增量请求被误判为混合提交。
+export const updateAnimeSchema = createAnimeSchema.partial().extend({
+  status: animeStatusSchema.optional(),
+  progress: z.number().int().min(0).optional(),
+});
 
 export const patchAnimeBodySchema = updateAnimeSchema.extend({
   progressDelta: z.union([z.literal(-1), z.literal(1)]).optional(),
