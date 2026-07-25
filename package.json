@@ -2,7 +2,6 @@
   "name": "anime-track-web",
   "version": "1.0.0",
   "private": true,
-  "main": "dist-desktop/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "node scripts/deploy/prod_build_guard.js",
@@ -27,16 +26,7 @@
     "anime:enrich-bangumi": "node scripts/enrich/enrich_bangumi.js",
     "anime:enrich-bangumi:write": "node scripts/enrich/enrich_bangumi.js --write",
     "covers:restore-sources": "node scripts/enrich/enrich_bangumi.js --covers-only",
-    "covers:restore-sources:write": "node scripts/enrich/enrich_bangumi.js --covers-only --write",
-    "desktop:prepare": "node scripts/desktop/prepare-staging.js",
-    "desktop:build:web": "npm run build:next",
-    "desktop:build:electron": "tsc -p desktop/tsconfig.json",
-    "desktop:build": "npm run desktop:build:web && npm run desktop:build:electron && npm run desktop:prepare",
-    "desktop:verify": "node scripts/desktop/verify-staging.js",
-    "desktop:start": "npm run desktop:build && node scripts/desktop/run-electron.js",
-    "desktop:pack": "npm run desktop:build && npm run desktop:verify && node scripts/desktop/build-artifact.js dir",
-    "desktop:clean:dist": "node scripts/desktop/cleanup-artifacts.js",
-    "desktop:dist": "npm run desktop:build && npm run desktop:verify && node scripts/desktop/build-artifact.js zip && node scripts/desktop/verify-artifact.js && npm run desktop:clean:dist"
+    "covers:restore-sources:write": "node scripts/enrich/enrich_bangumi.js --covers-only --write"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
@@ -58,49 +48,10 @@
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
     "autoprefixer": "^10.4.17",
-    "electron": "^43.1.1",
-    "electron-builder": "^26.15.3",
     "eslint": "^8.56.0",
     "eslint-config-next": "^14.1.0",
     "postcss": "^8.4.33",
     "tailwindcss": "^3.4.1",
     "vitest": "4.1.10"
-  },
-  "build": {
-    "appId": "com.animetrack.desktop",
-    "productName": "AnimeTrack",
-    "asar": true,
-    "npmRebuild": false,
-    "directories": {
-      "output": "dist-electron"
-    },
-    "files": [
-      "dist-desktop/main.js",
-      "dist-desktop/server.js",
-      "dist-desktop/window.js",
-      "package.json",
-      "!node_modules/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "dist-desktop/standalone",
-        "to": "app/standalone",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
-    "win": {
-      "icon": "desktop/assets/animetrack.ico",
-      "target": [
-        {
-          "target": "zip",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "artifactName": "AnimeTrack-${version}-win-${arch}.${ext}"
-    }
   }
 }

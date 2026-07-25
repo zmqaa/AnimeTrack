@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { fetchJson } from '@/lib/client-api';
 import type { AnimeStatus, AnimeDetailItem } from '@/lib/anime-shared';
-import { useRuntimeAccess } from '@/hooks/useRuntimeAccess';
+import { useManageAccess } from '@/hooks/useManageAccess';
 import { ANIME_LIST_KEY, isHistoryKey, animeDetailKey, swrFetcher } from '@/lib/swr-config';
 import {
   buildChangedPayload, resolveReturnTo,
@@ -19,7 +19,7 @@ import AnimeDetailMain from './AnimeDetailMain';
 import PageContainer from '@/components/shared/PageContainer';
 
 export default function AnimeDetailPage({ params }: { params: { id: string } }) {
-  const { canManage: isAdmin } = useRuntimeAccess();
+  const { canManage: isAdmin } = useManageAccess();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);

@@ -1,22 +1,12 @@
-import { NextRequest } from 'next/server';
-
-import { apiError, apiSuccess, requireManagePermission } from '@/lib/api-response';
+import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
 import { createAiRuntimeConfig, requestAiJson } from '@/lib/ai-runtime';
 
-export async function POST(request: NextRequest) {
-  const auth = await requireManagePermission('需要管理权限');
+export async function POST() {
+  const auth = await requireAdmin('需要管理员权限');
   if (!auth.authorized) return auth.response;
 
   try {
-    const body = await request.json().catch(() => ({})) as Record<string, unknown>;
-    const overrides = {
-      apiUrl: typeof body.apiUrl === 'string' && body.apiUrl.trim() ? body.apiUrl.trim() : undefined,
-      model: typeof body.model === 'string' && body.model.trim() ? body.model.trim() : undefined,
-      apiKey: typeof body.apiKey === 'string' && body.apiKey.trim() ? body.apiKey.trim() : undefined,
-    };
-    const runtime = createAiRuntimeConfig(
-      Object.fromEntries(Object.entries(overrides).filter(([, value]) => value !== undefined)),
-    );
+    const runtime = createAiRuntimeConfig();
 
     if (!runtime.apiKey) {
       return apiError('尚未配置 API Key', 400);

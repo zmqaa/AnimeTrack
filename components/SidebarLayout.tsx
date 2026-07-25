@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import { navigationItems } from '@/lib/config';
 import { useTheme } from '@/components/theme/ThemeProvider';
-import { useRuntimeAccess } from '@/hooks/useRuntimeAccess';
+import { useManageAccess } from '@/hooks/useManageAccess';
 
 interface TopNavProps {
   children: React.ReactNode;
@@ -14,7 +14,7 @@ interface TopNavProps {
 
 export default function TopNav({ children }: TopNavProps) {
   const { status } = useSession();
-  const { canManage, isDesktop } = useRuntimeAccess();
+  const { canManage } = useManageAccess();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const pathname = usePathname();
@@ -22,7 +22,7 @@ export default function TopNav({ children }: TopNavProps) {
   const { theme, setTheme, themes } = useTheme();
   const nextTheme = themes[(themes.findIndex((t) => t.value === theme) + 1) % themes.length];
 
-  const isAuthPage = !isDesktop && (pathname === '/login' || pathname === '/register');
+  const isAuthPage = pathname === '/login' || pathname === '/register';
   const isAuthenticated = status === 'authenticated';
 
   const visibleItems = navigationItems.filter(
@@ -69,7 +69,7 @@ export default function TopNav({ children }: TopNavProps) {
           {/* Left spacer */}
           <div className="flex-1" />
 
-          {/* Desktop nav links — centered */}
+          {/* Primary nav links — centered on wider screens */}
           <nav className="hidden md:flex items-center gap-1.5">
             {visibleItems.map((item) => {
               const active = isActive(item.href);
@@ -103,7 +103,7 @@ export default function TopNav({ children }: TopNavProps) {
               </svg>
             </button>
 
-            {!isDesktop && isAuthenticated && (
+            {isAuthenticated && (
               <button
                 onClick={handleSignOut}
                 disabled={isSigningOut}
@@ -152,7 +152,7 @@ export default function TopNav({ children }: TopNavProps) {
                   </Link>
                 );
               })}
-              {!isDesktop && isAuthenticated && (
+              {isAuthenticated && (
                 <button
                   onClick={handleSignOut}
                   disabled={isSigningOut}

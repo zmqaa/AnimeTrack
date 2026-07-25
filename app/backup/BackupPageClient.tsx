@@ -8,7 +8,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { fetchBlob, fetchJson } from '@/lib/client-api';
 import { buildExportFilename } from '@/lib/export-filename';
 import { isHistoryKey } from '@/lib/swr-config';
-import { useRuntimeAccess } from '@/hooks/useRuntimeAccess';
+import { useManageAccess } from '@/hooks/useManageAccess';
 
 interface BackupFile {
   name: string;
@@ -48,7 +48,7 @@ type PendingImport = {
 };
 
 export default function BackupPageClient() {
-  const { canManage, isLoading: accessLoading } = useRuntimeAccess();
+  const { canManage, isLoading: accessLoading } = useManageAccess();
   const router = useRouter();
   const importInputRef = useRef<HTMLInputElement | null>(null);
 

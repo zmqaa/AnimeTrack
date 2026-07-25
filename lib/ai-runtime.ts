@@ -1,8 +1,5 @@
 import 'server-only';
 
-import { isDesktopRuntime } from '@/lib/runtime-mode';
-import { readRuntimeSettings } from '@/lib/runtime-settings';
-
 export type AiMessage = {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -77,11 +74,10 @@ export function getAiApiKey(): string {
 }
 
 export function createAiRuntimeConfig(overrides: Partial<AiRuntimeConfig> = {}): AiRuntimeConfig {
-  const stored = isDesktopRuntime() ? readRuntimeSettings().ai : undefined;
-  const apiUrl = normalizeAiApiUrl(overrides.apiUrl ?? stored?.apiUrl ?? process.env.AI_API_URL);
-  const modelInput = overrides.model ?? stored?.model ?? process.env.AI_MODEL;
+  const apiUrl = normalizeAiApiUrl(overrides.apiUrl ?? process.env.AI_API_URL);
+  const modelInput = overrides.model ?? process.env.AI_MODEL;
   const model = String(modelInput || '').trim() || DEFAULT_AI_MODEL;
-  const apiKeyInput = overrides.apiKey ?? stored?.apiKey ?? getAiApiKey();
+  const apiKeyInput = overrides.apiKey ?? getAiApiKey();
   const apiKey = String(apiKeyInput || '').trim();
 
   return {

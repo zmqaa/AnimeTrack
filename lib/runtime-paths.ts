@@ -2,8 +2,6 @@ import 'server-only';
 
 import path from 'path';
 
-import { isDesktopRuntime } from '@/lib/runtime-mode';
-
 function resolveConfiguredPath(value: string | undefined, fallback: string): string {
   const configured = String(value || '').trim();
   if (!configured) {
@@ -32,25 +30,14 @@ export function getDatabasePath(): string {
 export function getBackupsDirectory(): string {
   return resolveConfiguredPath(
     process.env.ANIMETRACK_BACKUPS_DIR,
-    isDesktopRuntime()
-      ? path.join(getDataDirectory(), 'backups')
-      : path.join(process.cwd(), 'backups'),
+    path.join(process.cwd(), 'backups'),
   );
 }
 
 export function getCoversDirectory(): string {
   return resolveConfiguredPath(
     process.env.ANIMETRACK_COVERS_DIR,
-    isDesktopRuntime()
-      ? path.join(getDataDirectory(), 'covers')
-      : path.join(process.cwd(), 'public', 'covers'),
-  );
-}
-
-export function getSettingsPath(): string {
-  return resolveConfiguredPath(
-    process.env.ANIMETRACK_SETTINGS_PATH,
-    path.join(getDataDirectory(), 'settings.json'),
+    path.join(process.cwd(), 'public', 'covers'),
   );
 }
 

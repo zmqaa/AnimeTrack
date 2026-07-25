@@ -14,7 +14,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import PageContainer from '@/components/shared/PageContainer';
 import { fetchJson } from '@/lib/client-api';
 import type { AnimeStatus, AnimeSortBy, AnimeListItem, AnimeCardItem } from '@/lib/anime-shared';
-import { useRuntimeAccess } from '@/hooks/useRuntimeAccess';
+import { useManageAccess } from '@/hooks/useManageAccess';
 import { ANIME_LIST_KEY, isHistoryKey, animePageKey, swrFetcher } from '@/lib/swr-config';
 import AnimePagination from './AnimePagination';
 import AnimeQuickRecordPanel from './AnimeQuickRecordPanel';
@@ -31,7 +31,7 @@ import {
 const ANIME_LIST_SCROLL_KEY = 'anime-list-scroll-y';
 
 export default function AnimePageClient() {
-  const { canManage: isAdmin } = useRuntimeAccess();
+  const { canManage: isAdmin } = useManageAccess();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();

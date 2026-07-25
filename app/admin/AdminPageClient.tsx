@@ -8,7 +8,7 @@ import toast from 'react-hot-toast';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import SegmentedControl from '@/components/shared/SegmentedControl';
 import { fetchJson } from '@/lib/client-api';
-import { useRuntimeAccess } from '@/hooks/useRuntimeAccess';
+import { useManageAccess } from '@/hooks/useManageAccess';
 import { adminAnimeKey, adminHistoryKey, ANIME_LIST_KEY, isHistoryKey, swrFetcher } from '@/lib/swr-config';
 import {
   Checkbox,
@@ -640,7 +640,7 @@ function HistoryTab() {
 // ─────────────────────────────────────────────
 
 export default function AdminPageClient() {
-  const { canManage, isLoading: accessLoading } = useRuntimeAccess();
+  const { canManage, isLoading: accessLoading } = useManageAccess();
   const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<TabKey>('anime');
