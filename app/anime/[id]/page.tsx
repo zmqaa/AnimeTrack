@@ -17,6 +17,7 @@ import {
 import AnimeDetailSidebar from './AnimeDetailSidebar';
 import AnimeDetailMain from './AnimeDetailMain';
 import PageContainer from '@/components/shared/PageContainer';
+import { AnimeDetailRouteSkeleton } from '@/components/shared/RouteSkeletons';
 
 export default function AnimeDetailPage({ params }: { params: { id: string } }) {
   const { canManage: isAdmin } = useManageAccess();
@@ -125,11 +126,7 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
     : (displayStatus === 'completed' ? 100 : Math.min(displayProgress * 8, 100));
 
   if (isLoading) {
-    return (
-      <PageContainer width="wide" spacing="compact" animation="none">
-        <div className="text-center text-[var(--text-muted)]">Loading details...</div>
-      </PageContainer>
-    );
+    return <AnimeDetailRouteSkeleton />;
   }
   if (!item) return null;
 
