@@ -3,12 +3,21 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const dotenv = require('dotenv');
 
 const workspaceRoot = path.resolve(__dirname, '../..');
+// PM2 的 --update-env 只会保留进程管理器收到的环境变量，而 Web 版 AI
+// 配置通常保存在 .env.local。启动 Next.js 前显式加载一次，避免重启后
+// AI_API_KEY 等运行时变量丢失；已有的系统/PM2 变量仍拥有更高优先级。
+dotenv.config({
+  path: path.join(workspaceRoot, '.env.local'),
+  override: false,
+  quiet: true,
+});
 const buildDir = path.join(workspaceRoot, '.next');
 const standbyDir = path.join(workspaceRoot, '.next-standby');
+const standaloneEntry = path.join(buildDir, 'standalone', 'server.js');
 const lockFile = path.join(workspaceRoot, '.next-build.lock');
-const nextBin = path.join(workspaceRoot, 'node_modules', '.bin', process.platform === 'win32' ? 'next.cmd' : 'next');
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 const requiredBuildFiles = [
@@ -130,11 +139,25 @@ async function ensureBuildReady() {
 }
 
 function startNext() {
-  log(`Starting Next production server on ${host}:${port}`);
+  if (!fileExists(standaloneEntry)) {
+    throw new Error(`Standalone server entry is missing: ${standaloneEntry}`);
+  }
 
-  const child = spawn(nextBin, ['start', '-H', host, '-p', port], {
+  log(`Starting Next standalone server on ${host}:${port}`);
+
+  const child = spawn(process.execPath, [standaloneEntry], {
     cwd: workspaceRoot,
-    env: process.env,
+    env: {
+      ...process.env,
+      HOSTNAME: host,
+      HOST: host,
+      PORT: port,
+      DB_PATH: process.env.DB_PATH || path.join(workspaceRoot, 'data', 'animetrack.db'),
+      ANIMETRACK_DATA_DIR: process.env.ANIMETRACK_DATA_DIR || path.join(workspaceRoot, 'data'),
+      ANIMETRACK_BACKUPS_DIR: process.env.ANIMETRACK_BACKUPS_DIR || path.join(workspaceRoot, 'backups'),
+      ANIMETRACK_COVERS_DIR: process.env.ANIMETRACK_COVERS_DIR || path.join(workspaceRoot, 'public', 'covers'),
+      ANIMETRACK_RESOURCES_DIR: process.env.ANIMETRACK_RESOURCES_DIR || workspaceRoot,
+    },
     stdio: 'inherit',
   });
 

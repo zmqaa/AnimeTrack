@@ -7,6 +7,7 @@ const { spawn } = require('child_process');
 const workspaceRoot = path.resolve(__dirname, '../..');
 const buildDir = path.join(workspaceRoot, '.next');
 const standbyDir = path.join(workspaceRoot, '.next-standby');
+const standaloneDir = path.join(buildDir, 'standalone');
 const lockFile = path.join(workspaceRoot, '.next-build.lock');
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
@@ -113,6 +114,10 @@ async function main() {
       throw new Error('Build finished but required .next artifacts are incomplete.');
     }
 
+    copyDirectory(
+      path.join(buildDir, 'static'),
+      path.join(standaloneDir, '.next', 'static'),
+    );
     copyDirectory(buildDir, standbyDir);
     log('Build completed and standby snapshot refreshed.');
   } finally {

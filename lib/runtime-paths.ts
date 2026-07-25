@@ -55,6 +55,9 @@ export function getSettingsPath(): string {
 }
 
 export function getProjectResourcePath(...segments: string[]): string {
-  return path.join(process.cwd(), ...segments);
+  const resourcesRoot = resolveConfiguredPath(
+    process.env.ANIMETRACK_RESOURCES_DIR,
+    process.cwd(),
+  );
+  return path.join(resourcesRoot, ...segments);
 }
-

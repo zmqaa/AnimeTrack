@@ -8,7 +8,7 @@ import { getCoversDirectory } from '@/lib/runtime-paths';
 const COVER_FILE_PATTERN = /^\d+\.(?:jpg|jpeg|png|webp|gif)$/i;
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: { file: string } },
 ) {
   const fileName = context.params.file;
@@ -25,6 +25,7 @@ export async function GET(
   try {
     const content = await fs.readFile(filePath);
     const extension = path.extname(fileName).toLowerCase();
+    const version = new URL(request.url).searchParams.get('v')?.trim();
     const contentType = extension === '.png'
       ? 'image/png'
       : extension === '.webp'
@@ -36,8 +37,11 @@ export async function GET(
     return new NextResponse(content, {
       headers: {
         'Content-Type': contentType,
-        // 封面文件名基于番剧 ID，图片更新时 URL 不变，因此不允许客户端复用旧图。
-        'Cache-Control': 'no-store',
+        // 应用生成的展示 URL 会携带文件修改时间作为版本号。版本化地址可长期
+        // 缓存；直接访问无版本地址时仅短暂缓存，避免封面替换后长期看到旧图。
+        'Cache-Control': version
+          ? 'public, max-age=31536000, immutable'
+          : 'public, max-age=60, must-revalidate',
       },
     });
   } catch (error) {
