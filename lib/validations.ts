@@ -68,5 +68,11 @@ export const patchAnimeBodySchema = updateAnimeSchema.extend({
   }
 });
 
+export const animeNoteBodySchema = z.object({
+  episode: z.number().int().min(1).max(9999),
+  content: z.string().trim().min(1, '备注内容不能为空').max(5000),
+  notedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '备注日期格式应为 YYYY-MM-DD'),
+});
+
 export type CreateAnimeInput = z.infer<typeof createAnimeSchema>;
 export type UpdateAnimeInput = z.infer<typeof updateAnimeSchema>;

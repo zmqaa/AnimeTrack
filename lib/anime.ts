@@ -173,7 +173,7 @@ const SORT_COLUMN_MAP: Record<string, string> = {
 
 const LIST_COLUMNS_RAW = [
   'id', 'title', 'original_title', 'coverUrl', 'localCoverUrl', 'status', 'score',
-  'progress', 'totalEpisodes', 'durationMinutes', 'tags',
+  'progress', 'totalEpisodes', 'durationMinutes', 'notes', 'tags',
   'start_date', 'end_date', 'premiere_date', 'isFinished',
   'cast', 'cast_aliases', 'summary',
   'createdAt', 'updatedAt',

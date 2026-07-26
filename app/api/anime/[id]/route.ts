@@ -5,6 +5,7 @@ import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
 import { resolveLocalCoverImage } from '@/lib/cover-image';
 import { patchAnimeBodySchema } from '@/lib/validations';
 import { nowISO } from '@/lib/date-utils';
+import { listAnimeNotes } from '@/lib/anime-notes';
 
 function areAllowedFieldValuesEqual(key: string, nextValue: unknown, currentValue: unknown) {
   if (key === 'tags' || key === 'cast' || key === 'castAliases') {
@@ -32,7 +33,7 @@ export async function GET(
   const record = await getAnimeRecord(id);
   if (!record) return apiError('Not found', 404);
 
-  return apiSuccess(record);
+  return apiSuccess({ ...record, noteEntries: listAnimeNotes(id) });
 }
 
 export async function DELETE(
@@ -77,7 +78,7 @@ export async function PATCH(
       trimHistoryOnProgressDecrease: Boolean(body.trimHistoryOnProgressDecrease),
     });
     if (!updated) return apiError('Not found', 404);
-    return apiSuccess({ ok: true, entry: updated });
+    return apiSuccess({ ok: true, entry: { ...updated, noteEntries: listAnimeNotes(id) } });
   }
 
   const normalizedBody = {
@@ -153,5 +154,5 @@ export async function PATCH(
   });
   if (!updated) return apiError('Not found', 404);
 
-  return apiSuccess({ ok: true, entry: updated });
+  return apiSuccess({ ok: true, entry: { ...updated, noteEntries: listAnimeNotes(id) } });
 }

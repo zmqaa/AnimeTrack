@@ -3,6 +3,7 @@ import { enrichAnimeInput } from '@/lib/anime-enrichment';
 import { DEFAULT_METADATA_FIELDS, buildMetadataPatch } from '@/lib/metadata/merge-policy';
 import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
 import { isPlaceholderCoverPath, resolveLocalCoverImage } from '@/lib/cover-image';
+import { listAnimeNotes } from '@/lib/anime-notes';
 
 export async function POST(
   _request: Request,
@@ -65,7 +66,7 @@ export async function POST(
 
   const appliedFields = Object.keys(patch);
   if (appliedFields.length === 0) {
-    return apiSuccess({ ok: true, appliedFields: [], entry: record });
+    return apiSuccess({ ok: true, appliedFields: [], entry: { ...record, noteEntries: listAnimeNotes(id) } });
   }
 
   const updated = await updateAnimeRecord(id, patch);
@@ -73,5 +74,5 @@ export async function POST(
     return apiError('更新失败', 500);
   }
 
-  return apiSuccess({ ok: true, appliedFields, entry: updated });
+  return apiSuccess({ ok: true, appliedFields, entry: { ...updated, noteEntries: listAnimeNotes(id) } });
 }

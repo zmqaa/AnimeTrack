@@ -64,6 +64,44 @@ function listAnimeRows() {
 }
 
 describe('portable data replacement import', () => {
+  it('imports overall and episode notes from the structured JSON format', async () => {
+    await importModule.importAnimeData({
+      anime: {
+        records: [{
+          id: 9,
+          title: '备注测试',
+          status: 'watching',
+          progress: 3,
+          notes: [
+            {
+              content: '总体感觉不错\n会继续看',
+              notedAt: '2026-07-20',
+            },
+            {
+              episode: 3,
+              content: '这一集很有意思',
+              notedAt: '2026-07-21',
+            },
+          ],
+        }],
+      },
+    });
+
+    const anime = dbModule.getRawDb().prepare(`
+      SELECT id, notes FROM anime WHERE title = '备注测试'
+    `).get() as { id: number; notes: string };
+    expect(anime.notes).toBe('总体感觉不错\n会继续看');
+    expect(dbModule.getRawDb().prepare(`
+      SELECT episode, content, notedAt
+      FROM anime_notes
+      WHERE animeId = ?
+      ORDER BY episode IS NULL DESC, episode ASC
+    `).all(anime.id)).toEqual([
+      { episode: null, content: '总体感觉不错\n会继续看', notedAt: expect.any(String) },
+      { episode: 3, content: '这一集很有意思', notedAt: '2026-07-21' },
+    ]);
+  });
+
   it('replaces anime and maps history through numeric and legacy source IDs', async () => {
     seedExistingAnime();
 

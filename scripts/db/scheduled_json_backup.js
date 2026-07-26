@@ -89,6 +89,33 @@ function main() {
   const db = getDb();
   try {
     const anime = db.prepare('SELECT * FROM anime ORDER BY id ASC').all().map(mapAnimeRow);
+    const notesByAnimeId = new Map();
+    const noteTableExists = db.prepare(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'anime_notes'",
+    ).get();
+    if (noteTableExists) {
+      const notes = db.prepare(`
+        SELECT id, animeId, episode, content, notedAt, createdAt, updatedAt
+        FROM anime_notes
+        ORDER BY animeId ASC, episode IS NULL DESC, notedAt DESC, id DESC
+      `).all();
+      for (const note of notes) {
+        const records = notesByAnimeId.get(note.animeId) || [];
+        records.push({
+          id: note.id,
+          animeId: note.animeId,
+          ...(note.episode !== null ? { episode: Number(note.episode) } : {}),
+          content: note.content,
+          notedAt: note.notedAt,
+          createdAt: note.createdAt,
+          updatedAt: note.updatedAt,
+        });
+        notesByAnimeId.set(note.animeId, records);
+      }
+    }
+    for (const record of anime) {
+      record.noteEntries = notesByAnimeId.get(record.id) || [];
+    }
     const watchHistory = db.prepare(
       'SELECT id, animeId, animeTitle, episode, watchedAt FROM watch_history ORDER BY watchedAt DESC, id DESC',
     ).all();

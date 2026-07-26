@@ -8,6 +8,7 @@ vi.mock('server-only', () => ({}));
 
 let temporaryDirectory: string;
 let animeModule: typeof import('../../lib/anime');
+let animeNotesModule: typeof import('../../lib/anime-notes');
 let dbModule: typeof import('../../lib/db');
 
 beforeAll(async () => {
@@ -17,6 +18,7 @@ beforeAll(async () => {
   process.env.ANIMETRACK_COVERS_DIR = join(temporaryDirectory, 'covers');
 
   animeModule = await import('../../lib/anime');
+  animeNotesModule = await import('../../lib/anime-notes');
   dbModule = await import('../../lib/db');
   dbModule.getRawDb();
 });
@@ -59,6 +61,53 @@ function readHistory(animeId: number) {
 }
 
 describe('anime progress and watch history transaction', () => {
+  it('includes personal notes when listing anime for export', async () => {
+    await animeModule.createAnimeRecord({
+      title: '带备注的番剧',
+      status: 'completed',
+      progress: 12,
+      notes: '这是一条个人备注',
+    });
+
+    const records = await animeModule.listAnimeRecords();
+
+    expect(records).toHaveLength(1);
+    expect(records[0].notes).toBe('这是一条个人备注');
+    expect(animeNotesModule.listAnimeNotes(records[0].id)).toMatchObject([
+      { episode: undefined, content: '这是一条个人备注' },
+    ]);
+  });
+
+  it('creates, updates and deletes an episode note', async () => {
+    const anime = await createWatchingAnime();
+    const created = animeNotesModule.createEpisodeNote(anime.id, {
+      episode: 2,
+      content: '第一次记录',
+      notedAt: '2026-07-20',
+    });
+
+    expect(created).toMatchObject({
+      animeId: anime.id,
+      episode: 2,
+      content: '第一次记录',
+      notedAt: '2026-07-20',
+    });
+
+    const updated = animeNotesModule.updateAnimeNote(anime.id, created!.id, {
+      episode: 3,
+      content: '修改后的记录',
+      notedAt: '2026-07-21',
+    });
+    expect(updated).toMatchObject({
+      episode: 3,
+      content: '修改后的记录',
+      notedAt: '2026-07-21',
+    });
+
+    expect(animeNotesModule.deleteAnimeNote(anime.id, created!.id)).toBe(true);
+    expect(animeNotesModule.listAnimeNotes(anime.id)).toEqual([]);
+  });
+
   it('writes every newly watched episode when progress increases', async () => {
     const anime = await createWatchingAnime();
     const watchedAt = new Date('2026-07-25T12:30:00.000Z');

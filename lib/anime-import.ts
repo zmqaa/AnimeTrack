@@ -37,6 +37,18 @@ export interface ImportResult {
 type NormalizedAnime = {
   sourceId?: number | string;
   payload: CreateAnimeDTO;
+  episodeNotes: Array<{
+    episode: number;
+    content: string;
+    notedAt: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  overallNoteDetails?: {
+    notedAt: string;
+    createdAt: string;
+    updatedAt: string;
+  };
   createdAt: string;
   updatedAt: string;
 };
@@ -100,6 +112,68 @@ function normalizeTimestamp(value: unknown, fallback: string): string {
   return Number.isNaN(date.getTime()) ? fallback : value.trim();
 }
 
+function normalizeNotes(
+  value: unknown,
+  title: string,
+  fallbackTimestamp: string,
+): {
+  overallNote?: string;
+  overallNoteDetails?: NormalizedAnime['overallNoteDetails'];
+  episodeNotes: NormalizedAnime['episodeNotes'];
+} {
+  if (value === null || value === undefined || value === '') {
+    return { episodeNotes: [] };
+  }
+  if (typeof value === 'string') {
+    return {
+      overallNote: optionalString(value, 5000, `${title} 的总备注`),
+      episodeNotes: [],
+    };
+  }
+  if (!Array.isArray(value)) {
+    throw new Error(`${title} 的备注必须是字符串或备注数组`);
+  }
+  if (value.length > 10000) throw new Error(`${title} 的备注最多包含 10000 条`);
+
+  let overallNote: string | undefined;
+  let overallNoteDetails: NormalizedAnime['overallNoteDetails'];
+  const episodeNotes: NormalizedAnime['episodeNotes'] = [];
+  for (let index = 0; index < value.length; index++) {
+    const note = value[index];
+    if (!note || typeof note !== 'object') {
+      throw new Error(`${title} 的第 ${index + 1} 条备注格式无效`);
+    }
+    const record = note as Record<string, unknown>;
+    const content = optionalString(record.content, 5000, `${title} 的第 ${index + 1} 条备注`);
+    if (!content) throw new Error(`${title} 的第 ${index + 1} 条备注内容为空`);
+    const episode = optionalNumber(record.episode, `${title} 的第 ${index + 1} 条备注集数`, {
+      min: 1,
+      max: 9999,
+      integer: true,
+    });
+    if (episode === undefined) {
+      if (overallNote !== undefined) throw new Error(`${title} 只能包含一条总备注`);
+      overallNote = content;
+      overallNoteDetails = {
+        notedAt: optionalDate(record.notedAt, `${title} 的总备注日期`) || fallbackTimestamp.slice(0, 10),
+        createdAt: normalizeTimestamp(record.createdAt, fallbackTimestamp),
+        updatedAt: normalizeTimestamp(record.updatedAt, fallbackTimestamp),
+      };
+      continue;
+    }
+    const notedAt = optionalDate(record.notedAt, `${title} 的第 ${index + 1} 条备注日期`)
+      || fallbackTimestamp.slice(0, 10);
+    episodeNotes.push({
+      episode,
+      content,
+      notedAt,
+      createdAt: normalizeTimestamp(record.createdAt, fallbackTimestamp),
+      updatedAt: normalizeTimestamp(record.updatedAt, fallbackTimestamp),
+    });
+  }
+  return { overallNote, overallNoteDetails, episodeNotes };
+}
+
 function normalizeAnime(item: ImportAnimeItem, index: number): NormalizedAnime {
   if (!item || typeof item !== 'object') throw new Error(`第 ${index + 1} 部番剧格式无效`);
   const title = optionalString(item.title, 500, `第 ${index + 1} 部番剧的标题`);
@@ -109,6 +183,7 @@ function normalizeAnime(item: ImportAnimeItem, index: number): NormalizedAnime {
   if (!VALID_STATUSES.has(statusValue as AnimeStatus)) throw new Error(`${title} 的状态无效：${statusValue}`);
 
   const now = nowISO();
+  const normalizedNotes = normalizeNotes(item.notes, title, now);
   const importedCoverUrl = optionalString(item.coverUrl, 2000, `${title} 的封面地址`);
   const portableCoverUrl = importedCoverUrl && /^https?:\/\//i.test(importedCoverUrl)
     ? importedCoverUrl
@@ -125,7 +200,7 @@ function normalizeAnime(item: ImportAnimeItem, index: number): NormalizedAnime {
       progress: optionalNumber(item.progress, `${title} 的进度`, { min: 0, integer: true }) ?? 0,
       totalEpisodes: optionalNumber(item.totalEpisodes, `${title} 的总集数`, { min: 0, max: 9999, integer: true }),
       durationMinutes: optionalNumber(item.durationMinutes, `${title} 的时长`, { min: 0, max: 9999, integer: true }),
-      notes: optionalString(item.notes, 5000, `${title} 的备注`),
+      notes: normalizedNotes.overallNote,
       tags: stringArray(item.tags, `${title} 的标签`),
       cast: stringArray(item.cast, `${title} 的声优`),
       castAliases: stringArray(item.castAliases, `${title} 的声优别名`),
@@ -135,6 +210,8 @@ function normalizeAnime(item: ImportAnimeItem, index: number): NormalizedAnime {
       premiereDate: optionalDate(item.premiereDate, `${title} 的首播日期`),
       isFinished: optionalBoolean(item.isFinished, `${title} 的完结状态`),
     },
+    episodeNotes: normalizedNotes.episodeNotes,
+    overallNoteDetails: normalizedNotes.overallNoteDetails,
     createdAt: normalizeTimestamp(item.createdAt, now),
     updatedAt: normalizeTimestamp(item.updatedAt, now),
   };
@@ -178,7 +255,7 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
   const replaceTransaction = db.transaction(() => {
     db.prepare('DELETE FROM watch_history').run();
     db.prepare('DELETE FROM anime').run();
-    db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('anime', 'watch_history')").run();
+    db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('anime', 'anime_notes', 'watch_history')").run();
 
     const insertWithId = db.prepare(`
       INSERT INTO anime (id, title, original_title, coverUrl, localCoverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
@@ -189,6 +266,7 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const sourceIdMap = new Map<string, number>();
+    const importedAnimeIds = new Map<NormalizedAnime, number>();
     const titleMap = new Map<string, number[]>();
 
     const ordered = [...normalizedAnime].sort((left, right) => {
@@ -211,6 +289,7 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
         ? insertWithId.run(numericId, ...values)
         : insertWithoutId.run(...values);
       const newId = numericId ?? Number(result.lastInsertRowid);
+      importedAnimeIds.set(item, newId);
       const key = sourceKey(item.sourceId);
       if (key) sourceIdMap.set(key, newId);
       const titleIds = titleMap.get(p.title) || [];
@@ -221,6 +300,15 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
     const insertHistory = db.prepare(
       'INSERT INTO watch_history (animeId, animeTitle, episode, watchedAt) VALUES (?, ?, ?, ?)',
     );
+    const insertNoteWithoutId = db.prepare(`
+      INSERT INTO anime_notes (animeId, episode, content, notedAt, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    const updateOverallNoteMetadata = db.prepare(`
+      UPDATE anime_notes
+      SET notedAt = ?, createdAt = ?, updatedAt = ?
+      WHERE animeId = ? AND episode IS NULL
+    `);
     const animeTitleById = db.prepare('SELECT title FROM anime WHERE id = ?');
 
     for (let index = 0; index < historyRecords.length; index++) {
@@ -249,6 +337,29 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
       }
       insertHistory.run(animeId, row.title, episode, new Date(watchedAt).toISOString());
       importedHistory++;
+    }
+
+    for (const item of ordered) {
+      const animeId = importedAnimeIds.get(item);
+      if (!animeId) continue;
+      if (item.overallNoteDetails) {
+        updateOverallNoteMetadata.run(
+          item.overallNoteDetails.notedAt,
+          item.overallNoteDetails.createdAt,
+          item.overallNoteDetails.updatedAt,
+          animeId,
+        );
+      }
+      for (const note of item.episodeNotes) {
+        insertNoteWithoutId.run(
+          animeId,
+          note.episode,
+          note.content,
+          note.notedAt,
+          note.createdAt,
+          note.updatedAt,
+        );
+      }
     }
   });
 

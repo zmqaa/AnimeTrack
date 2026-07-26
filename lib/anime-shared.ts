@@ -13,6 +13,16 @@ export interface SessionUser {
   role?: string;
 }
 
+export interface AnimeNoteEntry {
+  id: number;
+  animeId: number;
+  episode?: number;
+  content: string;
+  notedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AnimeCardItem {
   id: number;
   title: string;
@@ -43,6 +53,7 @@ export interface AnimeListItem extends AnimeCardItem {
 export interface AnimeDetailItem extends AnimeListItem {
   summary?: string;
   premiereDate?: string;
+  noteEntries?: AnimeNoteEntry[];
 }
 
 export interface AnimeFormInitialData {

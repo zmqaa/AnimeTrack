@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {
   PencilSquareIcon, TrashIcon, CalendarIcon, CheckCircleIcon,
-  ClockIcon, SparklesIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import type { AnimeDetailItem, AnimeStatus } from '@/lib/anime-shared';
 import { statusMap, toTagInputValue, formatDateLabel, formatTimestampLabel } from './anime-detail-helpers';
@@ -9,6 +9,7 @@ import ProgressBar from '@/components/shared/ProgressBar';
 import StatTile from '@/components/shared/StatTile';
 import AsyncButton from '@/components/shared/AsyncButton';
 import SectionTitle from '@/components/shared/SectionTitle';
+import AnimeNotesPanel from './AnimeNotesPanel';
 
 type Props = {
   item: AnimeDetailItem;
@@ -29,13 +30,14 @@ type Props = {
   onSave: () => void;
   onEnrich: () => void;
   onDelete: () => void;
+  onNotesChanged: () => Promise<unknown>;
 };
 
 export default function AnimeDetailMain({
   item, isAdmin, canEdit, saving, isAiEnriching,
   formData, displayStatus, displayProgress, displayTotalEpisodes,
   displayDuration, displayTags, progressPercent,
-  onChange, onEdit, onCancel, onSave, onEnrich, onDelete,
+  onChange, onEdit, onCancel, onSave, onEnrich, onDelete, onNotesChanged,
 }: Props) {
   return (
     <section className="space-y-6">
@@ -175,17 +177,17 @@ export default function AnimeDetailMain({
             )}
           </div>
 
-          {/* Notes */}
-          <div className="surface-card rounded-[24px] p-6 backdrop-blur-xl">
-            <SectionTitle size="small" icon={<ClockIcon className="h-4 w-4" />}>个人备注</SectionTitle>
-            {canEdit ? (
-              <textarea rows={4} value={formData.notes || ''}
-                onChange={(event) => onChange('notes', event.target.value)}
-                className="surface-input theme-focus-accent mt-4 w-full rounded-2xl p-4 text-sm leading-7 text-[var(--text-primary)] transition" />
-            ) : (
-              <p className="mt-4 text-sm italic leading-7 text-[var(--text-secondary)]">{item.notes || '还没有留下观后感。'}</p>
-            )}
-          </div>
+          <AnimeNotesPanel
+            animeId={item.id}
+            overallNote={item.notes}
+            noteEntries={item.noteEntries}
+            currentEpisode={displayProgress}
+            isAdmin={isAdmin}
+            canEditOverall={canEdit}
+            overallDraft={typeof formData.notes === 'string' ? formData.notes : ''}
+            onOverallChange={(value) => onChange('notes', value)}
+            onNotesChanged={onNotesChanged}
+          />
         </div>
 
         {/* Right column: timeline + cast */}

@@ -70,7 +70,7 @@ AI 功能是可选的，相关环境变量及说明见 `.env.example`。
 
 ## 服务器定时 JSON 备份
 
-`db:scheduled-json-backup` 生成与 Web 页面“导出 JSON”相同格式的完整便携备份，默认保存到 `backups/json/`，并保留最近 30 份：
+`db:scheduled-json-backup` 生成与 Web 页面“导出 JSON”相同格式的完整便携备份，包含总备注和按集数记录的分集随记，默认保存到 `backups/json/`，并保留最近 30 份：
 
 ```bash
 npm run db:scheduled-json-backup

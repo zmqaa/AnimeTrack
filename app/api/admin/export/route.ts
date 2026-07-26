@@ -4,6 +4,7 @@ import { getAllWatchHistory } from '@/lib/history';
 import { requireAdmin } from '@/lib/api-response';
 import { buildExportFilename } from '@/lib/export-filename';
 import { buildPortableExport } from '@/scripts/shared/portable_export';
+import { listAllAnimeNotes } from '@/lib/anime-notes';
 
 function escapeCsvValue(value: unknown): string {
   if (value === null || value === undefined) return '';
@@ -75,7 +76,19 @@ export async function GET(request: NextRequest) {
   }
 
   // JSON format
-  const fullExport = buildPortableExport(anime, history);
+  const notesByAnimeId = new Map<number, ReturnType<typeof listAllAnimeNotes>>();
+  if (table !== 'history') {
+    for (const note of listAllAnimeNotes()) {
+      const notes = notesByAnimeId.get(note.animeId) || [];
+      notes.push(note);
+      notesByAnimeId.set(note.animeId, notes);
+    }
+  }
+  const animeWithNotes = anime.map((record) => ({
+    ...record,
+    noteEntries: notesByAnimeId.get(record.id) || [],
+  }));
+  const fullExport = buildPortableExport(animeWithNotes, history);
   const data = {
     ...fullExport,
     anime: table !== 'history' ? fullExport.anime : undefined,

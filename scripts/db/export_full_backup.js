@@ -1,7 +1,7 @@
 /**
  * 全量数据备份脚本（SQLite 版本）
  *
- * 导出 anime + watch_history + users 三张表为 SQL INSERT 文件。
+ * 导出 anime + anime_notes + watch_history + users 表为 SQL INSERT 文件。
  *
  * 用法：
  *   node scripts/db/export_full_backup.js                 # 默认输出到 backups/
@@ -64,6 +64,14 @@ async function main() {
     // watch_history
     const historyRows = db.prepare('SELECT id, animeId, animeTitle, episode, watchedAt FROM watch_history ORDER BY watchedAt ASC, id ASC').all();
     const historyColumns = ['id', 'animeId', 'animeTitle', 'episode', 'watchedAt'];
+    // 总备注由 anime.notes 兼容列恢复后通过触发器重建，这里只导出分集备注。
+    const noteRows = db.prepare(`
+      SELECT id, animeId, episode, content, notedAt, createdAt, updatedAt
+      FROM anime_notes
+      WHERE episode IS NOT NULL
+      ORDER BY animeId ASC, notedAt ASC, id ASC
+    `).all();
+    const noteColumns = ['animeId', 'episode', 'content', 'notedAt', 'createdAt', 'updatedAt'];
 
     // users (optional)
     let userRows = [];
@@ -76,8 +84,9 @@ async function main() {
       '-- Full database backup (export_full_backup.js)',
       `-- Source: SQLite database`,
       `-- Generated: ${nowCSTReadable()} (UTC+8)`,
-      `-- Tables: anime (${animeRows.length}), watch_history (${historyRows.length})${includeUsers ? `, users (${userRows.length})` : ''}`,
+      `-- Tables: anime (${animeRows.length}), anime_notes (${noteRows.length} episode notes), watch_history (${historyRows.length})${includeUsers ? `, users (${userRows.length})` : ''}`,
       '',
+      'DELETE FROM anime_notes;',
       'DELETE FROM watch_history;',
       'DELETE FROM anime;',
       '',
@@ -85,6 +94,11 @@ async function main() {
 
     for (const row of animeRows) {
       lines.push(buildInsert('anime', animeColumns, row));
+    }
+
+    lines.push('', '-- anime_notes (episode notes)', '');
+    for (const row of noteRows) {
+      lines.push(buildInsert('anime_notes', noteColumns, row));
     }
 
     lines.push('');
@@ -125,6 +139,7 @@ async function main() {
     const rel = path.relative(projectRoot, outputFile);
     console.log(`Backup complete → ${rel}`);
     console.log(`  anime:         ${animeRows.length} rows`);
+    console.log(`  anime_notes:   ${noteRows.length} episode note rows`);
     console.log(`  watch_history: ${historyRows.length} rows`);
     if (includeUsers) console.log(`  users:         ${userRows.length} rows`);
   } finally {

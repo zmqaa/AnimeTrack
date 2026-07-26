@@ -66,7 +66,7 @@ describe('database migrations', () => {
 
     const result = migrationModule.runDatabaseMigrations(database, databasePath);
 
-    expect(result.applied).toEqual([21]);
+    expect(result.applied).toEqual([21, 22]);
     expect(result.baselined).toEqual([2, 8, 11, 12, 15, 16, 17, 18, 19, 20]);
     expect(result.backupPath).not.toBeNull();
     expect(existsSync(result.backupPath!)).toBe(true);
@@ -112,7 +112,7 @@ describe('database migrations', () => {
     expect(readdirSync(backupsDirectory)).toHaveLength(backupCount);
   });
 
-  it('records an already-current schema without creating an unnecessary backup', () => {
+  it('records the cover migration as satisfied before applying newer migrations', () => {
     const { database, databasePath } = createTestDatabase();
     createLegacyAnimeTable(database);
     database.exec('ALTER TABLE anime ADD COLUMN localCoverUrl TEXT');
@@ -124,10 +124,36 @@ describe('database migrations', () => {
       WHERE version = 21
     `).get() as { execution_kind: string };
 
-    expect(result.applied).toEqual([]);
+    expect(result.applied).toEqual([22]);
     expect(result.baselined).toContain(21);
-    expect(result.backupPath).toBeNull();
+    expect(result.backupPath).not.toBeNull();
     expect(migration.execution_kind).toBe('satisfied');
+  });
+
+  it('migrates an existing overall note into the structured notes table', () => {
+    const { database, databasePath } = createTestDatabase();
+    createLegacyAnimeTable(database);
+    database.exec(`
+      ALTER TABLE anime ADD COLUMN notes TEXT;
+      ALTER TABLE anime ADD COLUMN createdAt TEXT;
+      ALTER TABLE anime ADD COLUMN updatedAt TEXT;
+    `);
+    database.prepare(`
+      INSERT INTO anime (title, status, notes, createdAt, updatedAt)
+      VALUES ('带备注的番剧', 'completed', '第一行\n第二行', '2026-07-20T10:00:00.000Z', '2026-07-21T10:00:00.000Z')
+    `).run();
+
+    migrationModule.runDatabaseMigrations(database, databasePath);
+
+    const note = database.prepare(`
+      SELECT episode, content, notedAt
+      FROM anime_notes
+    `).get();
+    expect(note).toEqual({
+      episode: null,
+      content: '第一行\n第二行',
+      notedAt: '2026-07-21',
+    });
   });
 
   it('rejects a changed checksum for a migration that was already recorded', () => {

@@ -153,6 +153,77 @@ function recordMigration(
   );
 }
 
+function migrateStructuredAnimeNotes(db: Database.Database): void {
+  if (!hasColumn(db, 'anime', 'notes')) return;
+  const hasCreatedAt = hasColumn(db, 'anime', 'createdAt');
+  const hasUpdatedAt = hasColumn(db, 'anime', 'updatedAt');
+  const createdAtExpression = hasCreatedAt ? 'createdAt' : "datetime('now')";
+  const updatedAtExpression = hasUpdatedAt ? 'updatedAt' : createdAtExpression;
+  const newCreatedAtExpression = hasCreatedAt ? 'NEW.createdAt' : "datetime('now')";
+  const newUpdatedAtExpression = hasUpdatedAt ? 'NEW.updatedAt' : "datetime('now')";
+
+  db.exec(`
+    INSERT INTO anime_notes (animeId, episode, content, notedAt, createdAt, updatedAt)
+    SELECT
+      id,
+      NULL,
+      notes,
+      substr(COALESCE(${updatedAtExpression}, ${createdAtExpression}, datetime('now')), 1, 10),
+      COALESCE(${createdAtExpression}, datetime('now')),
+      COALESCE(${updatedAtExpression}, ${createdAtExpression}, datetime('now'))
+    FROM anime
+    WHERE notes IS NOT NULL
+      AND trim(notes) <> ''
+      AND NOT EXISTS (
+        SELECT 1 FROM anime_notes
+        WHERE anime_notes.animeId = anime.id AND anime_notes.episode IS NULL
+      );
+
+    CREATE TRIGGER IF NOT EXISTS sync_anime_overall_note_after_insert
+    AFTER INSERT ON anime
+    WHEN NEW.notes IS NOT NULL AND trim(NEW.notes) <> ''
+    BEGIN
+      INSERT INTO anime_notes (animeId, episode, content, notedAt, createdAt, updatedAt)
+      VALUES (
+        NEW.id,
+        NULL,
+        NEW.notes,
+        substr(COALESCE(${newUpdatedAtExpression}, datetime('now')), 1, 10),
+        ${newCreatedAtExpression},
+        ${newUpdatedAtExpression}
+      )
+      ON CONFLICT(animeId) WHERE episode IS NULL DO UPDATE SET
+        content = excluded.content,
+        updatedAt = excluded.updatedAt;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS sync_anime_overall_note_after_update
+    AFTER UPDATE OF notes ON anime
+    BEGIN
+      DELETE FROM anime_notes
+      WHERE animeId = NEW.id
+        AND episode IS NULL
+        AND (NEW.notes IS NULL OR trim(NEW.notes) = '');
+
+      INSERT INTO anime_notes (animeId, episode, content, notedAt, createdAt, updatedAt)
+      SELECT
+        NEW.id,
+        NULL,
+        NEW.notes,
+        substr(COALESCE(${newUpdatedAtExpression}, datetime('now')), 1, 10),
+        COALESCE((
+          SELECT createdAt FROM anime_notes
+          WHERE animeId = NEW.id AND episode IS NULL
+        ), ${newCreatedAtExpression}),
+        ${newUpdatedAtExpression}
+      WHERE NEW.notes IS NOT NULL AND trim(NEW.notes) <> ''
+      ON CONFLICT(animeId) WHERE episode IS NULL DO UPDATE SET
+        content = excluded.content,
+        updatedAt = excluded.updatedAt;
+    END;
+  `);
+}
+
 function createMigrationBackup(
   db: Database.Database,
   databasePath: string,
@@ -215,6 +286,9 @@ export function runDatabaseMigrations(
     try {
       db.transaction(() => {
         db.exec(migration.sql);
+        if (migration.version === 22) {
+          migrateStructuredAnimeNotes(db);
+        }
         recordMigration(db, migration, 'executed', Date.now() - startedAt);
       })();
       result.applied.push(migration.version);

@@ -194,6 +194,7 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
               onSave={saveChanges}
               onEnrich={enrichAnimeInfo}
               onDelete={() => setShowDeleteConfirm(true)}
+              onNotesChanged={() => mutate()}
             />
           </div>
         </div>

@@ -1,7 +1,7 @@
 /**
  * 定时备份脚本 — 配合 cron 使用（SQLite 版本）
  *
- * 导出 anime + watch_history 两张表为 SQL 文件，自动轮转旧备份。
+ * 导出 anime + anime_notes + watch_history 为 SQL 文件，自动轮转旧备份。
  *
  * 用法：
  *   node scripts/db/scheduled_backup.js              # 默认保留 10 份
@@ -64,6 +64,12 @@ async function main() {
   try {
     const animeRows = db.prepare('SELECT * FROM anime ORDER BY id ASC').all();
     const historyRows = db.prepare('SELECT id, animeId, animeTitle, episode, watchedAt FROM watch_history ORDER BY watchedAt ASC, id ASC').all();
+    const noteRows = db.prepare(`
+      SELECT id, animeId, episode, content, notedAt, createdAt, updatedAt
+      FROM anime_notes
+      WHERE episode IS NOT NULL
+      ORDER BY animeId ASC, notedAt ASC, id ASC
+    `).all();
 
     const animeColumns = [
       'id', 'title', 'original_title', 'coverUrl', 'localCoverUrl', 'status', 'score',
@@ -72,6 +78,7 @@ async function main() {
       'cast', 'cast_aliases', 'isFinished', 'createdAt', 'updatedAt',
     ];
     const historyColumns = ['id', 'animeId', 'animeTitle', 'episode', 'watchedAt'];
+    const noteColumns = ['animeId', 'episode', 'content', 'notedAt', 'createdAt', 'updatedAt'];
 
     const ts = nowCSTTimestamp();
     let fileName = `${BACKUP_PREFIX}${ts}.sql`;
@@ -87,8 +94,9 @@ async function main() {
       '-- Scheduled backup (scheduled_backup.js)',
       `-- Source: SQLite database`,
       `-- Generated: ${nowCSTReadable()} (UTC+8)`,
-      `-- Tables: anime (${animeRows.length}), watch_history (${historyRows.length})`,
+      `-- Tables: anime (${animeRows.length}), anime_notes (${noteRows.length} episode notes), watch_history (${historyRows.length})`,
       '',
+      'DELETE FROM anime_notes;',
       'DELETE FROM watch_history;',
       'DELETE FROM anime;',
       '',
@@ -96,6 +104,11 @@ async function main() {
 
     for (const row of animeRows) {
       lines.push(buildInsert('anime', animeColumns, row));
+    }
+
+    lines.push('', '-- anime_notes (episode notes)', '');
+    for (const row of noteRows) {
+      lines.push(buildInsert('anime_notes', noteColumns, row));
     }
 
     lines.push('');
@@ -110,7 +123,7 @@ async function main() {
 
     fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
     console.log(`[backup] 备份完成: ${fileName}`);
-    console.log(`[backup] anime: ${animeRows.length} 条, watch_history: ${historyRows.length} 条`);
+    console.log(`[backup] anime: ${animeRows.length} 条, anime_notes: ${noteRows.length} 条, watch_history: ${historyRows.length} 条`);
 
     rotateBackups(keep);
     console.log(`[backup] 保留策略: 最近 ${keep} 份`);
