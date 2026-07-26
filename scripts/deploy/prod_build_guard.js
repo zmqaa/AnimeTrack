@@ -5,10 +5,10 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const workspaceRoot = path.resolve(__dirname, '../..');
-const buildDir = path.join(workspaceRoot, '.next');
-const standbyDir = path.join(workspaceRoot, '.next-standby');
-const standaloneDir = path.join(buildDir, 'standalone');
-const lockFile = path.join(workspaceRoot, '.next-build.lock');
+const deployRoot = path.join(workspaceRoot, '.deploy');
+const releasesDir = path.join(deployRoot, 'releases');
+const lockFile = path.join(deployRoot, 'build.lock');
+const lastBuiltFile = path.join(deployRoot, 'last-built-release');
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 const requiredBuildFiles = [
@@ -20,7 +20,7 @@ const requiredBuildFiles = [
 
 function log(message) {
   const time = new Date().toISOString().replace('T', ' ').replace('Z', '');
-  console.log(`[prod-build ${time}] ${message}`);
+  console.log(`[release-build ${time}] ${message}`);
 }
 
 function fileExists(targetPath) {
@@ -32,100 +32,140 @@ function fileExists(targetPath) {
   }
 }
 
-function ensureRemoved(targetPath) {
-  fs.rmSync(targetPath, { recursive: true, force: true });
-}
-
-function copyDirectory(sourcePath, targetPath) {
-  ensureRemoved(targetPath);
-  fs.cpSync(sourcePath, targetPath, { recursive: true });
-}
-
 function hasValidBuild(targetDir) {
-  if (!fileExists(targetDir)) {
-    return false;
-  }
-
+  if (!fileExists(targetDir)) return false;
   return requiredBuildFiles.every((relativePath) => {
-    const absolutePath = path.join(targetDir, relativePath);
     try {
-      return fs.statSync(absolutePath).size >= 0;
+      return fs.statSync(path.join(targetDir, relativePath)).isFile();
     } catch {
       return false;
     }
   });
 }
 
-function acquireLock() {
-  try {
-    const payload = JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }, null, 2);
-    fs.writeFileSync(lockFile, payload, { flag: 'wx' });
-    return true;
-  } catch (error) {
-    if (error && error.code === 'EEXIST') {
-      return false;
-    }
-
-    throw error;
-  }
-}
-
-function releaseLock() {
-  ensureRemoved(lockFile);
-}
-
-function runCommand(command, args) {
+function runCommand(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
-      cwd: workspaceRoot,
-      env: process.env,
-      stdio: 'inherit',
+      cwd: options.cwd || workspaceRoot,
+      env: options.env || process.env,
+      stdio: options.capture ? ['ignore', 'pipe', 'inherit'] : 'inherit',
     });
-
+    let stdout = '';
+    if (options.capture) {
+      child.stdout.on('data', (chunk) => { stdout += chunk; });
+    }
     child.on('exit', (code, signal) => {
-      if (signal) {
-        reject(new Error(`Command exited with signal ${signal}`));
-        return;
-      }
-
-      if (code !== 0) {
-        reject(new Error(`Command exited with code ${code}`));
-        return;
-      }
-
-      resolve();
+      if (signal) return reject(new Error(`${command} exited with signal ${signal}`));
+      if (code !== 0) return reject(new Error(`${command} exited with code ${code}`));
+      resolve(stdout.trim());
     });
-
     child.on('error', reject);
   });
 }
 
-async function main() {
-  if (!acquireLock()) {
-    log('Build lock already exists. Another build is in progress.');
-    process.exit(2);
+function acquireLock() {
+  fs.mkdirSync(deployRoot, { recursive: true });
+  try {
+    fs.writeFileSync(lockFile, JSON.stringify({
+      pid: process.pid,
+      startedAt: new Date().toISOString(),
+    }, null, 2), { flag: 'wx' });
+  } catch (error) {
+    if (error && error.code === 'EEXIST') {
+      throw new Error('Another release build is already in progress.');
+    }
+    throw error;
   }
+}
+
+function copyDirectory(sourcePath, targetPath) {
+  fs.rmSync(targetPath, { recursive: true, force: true });
+  fs.cpSync(sourcePath, targetPath, { recursive: true });
+}
+
+async function main() {
+  acquireLock();
+  let buildSourceDir;
+  let completed = false;
 
   try {
-    log('Starting guarded production build...');
-    await runCommand(npmCommand, ['run', 'build:next']);
+    const shortCommit = await runCommand('git', ['rev-parse', '--short', 'HEAD'], { capture: true });
+    const dirtyStatus = await runCommand('git', ['status', '--porcelain'], { capture: true });
+    const timestamp = new Date().toISOString().replace(/\D/g, '').slice(0, 14);
+    const releaseName = `${timestamp}-${shortCommit}${dirtyStatus ? '-dirty' : ''}`;
+    buildSourceDir = path.join(deployRoot, `build-source-${process.pid}`);
+    const buildDir = path.join(buildSourceDir, '.next');
+    const releaseDir = path.join(releasesDir, releaseName);
 
-    if (!hasValidBuild(buildDir)) {
-      throw new Error('Build finished but required .next artifacts are incomplete.');
+    fs.mkdirSync(releasesDir, { recursive: true });
+    log(`Preparing isolated source tree for ${releaseName}`);
+    await runCommand('rsync', [
+      '-a',
+      '--delete',
+      '--exclude=/.git/',
+      '--exclude=/.next/',
+      '--exclude=/.next-standby/',
+      '--exclude=/.deploy/',
+      '--exclude=/node_modules/',
+      '--exclude=/data/',
+      '--exclude=/backups/',
+      '--exclude=/logs/',
+      '--exclude=/public/covers/',
+      '--exclude=/.env.local',
+      `${workspaceRoot}/`,
+      `${buildSourceDir}/`,
+    ]);
+
+    fs.symlinkSync(path.join(workspaceRoot, 'node_modules'), path.join(buildSourceDir, 'node_modules'), 'dir');
+    const envFile = path.join(workspaceRoot, '.env.local');
+    if (fileExists(envFile)) {
+      fs.symlinkSync(envFile, path.join(buildSourceDir, '.env.local'), 'file');
     }
 
-    copyDirectory(
-      path.join(buildDir, 'static'),
-      path.join(standaloneDir, '.next', 'static'),
-    );
-    copyDirectory(buildDir, standbyDir);
-    log('Build completed and standby snapshot refreshed.');
+    log('Building candidate without touching the active production release');
+    await runCommand(npmCommand, ['run', 'build:next'], { cwd: buildSourceDir });
+    if (!hasValidBuild(buildDir)) {
+      throw new Error('Build finished but required Next.js artifacts are incomplete.');
+    }
+
+    const standaloneDir = path.join(buildDir, 'standalone');
+    if (!fileExists(path.join(standaloneDir, 'server.js'))) {
+      throw new Error('Standalone server entry was not generated.');
+    }
+
+    copyDirectory(standaloneDir, releaseDir);
+    copyDirectory(path.join(buildDir, 'static'), path.join(releaseDir, '.next', 'static'));
+    const publicDir = path.join(buildSourceDir, 'public');
+    if (fileExists(publicDir)) {
+      copyDirectory(publicDir, path.join(releaseDir, 'public'));
+    }
+    const coversDir = path.join(workspaceRoot, 'public', 'covers');
+    if (fileExists(coversDir)) {
+      const releaseCoversDir = path.join(releaseDir, 'public', 'covers');
+      fs.rmSync(releaseCoversDir, { recursive: true, force: true });
+      fs.symlinkSync(coversDir, releaseCoversDir, 'dir');
+    }
+
+    fs.writeFileSync(path.join(releaseDir, 'release.json'), JSON.stringify({
+      releaseName,
+      commit: shortCommit,
+      dirty: Boolean(dirtyStatus),
+      builtAt: new Date().toISOString(),
+    }, null, 2));
+    fs.writeFileSync(lastBuiltFile, `${releaseDir}\n`);
+    completed = true;
+    log(`Candidate release ready: ${releaseDir}`);
   } finally {
-    releaseLock();
+    fs.rmSync(lockFile, { force: true });
+    if (completed && buildSourceDir) {
+      fs.rmSync(buildSourceDir, { recursive: true, force: true });
+    } else if (buildSourceDir) {
+      log(`Build failed; preserved source tree for inspection: ${buildSourceDir}`);
+    }
   }
 }
 
 main().catch((error) => {
-  log(`Build failed: ${error.message}`);
+  log(`ERROR: ${error.message}`);
   process.exit(1);
 });

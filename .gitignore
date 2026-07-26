@@ -11,6 +11,7 @@
 /.next/
 /.next-standby/
 /.next-build.lock
+/.deploy/
 /.next.bak.*/
 /out/
 
