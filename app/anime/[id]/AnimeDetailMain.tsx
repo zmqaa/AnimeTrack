@@ -1,3 +1,6 @@
+"use client";
+
+import { useLayoutEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   PencilSquareIcon, TrashIcon, CalendarIcon, CheckCircleIcon,
@@ -42,6 +45,15 @@ export default function AnimeDetailMain({
   onChange, onEdit, onCancel, onSave, onEnrich, onDelete,
   noteEntriesDraft, onNoteEntriesChange,
 }: Props) {
+  const summaryTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    if (!canEdit || !summaryTextareaRef.current) return;
+    const textarea = summaryTextareaRef.current;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [canEdit, formData.summary]);
+
   return (
     <section className="space-y-6">
       {/* Header: title + tags + actions */}
@@ -185,9 +197,9 @@ export default function AnimeDetailMain({
           <div className="surface-card rounded-[24px] p-6 backdrop-blur-xl">
             <SectionTitle size="small" icon={<SparklesIcon className="h-4 w-4" />}>简介 / 剧情</SectionTitle>
             {canEdit ? (
-              <textarea rows={8} value={formData.summary || ''}
+              <textarea ref={summaryTextareaRef} rows={1} value={formData.summary || ''}
                 onChange={(event) => onChange('summary', event.target.value)}
-                className="surface-input theme-focus-accent mt-4 min-h-[220px] w-full rounded-2xl p-4 text-sm leading-7 text-[var(--text-primary)] transition" />
+                className="surface-input theme-focus-accent mt-4 min-h-[220px] w-full resize-none overflow-y-hidden rounded-2xl p-4 text-sm leading-7 text-[var(--text-primary)] transition" />
             ) : (
               <p className="mt-4 whitespace-pre-wrap text-sm leading-8 text-[var(--text-secondary)]">{item.summary || '暂无简介'}</p>
             )}
