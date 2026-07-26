@@ -17,6 +17,8 @@ describe('portable JSON export', () => {
       title: '备注测试',
       status: 'watching',
       progress: 3,
+      startDate: '2026-07-20',
+      startDateSource: 'history',
       notes: '兼容字段不应覆盖结构化备注',
       noteEntries: [
         {
@@ -44,5 +46,9 @@ describe('portable JSON export', () => {
       { id: 11, episode: 3, content: '第三集随记', notedAt: '2026-07-21' },
     ]);
     expect(result.anime.records[0]).not.toHaveProperty('noteEntries');
+    expect(result.anime.records[0]).toMatchObject({
+      startDate: '2026-07-20',
+      startDateSource: 'history',
+    });
   });
 });

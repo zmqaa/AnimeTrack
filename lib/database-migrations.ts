@@ -6,6 +6,7 @@ import path from 'path';
 
 import type Database from 'better-sqlite3';
 
+import { backfillMissingAnimeStartDates } from '@/lib/anime-start-date';
 import {
   getBackupsDirectory,
   getDatabasePath,
@@ -126,6 +127,9 @@ function isMigrationAlreadySatisfied(
 ): boolean {
   if (migration.version === 21) {
     return hasColumn(db, 'anime', 'localCoverUrl');
+  }
+  if (migration.version === 23) {
+    return hasColumn(db, 'anime', 'start_date_source');
   }
   return false;
 }
@@ -272,7 +276,17 @@ export function runDatabaseMigrations(
     }
 
     if (isMigrationAlreadySatisfied(db, migration)) {
-      db.transaction(() => recordMigration(db, migration, 'satisfied'))();
+      db.transaction(() => {
+        if (migration.version === 23 && hasColumn(db, 'anime', 'start_date')) {
+          const hasWatchHistory = db.prepare(`
+            SELECT 1
+            FROM sqlite_master
+            WHERE type = 'table' AND name = 'watch_history'
+          `).get();
+          if (hasWatchHistory) backfillMissingAnimeStartDates(db);
+        }
+        recordMigration(db, migration, 'satisfied');
+      })();
       result.baselined.push(migration.version);
       continue;
     }
@@ -288,6 +302,16 @@ export function runDatabaseMigrations(
         db.exec(migration.sql);
         if (migration.version === 22) {
           migrateStructuredAnimeNotes(db);
+        }
+        if (migration.version === 23 && hasColumn(db, 'anime', 'start_date')) {
+          const hasWatchHistory = db.prepare(`
+            SELECT 1
+            FROM sqlite_master
+            WHERE type = 'table' AND name = 'watch_history'
+          `).get();
+          if (hasWatchHistory) {
+            backfillMissingAnimeStartDates(db);
+          }
         }
         recordMigration(db, migration, 'executed', Date.now() - startedAt);
       })();

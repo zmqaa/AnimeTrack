@@ -1,6 +1,7 @@
 import { deleteWatchHistoryById, updateWatchHistoryTime } from '@/lib/history';
 import { getRawDb } from '@/lib/db';
 import { nowISO } from '@/lib/date-utils';
+import { syncAnimeStartDateFromHistory } from '@/lib/anime-start-date';
 import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
 
 interface UndoContextRow {
@@ -92,6 +93,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
           updatedAt = ?
       WHERE id = ?
     `).run(preview.targetProgress, nowISO(), preview.animeId);
+    syncAnimeStartDateFromHistory(db, preview.animeId);
 
     return {
       ...preview,

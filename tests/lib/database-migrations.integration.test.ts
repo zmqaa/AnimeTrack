@@ -66,7 +66,7 @@ describe('database migrations', () => {
 
     const result = migrationModule.runDatabaseMigrations(database, databasePath);
 
-    expect(result.applied).toEqual([21, 22]);
+    expect(result.applied).toEqual([21, 22, 23]);
     expect(result.baselined).toEqual([2, 8, 11, 12, 15, 16, 17, 18, 19, 20]);
     expect(result.backupPath).not.toBeNull();
     expect(existsSync(result.backupPath!)).toBe(true);
@@ -124,7 +124,7 @@ describe('database migrations', () => {
       WHERE version = 21
     `).get() as { execution_kind: string };
 
-    expect(result.applied).toEqual([22]);
+    expect(result.applied).toEqual([22, 23]);
     expect(result.baselined).toContain(21);
     expect(result.backupPath).not.toBeNull();
     expect(migration.execution_kind).toBe('satisfied');
@@ -154,6 +154,46 @@ describe('database migrations', () => {
       content: '第一行\n第二行',
       notedAt: '2026-07-21',
     });
+  });
+
+  it('backfills missing start dates from the earliest history without replacing manual dates', () => {
+    const { database, databasePath } = createTestDatabase();
+    createLegacyAnimeTable(database);
+    database.exec(`
+      ALTER TABLE anime ADD COLUMN start_date TEXT;
+      CREATE TABLE watch_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        animeId INTEGER NOT NULL,
+        animeTitle TEXT NOT NULL,
+        episode INTEGER NOT NULL,
+        watchedAt TEXT NOT NULL
+      );
+    `);
+    database.prepare(`
+      INSERT INTO anime (id, title, status, start_date)
+      VALUES
+        (1, '待补齐', 'watching', NULL),
+        (2, '人工日期', 'completed', '2026-07-01')
+    `).run();
+    database.prepare(`
+      INSERT INTO watch_history (animeId, animeTitle, episode, watchedAt)
+      VALUES
+        (1, '待补齐', 2, '2026-07-20T17:30:00.000Z'),
+        (1, '待补齐', 1, '2026-07-19T16:30:00.000Z'),
+        (2, '人工日期', 1, '2026-07-10T12:00:00.000Z')
+    `).run();
+
+    migrationModule.runDatabaseMigrations(database, databasePath);
+
+    const rows = database.prepare(`
+      SELECT id, start_date AS startDate, start_date_source AS startDateSource
+      FROM anime
+      ORDER BY id
+    `).all();
+    expect(rows).toEqual([
+      { id: 1, startDate: '2026-07-20', startDateSource: 'history' },
+      { id: 2, startDate: '2026-07-01', startDateSource: null },
+    ]);
   });
 
   it('rejects a changed checksum for a migration that was already recorded', () => {

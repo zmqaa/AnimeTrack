@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS anime (
     tags TEXT,
     summary TEXT,
     start_date TEXT,
+    start_date_source TEXT CHECK (start_date_source IS NULL OR start_date_source = 'history'),
     end_date TEXT,
     premiere_date TEXT,
     cast TEXT,

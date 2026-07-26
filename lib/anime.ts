@@ -1,6 +1,7 @@
 import 'server-only';
 import { getRawDb, query, type DbResult } from './db';
 import { parseJsonStringArray } from './anime-cast';
+import { syncAnimeStartDateFromHistory } from './anime-start-date';
 import { pickBestAnimeTitleCandidate } from './anime-title-matching';
 import { formatAppDateKey, nowISO } from './date-utils';
 import type { AnimeStatus } from './anime-shared';
@@ -33,6 +34,7 @@ export interface AnimeRecord {
   castAliases?: string[];
   summary?: string;
   startDate?: string;
+  startDateSource?: 'history';
   endDate?: string;
   premiereDate?: string;
   isFinished?: boolean;
@@ -57,6 +59,7 @@ export interface CreateAnimeDTO {
   castAliases?: string[];
   summary?: string;
   startDate?: string;
+  startDateSource?: 'history';
   endDate?: string;
   premiereDate?: string;
   isFinished?: boolean;
@@ -80,6 +83,7 @@ export function animeRecordToDTO(record: AnimeRecord): CreateAnimeDTO {
     castAliases: record.castAliases,
     summary: record.summary,
     startDate: record.startDate,
+    startDateSource: record.startDateSource,
     endDate: record.endDate,
     premiereDate: record.premiereDate,
     isFinished: record.isFinished,
@@ -101,6 +105,7 @@ interface AnimeRow {
   tags?: string | null;
   summary?: string | null;
   start_date?: string | null;
+  start_date_source?: string | null;
   end_date?: string | null;
   premiere_date?: string | null;
   cast?: string | null;
@@ -130,6 +135,7 @@ function mapRowToAnimeRecord(row: AnimeRow): AnimeRecord {
     tags: parseJsonStringArray(row.tags),
     summary: row.summary || undefined,
     startDate: row.start_date || undefined,
+    startDateSource: row.start_date_source === 'history' ? 'history' : undefined,
     endDate: row.end_date || undefined,
     premiereDate: row.premiere_date || undefined,
     isFinished: row.isFinished != null ? Boolean(row.isFinished) : undefined,
@@ -174,7 +180,7 @@ const SORT_COLUMN_MAP: Record<string, string> = {
 const LIST_COLUMNS_RAW = [
   'id', 'title', 'original_title', 'coverUrl', 'localCoverUrl', 'status', 'score',
   'progress', 'totalEpisodes', 'durationMinutes', 'notes', 'tags',
-  'start_date', 'end_date', 'premiere_date', 'isFinished',
+  'start_date', 'start_date_source', 'end_date', 'premiere_date', 'isFinished',
   'cast', 'cast_aliases', 'summary',
   'createdAt', 'updatedAt',
 ];
@@ -332,8 +338,8 @@ export async function getAnimeRecord(id: number): Promise<AnimeRecord | null> {
 export async function createAnimeRecord(input: CreateAnimeDTO): Promise<AnimeRecord> {
   const now = nowISO();
   const sql = `
-    INSERT INTO anime (title, original_title, coverUrl, localCoverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO anime (title, original_title, coverUrl, localCoverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, start_date_source, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   const params = [
@@ -350,6 +356,7 @@ export async function createAnimeRecord(input: CreateAnimeDTO): Promise<AnimeRec
     JSON.stringify(input.tags || []),
     input.summary || null,
     input.startDate || null,
+    input.startDateSource || null,
     input.endDate || null,
     input.premiereDate || null,
     JSON.stringify(input.cast || []),
@@ -379,6 +386,7 @@ export async function createAnimeRecord(input: CreateAnimeDTO): Promise<AnimeRec
     castAliases: input.castAliases || [],
     summary: input.summary,
     startDate: input.startDate,
+    startDateSource: input.startDateSource,
     endDate: input.endDate,
     premiereDate: input.premiereDate,
     isFinished: input.isFinished != null ? Boolean(input.isFinished) : undefined,
@@ -396,13 +404,13 @@ export function createAnimeRecordWithHistory(
   const transaction = db.transaction(() => {
     const now = nowISO();
     const result = db.prepare(`
-      INSERT INTO anime (title, original_title, coverUrl, localCoverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO anime (title, original_title, coverUrl, localCoverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, start_date_source, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       input.title, input.originalTitle || null, input.coverUrl || null, input.localCoverUrl || null, input.status,
       input.score ?? null, input.progress, input.totalEpisodes ?? null,
       input.durationMinutes ?? null, input.notes || null, JSON.stringify(input.tags || []),
-      input.summary || null, input.startDate || null, input.endDate || null,
+      input.summary || null, input.startDate || null, input.startDateSource || null, input.endDate || null,
       input.premiereDate || null, JSON.stringify(input.cast || []),
       JSON.stringify(input.castAliases || []),
       input.isFinished == null ? null : (input.isFinished ? 1 : 0), now, now,
@@ -412,6 +420,7 @@ export function createAnimeRecordWithHistory(
       db.prepare(
         'INSERT INTO watch_history (animeId, animeTitle, episode, watchedAt) VALUES (?, ?, ?, ?)',
       ).run(id, input.title, history.episode, (history.watchedAt || new Date()).toISOString());
+      syncAnimeStartDateFromHistory(db, id);
     }
     const row = db.prepare('SELECT * FROM anime WHERE id = ?').get(id) as AnimeRow;
     return mapRowToAnimeRecord(row);
@@ -442,7 +451,10 @@ export async function updateAnimeRecord(
   if (input.notes !== undefined) { fields.push('notes = ?'); params.push(input.notes); }
   if (input.tags !== undefined) { fields.push('tags = ?'); params.push(JSON.stringify(input.tags)); }
   if (input.summary !== undefined) { fields.push('summary = ?'); params.push(input.summary); }
-  if (input.startDate !== undefined) { fields.push('start_date = ?'); params.push(input.startDate); }
+  if (input.startDate !== undefined) {
+    fields.push('start_date = ?', 'start_date_source = NULL');
+    params.push(input.startDate);
+  }
   if (input.endDate !== undefined) { fields.push('end_date = ?'); params.push(input.endDate); }
   if (input.premiereDate !== undefined) { fields.push('premiere_date = ?'); params.push(input.premiereDate); }
   if (input.cast !== undefined) { fields.push('cast = ?'); params.push(JSON.stringify(input.cast)); }
@@ -504,7 +516,10 @@ export function updateAnimeRecordWithHistory(
     if (input.notes !== undefined) add('notes', input.notes);
     if (input.tags !== undefined) add('tags', JSON.stringify(input.tags));
     if (input.summary !== undefined) add('summary', input.summary);
-    if (input.startDate !== undefined) add('start_date', input.startDate);
+    if (input.startDate !== undefined) {
+      add('start_date', input.startDate);
+      add('start_date_source', null);
+    }
     if (input.endDate !== undefined) add('end_date', input.endDate);
     if (input.premiereDate !== undefined) add('premiere_date', input.premiereDate);
     if (input.cast !== undefined) add('cast', JSON.stringify(input.cast));
@@ -537,7 +552,14 @@ export function updateAnimeRecordWithHistory(
       db.prepare('DELETE FROM watch_history WHERE animeId = ? AND episode > ?').run(id, updatedProgress);
     }
 
-    return mapRowToAnimeRecord(updatedRow);
+    if ((delta > 0 || options.replayEpisode) && options.recordHistory) {
+      syncAnimeStartDateFromHistory(db, id);
+    } else if (delta < 0 && options.trimHistoryOnProgressDecrease) {
+      syncAnimeStartDateFromHistory(db, id);
+    }
+
+    const finalRow = db.prepare('SELECT * FROM anime WHERE id = ?').get(id) as AnimeRow;
+    return mapRowToAnimeRecord(finalRow);
   });
 
   return transaction();
@@ -595,10 +617,12 @@ export function adjustAnimeProgressWithHistory(
         INSERT INTO watch_history (animeId, animeTitle, episode, watchedAt)
         VALUES (?, ?, ?, ?)
       `).run(id, beforeRow.title, nextProgress, watchedAt.toISOString());
+      syncAnimeStartDateFromHistory(db, id);
     } else if (delta < 0 && options.trimHistoryOnProgressDecrease) {
       db.prepare(
         'DELETE FROM watch_history WHERE animeId = ? AND episode > ?',
       ).run(id, nextProgress);
+      syncAnimeStartDateFromHistory(db, id);
     }
 
     const updatedRow = db.prepare('SELECT * FROM anime WHERE id = ?').get(id) as AnimeRow;

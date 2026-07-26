@@ -149,6 +149,49 @@ describe('anime progress and watch history transaction', () => {
       { episode: 2, watchedAt: watchedAt.toISOString() },
       { episode: 3, watchedAt: watchedAt.toISOString() },
     ]);
+    expect(updated?.startDate).toBe('2026-07-25');
+  });
+
+  it('fills a missing start date in app time and preserves a manual date', async () => {
+    const automatic = await createWatchingAnime();
+    const manual = await animeModule.createAnimeRecord({
+      title: '人工日期番剧',
+      status: 'watching',
+      progress: 0,
+      totalEpisodes: 12,
+      startDate: '2026-07-01',
+    });
+    const watchedAt = new Date('2026-07-25T16:30:00.000Z');
+
+    const automaticUpdated = animeModule.adjustAnimeProgressWithHistory(
+      automatic.id,
+      1,
+      { recordHistory: true, watchedAt },
+    );
+    const manualUpdated = animeModule.adjustAnimeProgressWithHistory(
+      manual.id,
+      1,
+      { recordHistory: true, watchedAt },
+    );
+
+    expect(automaticUpdated?.startDate).toBe('2026-07-26');
+    expect(automaticUpdated?.startDateSource).toBe('history');
+    expect(manualUpdated?.startDate).toBe('2026-07-01');
+
+    const automaticReverted = animeModule.adjustAnimeProgressWithHistory(
+      automatic.id,
+      -1,
+      { recordHistory: false, trimHistoryOnProgressDecrease: true },
+    );
+    const manualReverted = animeModule.adjustAnimeProgressWithHistory(
+      manual.id,
+      -1,
+      { recordHistory: false, trimHistoryOnProgressDecrease: true },
+    );
+
+    expect(automaticReverted?.startDate).toBeUndefined();
+    expect(automaticReverted?.startDateSource).toBeUndefined();
+    expect(manualReverted?.startDate).toBe('2026-07-01');
   });
 
   it('applies repeated progress increments to the latest stored value', async () => {

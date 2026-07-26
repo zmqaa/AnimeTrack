@@ -1,5 +1,6 @@
 import 'server-only';
-import { query, type DbResult } from './db';
+import { getRawDb, query, type DbResult } from './db';
+import { syncAnimeStartDateFromHistory } from './anime-start-date';
 
 export interface WatchHistoryRecord {
   id: number;
@@ -59,6 +60,7 @@ export async function addWatchHistory(animeId: number, animeTitle: string, episo
   `;
 
   const result = await query<DbResult>(sql, [animeId, animeTitle, episode, watchedAt]);
+  syncAnimeStartDateFromHistory(getRawDb(), animeId);
 
   return {
     id: result.insertId,
@@ -87,14 +89,21 @@ export async function addBatchWatchHistory(animeId: number, animeTitle: string, 
   `;
 
   await query(sql, values);
+  syncAnimeStartDateFromHistory(getRawDb(), animeId);
 }
 
 export async function deleteWatchHistoryByAnime(animeId: number): Promise<void> {
   await query('DELETE FROM watch_history WHERE animeId = ?', [animeId]);
+  syncAnimeStartDateFromHistory(getRawDb(), animeId);
 }
 
 export async function deleteWatchHistoryById(id: number): Promise<boolean> {
+  const [record] = await query<Array<{ animeId: number }>>(
+    'SELECT animeId FROM watch_history WHERE id = ?',
+    [id],
+  );
   const result = await query<DbResult>('DELETE FROM watch_history WHERE id = ?', [id]);
+  if (record) syncAnimeStartDateFromHistory(getRawDb(), record.animeId);
   return result.affectedRows > 0;
 }
 
@@ -110,13 +119,21 @@ export async function updateWatchHistoryTime(id: number, watchedAt: Date): Promi
     'SELECT id, animeId, animeTitle, episode, watchedAt FROM watch_history WHERE id = ?',
     [id],
   );
+  if (row) syncAnimeStartDateFromHistory(getRawDb(), row.animeId);
   return row ? mapRowToHistory(row) : null;
 }
 
 export async function deleteWatchHistoryBatch(ids: number[]): Promise<number> {
   if (ids.length === 0) return 0;
   const placeholders = ids.map(() => '?').join(', ');
+  const affectedAnime = await query<Array<{ animeId: number }>>(
+    `SELECT DISTINCT animeId FROM watch_history WHERE id IN (${placeholders})`,
+    ids,
+  );
   const result = await query<DbResult>(`DELETE FROM watch_history WHERE id IN (${placeholders})`, ids);
+  for (const record of affectedAnime) {
+    syncAnimeStartDateFromHistory(getRawDb(), record.animeId);
+  }
   return result.affectedRows;
 }
 

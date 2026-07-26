@@ -1,5 +1,6 @@
 import 'server-only';
 import { getRawDb } from './db';
+import { backfillMissingAnimeStartDates } from './anime-start-date';
 import { clearAllCoverImages } from './cover-image';
 import type { AnimeStatus, CreateAnimeDTO } from './anime';
 import { nowISO } from './date-utils';
@@ -206,6 +207,7 @@ function normalizeAnime(item: ImportAnimeItem, index: number): NormalizedAnime {
       castAliases: stringArray(item.castAliases, `${title} 的声优别名`),
       summary: optionalString(item.summary, 10000, `${title} 的简介`),
       startDate: optionalDate(item.startDate, `${title} 的开始日期`),
+      startDateSource: item.startDateSource === 'history' ? 'history' : undefined,
       endDate: optionalDate(item.endDate, `${title} 的结束日期`),
       premiereDate: optionalDate(item.premiereDate, `${title} 的首播日期`),
       isFinished: optionalBoolean(item.isFinished, `${title} 的完结状态`),
@@ -258,12 +260,12 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
     db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('anime', 'anime_notes', 'watch_history')").run();
 
     const insertWithId = db.prepare(`
-      INSERT INTO anime (id, title, original_title, coverUrl, localCoverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO anime (id, title, original_title, coverUrl, localCoverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, start_date_source, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertWithoutId = db.prepare(`
-      INSERT INTO anime (title, original_title, coverUrl, localCoverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO anime (title, original_title, coverUrl, localCoverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, start_date_source, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const sourceIdMap = new Map<string, number>();
     const importedAnimeIds = new Map<NormalizedAnime, number>();
@@ -280,7 +282,7 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
       const values = [
         p.title, p.originalTitle || null, p.coverUrl || null, p.localCoverUrl || null, p.status, p.score ?? null,
         p.progress, p.totalEpisodes ?? null, p.durationMinutes ?? null, p.notes || null,
-        JSON.stringify(p.tags || []), p.summary || null, p.startDate || null, p.endDate || null,
+        JSON.stringify(p.tags || []), p.summary || null, p.startDate || null, p.startDateSource || null, p.endDate || null,
         p.premiereDate || null, JSON.stringify(p.cast || []), JSON.stringify(p.castAliases || []),
         p.isFinished == null ? null : (p.isFinished ? 1 : 0), item.createdAt, item.updatedAt,
       ];
@@ -338,6 +340,8 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
       insertHistory.run(animeId, row.title, episode, new Date(watchedAt).toISOString());
       importedHistory++;
     }
+
+    backfillMissingAnimeStartDates(db);
 
     for (const item of ordered) {
       const animeId = importedAnimeIds.get(item);
