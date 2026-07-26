@@ -108,6 +108,31 @@ describe('anime progress and watch history transaction', () => {
     expect(animeNotesModule.listAnimeNotes(anime.id)).toEqual([]);
   });
 
+  it('replaces episode-note drafts while preserving the overall note', async () => {
+    const anime = await animeModule.createAnimeRecord({
+      title: '统一编辑备注',
+      status: 'watching',
+      progress: 2,
+      notes: '保留的总备注',
+    });
+    animeNotesModule.createEpisodeNote(anime.id, {
+      episode: 1,
+      content: '旧随记',
+      notedAt: '2026-07-20',
+    });
+
+    const notes = animeNotesModule.replaceEpisodeNotes(anime.id, [{
+      episode: 2,
+      content: '保存后的新随记',
+      notedAt: '2026-07-21',
+    }]);
+
+    expect(notes).toMatchObject([
+      { episode: undefined, content: '保留的总备注' },
+      { episode: 2, content: '保存后的新随记', notedAt: '2026-07-21' },
+    ]);
+  });
+
   it('writes every newly watched episode when progress increases', async () => {
     const anime = await createWatchingAnime();
     const watchedAt = new Date('2026-07-25T12:30:00.000Z');

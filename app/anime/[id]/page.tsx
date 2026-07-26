@@ -7,7 +7,7 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { fetchJson } from '@/lib/client-api';
-import type { AnimeStatus, AnimeDetailItem } from '@/lib/anime-shared';
+import type { AnimeStatus, AnimeDetailItem, AnimeNoteEntry } from '@/lib/anime-shared';
 import { useManageAccess } from '@/hooks/useManageAccess';
 import { ANIME_LIST_KEY, isHistoryKey, animeDetailKey, swrFetcher } from '@/lib/swr-config';
 import {
@@ -44,10 +44,14 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
 
   // 表单编辑副本（与 SWR 缓存分离）
   const [formData, setFormData] = useState<Partial<AnimeDetailItem>>({});
+  const [noteEntriesDraft, setNoteEntriesDraft] = useState<AnimeNoteEntry[]>([]);
 
   // 数据就绪后初始化表单
   useEffect(() => {
-    if (item) setFormData(item);
+    if (item) {
+      setFormData(item);
+      setNoteEntriesDraft(item.noteEntries || []);
+    }
   }, [item]);
 
   useEffect(() => {
@@ -61,20 +65,42 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
   const saveChanges = async () => {
     if (!item || !isAdmin) return;
     const payload = buildChangedPayload(formData, item);
-    if (Object.keys(payload).length === 0) {
+    const episodeNotes = noteEntriesDraft.filter((note) => note.episode !== undefined);
+    const originalEpisodeNotes = (item.noteEntries || []).filter((note) => note.episode !== undefined);
+    const noteEntriesChanged = JSON.stringify(episodeNotes.map(({ episode, content, notedAt }) => ({
+      episode, content, notedAt,
+    }))) !== JSON.stringify(originalEpisodeNotes.map(({ episode, content, notedAt }) => ({
+      episode, content, notedAt,
+    })));
+    if (Object.keys(payload).length === 0 && !noteEntriesChanged) {
       toast('没有需要保存的变更', { icon: 'ℹ️' });
       return;
     }
     setSaving(true);
     try {
-      const response = await fetchJson<AnimeMutationResponse>(`/api/anime/${params.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      }, '保存失败');
+      let nextEntry = item;
+      if (Object.keys(payload).length > 0) {
+        const response = await fetchJson<AnimeMutationResponse>(`/api/anime/${params.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }, '保存失败');
+        nextEntry = response.entry;
+      }
+      if (noteEntriesChanged) {
+        const savedNotes = await fetchJson<AnimeNoteEntry[]>(`/api/anime/${params.id}/notes`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(episodeNotes.map(({ episode, content, notedAt }) => ({
+            episode, content, notedAt,
+          }))),
+        }, '保存分集备注失败');
+        nextEntry = { ...nextEntry, noteEntries: savedNotes };
+      }
       // 更新当前详情缓存
-      mutate(response.entry, { revalidate: false });
-      setFormData(response.entry);
+      mutate(nextEntry, { revalidate: false });
+      setFormData(nextEntry);
+      setNoteEntriesDraft(nextEntry.noteEntries || []);
       // 全局刷新番剧列表（侧边栏、Dashboard 等自动同步）
       globalMutate(ANIME_LIST_KEY);
       setIsEditing(false);
@@ -190,11 +216,16 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
               progressPercent={progressPercent}
               onChange={handleChange}
               onEdit={() => setIsEditing(true)}
-              onCancel={() => { setIsEditing(false); setFormData(item); }}
+              onCancel={() => {
+                setIsEditing(false);
+                setFormData(item);
+                setNoteEntriesDraft(item.noteEntries || []);
+              }}
               onSave={saveChanges}
               onEnrich={enrichAnimeInfo}
               onDelete={() => setShowDeleteConfirm(true)}
-              onNotesChanged={() => mutate()}
+              noteEntriesDraft={noteEntriesDraft}
+              onNoteEntriesChange={setNoteEntriesDraft}
             />
           </div>
         </div>

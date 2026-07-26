@@ -74,5 +74,7 @@ export const animeNoteBodySchema = z.object({
   notedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '备注日期格式应为 YYYY-MM-DD'),
 });
 
+export const animeNoteCollectionSchema = z.array(animeNoteBodySchema).max(10000);
+
 export type CreateAnimeInput = z.infer<typeof createAnimeSchema>;
 export type UpdateAnimeInput = z.infer<typeof updateAnimeSchema>;

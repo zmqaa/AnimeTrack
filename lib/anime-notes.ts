@@ -91,3 +91,26 @@ export function deleteAnimeNote(animeId: number, noteId: number): boolean {
   `).run(noteId, animeId);
   return result.changes > 0;
 }
+
+export function replaceEpisodeNotes(
+  animeId: number,
+  notes: Array<{ episode: number; content: string; notedAt: string }>,
+): AnimeNoteEntry[] | null {
+  const db = getRawDb();
+  const transaction = db.transaction(() => {
+    const exists = db.prepare('SELECT 1 FROM anime WHERE id = ?').get(animeId);
+    if (!exists) return null;
+
+    db.prepare('DELETE FROM anime_notes WHERE animeId = ? AND episode IS NOT NULL').run(animeId);
+    const insert = db.prepare(`
+      INSERT INTO anime_notes (animeId, episode, content, notedAt, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    const now = nowISO();
+    for (const note of notes) {
+      insert.run(animeId, note.episode, note.content, note.notedAt, now, now);
+    }
+    return listAnimeNotes(animeId);
+  });
+  return transaction();
+}

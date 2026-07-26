@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
-import { ClockIcon, PencilSquareIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-import toast from 'react-hot-toast';
-import AsyncButton from '@/components/shared/AsyncButton';
+import {
+  CalendarDaysIcon,
+  ChatBubbleBottomCenterTextIcon,
+  PencilSquareIcon,
+  PlusIcon,
+  TrashIcon,
+} from '@heroicons/react/24/outline';
 import SectionTitle from '@/components/shared/SectionTitle';
-import { fetchJson } from '@/lib/client-api';
 import type { AnimeNoteEntry } from '@/lib/anime-shared';
 
 type NoteDraft = {
@@ -17,13 +20,12 @@ type NoteDraft = {
 type Props = {
   animeId: number;
   overallNote?: string;
-  noteEntries?: AnimeNoteEntry[];
+  noteEntries: AnimeNoteEntry[];
   currentEpisode: number;
-  isAdmin: boolean;
-  canEditOverall: boolean;
+  canEdit: boolean;
   overallDraft?: string;
   onOverallChange: (value: string) => void;
-  onNotesChanged: () => Promise<unknown>;
+  onNoteEntriesChange: (notes: AnimeNoteEntry[]) => void;
 };
 
 function todayDateKey() {
@@ -43,7 +45,7 @@ function emptyDraft(currentEpisode: number): NoteDraft {
   };
 }
 
-function noteDraft(note: AnimeNoteEntry): NoteDraft {
+function draftFromNote(note: AnimeNoteEntry): NoteDraft {
   return {
     episode: String(note.episode || 1),
     notedAt: note.notedAt,
@@ -56,120 +58,115 @@ export default function AnimeNotesPanel({
   overallNote,
   noteEntries,
   currentEpisode,
-  isAdmin,
-  canEditOverall,
+  canEdit,
   overallDraft,
   onOverallChange,
-  onNotesChanged,
+  onNoteEntriesChange,
 }: Props) {
   const episodeNotes = useMemo(
-    () => (noteEntries || []).filter((note) => note.episode !== undefined),
+    () => noteEntries
+      .filter((note) => note.episode !== undefined)
+      .sort((left, right) => (
+        right.notedAt.localeCompare(left.notedAt) || right.id - left.id
+      )),
     [noteEntries],
   );
-  const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState<NoteDraft>(() => emptyDraft(currentEpisode));
+  const [composerOpen, setComposerOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-  const canManageEpisodeNotes = isAdmin && !canEditOverall;
+  const [draft, setDraft] = useState<NoteDraft>(() => emptyDraft(currentEpisode));
+  const [draftError, setDraftError] = useState('');
 
-  useEffect(() => {
-    if (canEditOverall) {
-      setAdding(false);
-      setEditingId(null);
-      setDeletingId(null);
-    }
-  }, [canEditOverall]);
-
-  const resetComposer = () => {
-    setAdding(false);
+  const closeComposer = () => {
+    setComposerOpen(false);
     setEditingId(null);
+    setDraftError('');
     setDraft(emptyDraft(currentEpisode));
   };
 
-  const submitNote = async () => {
+  useEffect(() => {
+    if (!canEdit) closeComposer();
+    // Only react to the page entering or leaving edit mode.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEdit]);
+
+  const saveDraft = () => {
     const episode = Number(draft.episode);
+    const content = draft.content.trim();
     if (!Number.isInteger(episode) || episode < 1) {
-      toast.error('请输入有效集数');
+      setDraftError('请输入有效集数');
       return;
     }
-    if (!draft.content.trim()) {
-      toast.error('请输入备注内容');
+    if (!draft.notedAt) {
+      setDraftError('请选择备注日期');
+      return;
+    }
+    if (!content) {
+      setDraftError('写一点这一集留下的印象吧');
       return;
     }
 
-    setSaving(true);
-    try {
-      const url = editingId
-        ? `/api/anime/${animeId}/notes/${editingId}`
-        : `/api/anime/${animeId}/notes`;
-      await fetchJson<AnimeNoteEntry>(url, {
-        method: editingId ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    const now = new Date().toISOString();
+    if (editingId !== null) {
+      onNoteEntriesChange(noteEntries.map((note) => (
+        note.id === editingId
+          ? { ...note, episode, content, notedAt: draft.notedAt, updatedAt: now }
+          : note
+      )));
+    } else {
+      const temporaryId = -Date.now();
+      onNoteEntriesChange([
+        ...noteEntries,
+        {
+          id: temporaryId,
+          animeId,
           episode,
+          content,
           notedAt: draft.notedAt,
-          content: draft.content,
-        }),
-      }, editingId ? '更新备注失败' : '新增备注失败');
-      await onNotesChanged();
-      toast.success(editingId ? '备注已更新' : '备注已添加');
-      resetComposer();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '保存备注失败');
-    } finally {
-      setSaving(false);
+          createdAt: now,
+          updatedAt: now,
+        },
+      ]);
     }
+    closeComposer();
   };
 
-  const deleteNote = async (noteId: number) => {
-    setSaving(true);
-    try {
-      await fetchJson<{ ok: true }>(`/api/anime/${animeId}/notes/${noteId}`, {
-        method: 'DELETE',
-      }, '删除备注失败');
-      await onNotesChanged();
-      toast.success('备注已删除');
-      setDeletingId(null);
-      if (editingId === noteId) resetComposer();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '删除备注失败');
-    } finally {
-      setSaving(false);
-    }
+  const deleteDraft = (noteId: number) => {
+    onNoteEntriesChange(noteEntries.filter((note) => note.id !== noteId));
+    if (editingId === noteId) closeComposer();
   };
 
   return (
     <div className="surface-card rounded-[24px] p-6 backdrop-blur-xl">
       <SectionTitle
         size="small"
-        icon={<ClockIcon className="h-4 w-4" />}
-        action={canManageEpisodeNotes && !adding && editingId === null ? (
+        icon={<ChatBubbleBottomCenterTextIcon className="h-4 w-4" />}
+        action={canEdit && !composerOpen ? (
           <button
             type="button"
             onClick={() => {
               setDraft(emptyDraft(currentEpisode));
-              setAdding(true);
+              setEditingId(null);
+              setComposerOpen(true);
             }}
-            className="theme-accent-soft flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs transition"
+            className="theme-accent-soft flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition"
           >
-            <PlusIcon className="h-4 w-4" />
-            添加分集备注
+            <PlusIcon className="h-3.5 w-3.5" />
+            分集随记
           </button>
         ) : undefined}
       >
         个人备注
       </SectionTitle>
 
-      <div className="mt-4">
-        <p className="mb-2 text-xs font-medium text-[var(--text-muted)]">总备注</p>
-        {canEditOverall ? (
+      <div className="mt-5">
+        <p className="mb-2 text-[11px] font-medium tracking-wide text-[var(--text-muted)]">总体感受</p>
+        {canEdit ? (
           <textarea
             rows={4}
             value={overallDraft || ''}
             onChange={(event) => onOverallChange(event.target.value)}
-            placeholder="记录对整部作品的总体印象"
-            className="surface-input theme-focus-accent w-full rounded-2xl p-4 text-sm leading-7 text-[var(--text-primary)] transition"
+            placeholder="对整部作品的印象、期待或总结…"
+            className="theme-focus-accent w-full resize-y rounded-2xl border border-[var(--border)] bg-transparent px-4 py-3 text-sm leading-7 text-[var(--text-primary)] transition placeholder:text-[var(--text-muted)]"
           />
         ) : (
           <p className="whitespace-pre-wrap text-sm leading-7 text-[var(--text-secondary)]">
@@ -178,126 +175,116 @@ export default function AnimeNotesPanel({
         )}
       </div>
 
-      {canManageEpisodeNotes && (adding || editingId !== null) && (
-        <div className="surface-card-muted mt-5 rounded-2xl p-4">
-          <div className="grid gap-3 sm:grid-cols-[110px_150px_minmax(0,1fr)]">
-            <label className="text-xs text-[var(--text-muted)]">
-              集数
+      {canEdit && composerOpen && (
+        <div className="mt-5 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]">
+          <div className="flex flex-wrap items-center gap-3 border-b border-[var(--border)] px-4 py-3">
+            <label className="theme-accent-soft flex items-center gap-2 rounded-full px-3 py-1.5 text-xs">
+              <span>第</span>
               <input
                 type="number"
                 min={1}
                 value={draft.episode}
                 onChange={(event) => setDraft((current) => ({ ...current, episode: event.target.value }))}
-                className="surface-input theme-focus-accent mt-1.5 w-full rounded-xl px-3 py-2 text-sm text-[var(--text-primary)]"
+                className="w-10 bg-transparent text-center font-mono text-[var(--text-primary)] outline-none"
               />
+              <span>集</span>
             </label>
-            <label className="text-xs text-[var(--text-muted)]">
-              日期
+            <label className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+              <CalendarDaysIcon className="h-4 w-4" />
               <input
                 type="date"
                 value={draft.notedAt}
                 onChange={(event) => setDraft((current) => ({ ...current, notedAt: event.target.value }))}
-                className="surface-input theme-focus-accent mt-1.5 w-full rounded-xl px-3 py-2 text-sm text-[var(--text-primary)]"
-              />
-            </label>
-            <label className="text-xs text-[var(--text-muted)]">
-              备注
-              <textarea
-                rows={3}
-                value={draft.content}
-                onChange={(event) => setDraft((current) => ({ ...current, content: event.target.value }))}
-                placeholder="这一集给你留下了什么印象？"
-                className="surface-input theme-focus-accent mt-1.5 w-full rounded-xl px-3 py-2 text-sm leading-6 text-[var(--text-primary)]"
+                className="bg-transparent text-[var(--text-secondary)] outline-none"
               />
             </label>
           </div>
-          <div className="mt-3 flex justify-end gap-2">
-            <button
-              type="button"
-              disabled={saving}
-              onClick={resetComposer}
-              className="rounded-xl px-3 py-2 text-xs text-[var(--text-secondary)] transition hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
-            >
-              取消
-            </button>
-            <AsyncButton
-              onClick={submitNote}
-              busy={saving}
-              busyLabel="保存中…"
-              className="theme-accent-button rounded-xl px-4 py-2 text-xs font-medium disabled:opacity-50"
-            >
-              {editingId ? '保存备注' : '添加备注'}
-            </AsyncButton>
+          <textarea
+            rows={4}
+            autoFocus
+            value={draft.content}
+            onChange={(event) => {
+              setDraft((current) => ({ ...current, content: event.target.value }));
+              if (draftError) setDraftError('');
+            }}
+            placeholder="这一集给你留下了什么印象？"
+            className="w-full resize-y bg-transparent px-4 py-4 text-sm leading-7 text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+          />
+          <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-4 py-3">
+            <p className="text-xs text-danger">{draftError}</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={closeComposer}
+                className="rounded-full px-3 py-1.5 text-xs text-[var(--text-muted)] transition hover:text-[var(--text-primary)]"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={saveDraft}
+                className="theme-accent-button rounded-full px-4 py-1.5 text-xs font-medium"
+              >
+                {editingId !== null ? '完成修改' : '加入随记'}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       <div className="mt-6 border-t border-[var(--border)] pt-5">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs font-medium text-[var(--text-muted)]">分集随记</p>
-          <span className="text-xs text-[var(--text-muted)]">{episodeNotes.length} 条</span>
+          <p className="text-[11px] font-medium tracking-wide text-[var(--text-muted)]">分集随记</p>
+          {episodeNotes.length > 0 && (
+            <span className="text-[11px] text-[var(--text-muted)]">{episodeNotes.length} 条</span>
+          )}
         </div>
         {episodeNotes.length > 0 ? (
           <div className="space-y-3">
             {episodeNotes.map((note) => (
-              <article key={note.id} className="surface-card-muted rounded-2xl px-4 py-3.5">
-                <div className="flex items-start justify-between gap-3">
+              <article
+                key={note.id}
+                className="group rounded-2xl border border-transparent bg-[var(--color-surface-subtle)] px-4 py-3.5 transition hover:border-[var(--border)]"
+              >
+                <div className="flex items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className="theme-accent-soft rounded-full px-2.5 py-1 font-medium">第 {note.episode} 集</span>
+                    <span className="theme-accent-text font-medium">EP {note.episode}</span>
+                    <span className="h-1 w-1 rounded-full bg-[var(--text-muted)]" />
                     <time className="text-[var(--text-muted)]">{note.notedAt}</time>
                   </div>
-                  {canManageEpisodeNotes && editingId !== note.id && (
-                    <div className="flex shrink-0 gap-1">
+                  {canEdit && !composerOpen && (
+                    <div className="flex gap-1 opacity-70 transition group-hover:opacity-100">
                       <button
                         type="button"
                         title="编辑备注"
                         onClick={() => {
-                          setAdding(false);
                           setEditingId(note.id);
-                          setDraft(noteDraft(note));
+                          setDraft(draftFromNote(note));
+                          setComposerOpen(true);
                         }}
-                        className="rounded-lg p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--text-primary)]"
+                        className="rounded-full p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--text-primary)]"
                       >
-                        <PencilSquareIcon className="h-4 w-4" />
+                        <PencilSquareIcon className="h-3.5 w-3.5" />
                       </button>
-                      {deletingId === note.id ? (
-                        <>
-                          <button
-                            type="button"
-                            disabled={saving}
-                            onClick={() => void deleteNote(note.id)}
-                            className="danger-soft rounded-lg px-2 py-1 text-xs disabled:opacity-50"
-                          >
-                            确认
-                          </button>
-                          <button
-                            type="button"
-                            disabled={saving}
-                            onClick={() => setDeletingId(null)}
-                            className="rounded-lg px-2 py-1 text-xs text-[var(--text-muted)] disabled:opacity-50"
-                          >
-                            取消
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          title="删除备注"
-                          onClick={() => setDeletingId(note.id)}
-                          className="rounded-lg p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--color-surface-hover)] hover:text-danger"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        title="移除备注"
+                        onClick={() => deleteDraft(note.id)}
+                        className="rounded-full p-1.5 text-[var(--text-muted)] transition hover:bg-[var(--color-surface-hover)] hover:text-danger"
+                      >
+                        <TrashIcon className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   )}
                 </div>
-                <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--text-secondary)]">{note.content}</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[var(--text-secondary)]">{note.content}</p>
               </article>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-[var(--text-muted)]">还没有分集随记。</p>
+          <p className="text-sm text-[var(--text-muted)]">
+            {canEdit ? '可以添加一条与集数关联的观看感受。' : '还没有分集随记。'}
+          </p>
         )}
       </div>
     </div>

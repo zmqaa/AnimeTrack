@@ -1,7 +1,7 @@
 import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
 import { parseAnimeId } from '@/lib/anime';
-import { createEpisodeNote, listAnimeNotes } from '@/lib/anime-notes';
-import { animeNoteBodySchema } from '@/lib/validations';
+import { createEpisodeNote, listAnimeNotes, replaceEpisodeNotes } from '@/lib/anime-notes';
+import { animeNoteBodySchema, animeNoteCollectionSchema } from '@/lib/validations';
 
 export async function GET(
   _request: Request,
@@ -30,4 +30,24 @@ export async function POST(
   const note = createEpisodeNote(animeId, parsed.data);
   if (!note) return apiError('Not found', 404);
   return apiSuccess(note, 201);
+}
+
+export async function PUT(
+  request: Request,
+  context: { params: { id: string } },
+) {
+  const auth = await requireAdmin();
+  if (!auth.authorized) return auth.response;
+
+  const animeId = parseAnimeId(context.params.id);
+  if (!animeId) return apiError('Invalid ID', 400);
+
+  const parsed = animeNoteCollectionSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return apiError(parsed.error.issues[0]?.message || '参数校验失败', 400);
+  }
+
+  const notes = replaceEpisodeNotes(animeId, parsed.data);
+  if (!notes) return apiError('Not found', 404);
+  return apiSuccess(notes);
 }
