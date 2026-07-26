@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import NumericInput from '@/components/shared/NumericInput';
 
 type AnimePaginationProps = {
   loading: boolean;
@@ -90,13 +91,14 @@ export default function AnimePagination({
           className="flex items-center gap-2"
         >
           <span>跳至</span>
-          <input
-            type="number"
+          <NumericInput
             min={1}
             max={totalPages}
             value={pageInput}
-            onChange={(event) => setPageInput(event.target.value)}
+            onValueChange={setPageInput}
             onBlur={jumpToPage}
+            selectOnFocus
+            aria-label="跳转页码"
             className="surface-input theme-focus-accent w-16 rounded-lg px-2 py-1.5 text-center text-xs text-[var(--text-primary)] outline-none"
           />
           <span>页</span>

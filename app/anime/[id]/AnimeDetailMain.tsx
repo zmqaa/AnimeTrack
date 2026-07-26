@@ -9,6 +9,7 @@ import ProgressBar from '@/components/shared/ProgressBar';
 import StatTile from '@/components/shared/StatTile';
 import AsyncButton from '@/components/shared/AsyncButton';
 import SectionTitle from '@/components/shared/SectionTitle';
+import NumericInput from '@/components/shared/NumericInput';
 import AnimeNotesPanel from './AnimeNotesPanel';
 
 type Props = {
@@ -142,14 +143,27 @@ export default function AnimeDetailMain({
               action={(
                 <span className="font-mono text-sm text-[var(--text-secondary)]">
                 {canEdit ? (
-                  <div className="flex items-center gap-2">
-                    <input type="number" value={formData.progress ?? item.progress}
-                      onChange={(event) => onChange('progress', event.target.value)}
-                      className="surface-input theme-focus-accent w-20 rounded-xl px-2 py-1.5 text-center text-sm text-[var(--text-primary)] transition" />
-                    <span>/</span>
-                    <input type="number" value={formData.totalEpisodes ?? item.totalEpisodes ?? ''}
-                      onChange={(event) => onChange('totalEpisodes', event.target.value)} placeholder="?"
-                      className="surface-input theme-focus-accent w-20 rounded-xl px-2 py-1.5 text-center text-sm text-[var(--text-primary)] transition" />
+                  <div className="surface-card-muted flex items-center gap-2 rounded-2xl px-2 py-1.5">
+                    <NumericInput
+                      aria-label="当前观看集数"
+                      min={0}
+                      selectOnFocus
+                      value={formData.progress ?? item.progress}
+                      onValueChange={(value) => onChange('progress', value)}
+                      className="theme-focus-accent w-14 rounded-lg border border-transparent bg-transparent px-1.5 py-1 text-center text-sm text-[var(--text-primary)] transition"
+                    />
+                    <span className="text-[var(--text-muted)]">/</span>
+                    <NumericInput
+                      aria-label="番剧总集数"
+                      min={1}
+                      max={9999}
+                      selectOnFocus
+                      value={formData.totalEpisodes ?? item.totalEpisodes ?? ''}
+                      onValueChange={(value) => onChange('totalEpisodes', value)}
+                      placeholder="?"
+                      className="theme-focus-accent w-14 rounded-lg border border-transparent bg-transparent px-1.5 py-1 text-center text-sm text-[var(--text-primary)] transition"
+                    />
+                    <span className="pr-1 text-[10px] text-[var(--text-muted)]">EP</span>
                   </div>
                 ) : (
                   <><span className="text-2xl text-[var(--text-primary)]">{displayProgress}</span><span className="mx-1 text-[var(--text-muted)]">/</span><span>{displayTotalEpisodes || '?'}</span><span className="ml-1 text-xs text-[var(--text-muted)]">EP</span></>

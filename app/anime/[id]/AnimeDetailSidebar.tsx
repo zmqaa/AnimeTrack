@@ -4,6 +4,7 @@ import type { AnimeDetailItem, AnimeStatus } from '@/lib/anime-shared';
 import { statusMap, statusBadgeStyles } from './anime-detail-helpers';
 import FormField from '@/components/shared/FormField';
 import StatTile from '@/components/shared/StatTile';
+import NumericInput from '@/components/shared/NumericInput';
 
 type Props = {
   item: AnimeDetailItem;
@@ -126,18 +127,23 @@ export default function AnimeDetailSidebar({
             </FormField>
             <div className="grid grid-cols-2 gap-3">
               <FormField label="评分">
-                <input
-                  type="number"
+                <NumericInput
+                  min={0}
+                  max={10}
+                  allowDecimal
                   value={formData.score ?? ''}
-                  onChange={(event) => onChange('score', event.target.value)}
+                  onValueChange={(value) => onChange('score', value)}
+                  placeholder="—"
                   className="surface-input theme-focus-accent w-full rounded-xl px-3 py-2.5 text-sm text-[var(--text-primary)] transition"
                 />
               </FormField>
               <FormField label="单集时长">
-                <input
-                  type="number"
+                <NumericInput
+                  min={1}
+                  max={9999}
                   value={formData.durationMinutes ?? ''}
-                  onChange={(event) => onChange('durationMinutes', event.target.value)}
+                  onValueChange={(value) => onChange('durationMinutes', value)}
+                  placeholder="24"
                   className="surface-input theme-focus-accent w-full rounded-xl px-3 py-2.5 text-sm text-[var(--text-primary)] transition"
                 />
               </FormField>

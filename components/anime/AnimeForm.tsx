@@ -8,6 +8,7 @@ import type { AnimeStatus, AnimeFormInitialData } from '@/lib/anime-shared';
 import { statusLabels } from '@/lib/dashboard-types';
 import FormField from '@/components/shared/FormField';
 import AsyncButton from '@/components/shared/AsyncButton';
+import NumericInput from '@/components/shared/NumericInput';
 
 interface AnimeFormProps {
   editingId: number | null;
@@ -161,14 +162,14 @@ export default function AnimeForm({
         <div className="lg:col-span-6 space-y-4">
             <div className="grid grid-cols-2 gap-4">
                 <FormField label="当前进度">
-                    <input 
-                        type="number" value={progress} onChange={e => setProgress(e.target.value)}
+                    <NumericInput
+                        min={0} value={progress} onValueChange={setProgress}
                         className="surface-input w-full rounded-lg px-3 py-2.5 focus-theme focus:outline-none transition text-[var(--text-primary)]"
                     />
                 </FormField>
                 <FormField label="总集数">
-                    <input 
-                        type="number" value={totalEpisodes} onChange={e => setTotalEpisodes(e.target.value)}
+                    <NumericInput
+                        min={1} max={9999} value={totalEpisodes} onValueChange={setTotalEpisodes}
                         placeholder="未知"
                         className="surface-input w-full rounded-lg px-3 py-2.5 focus-theme focus:outline-none transition text-[var(--text-primary)]"
                     />
@@ -176,8 +177,8 @@ export default function AnimeForm({
             </div>
              <div className="grid grid-cols-2 gap-4">
                 <FormField label="单集时长 (分)">
-                     <input 
-                         type="number" value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)}
+                     <NumericInput
+                         min={1} max={9999} value={durationMinutes} onValueChange={setDurationMinutes}
                          placeholder="24"
                          className="surface-input w-full rounded-lg px-3 py-2.5 focus-theme focus:outline-none transition text-[var(--text-primary)]"
                      />
