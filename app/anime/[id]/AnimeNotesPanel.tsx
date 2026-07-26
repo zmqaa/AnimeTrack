@@ -196,38 +196,30 @@ export default function AnimeNotesPanel({
 
       {canEdit && composerOpen && (
         <div className="surface-card-muted mt-5 overflow-hidden rounded-[20px]">
-          <div className="flex flex-col gap-3 border-b border-[var(--border)] px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-medium text-[var(--text-primary)]">
-                {editingId !== null ? '修改分集随记' : '记录这一集'}
-              </p>
-              <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">加入后仍需保存整个页面</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="theme-accent-soft flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs">
-                <span>第</span>
-                <NumericInput
-                  aria-label="随记集数"
-                  min={1}
-                  max={9999}
-                  selectOnFocus
-                  value={draft.episode}
-                  onValueChange={(value) => setDraft((current) => ({ ...current, episode: value }))}
-                  className="theme-focus-accent w-9 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-center font-mono text-[var(--text-primary)]"
-                />
-                <span>集</span>
-              </label>
-              <label className="surface-pill flex items-center gap-2 rounded-full px-3 py-1.5 text-xs text-[var(--text-muted)]">
-                <CalendarDaysIcon className="h-3.5 w-3.5" />
-                <input
-                  type="date"
-                  aria-label="随记日期"
-                  value={draft.notedAt}
-                  onChange={(event) => setDraft((current) => ({ ...current, notedAt: event.target.value }))}
-                  className="bg-transparent text-[var(--text-secondary)] outline-none"
-                />
-              </label>
-            </div>
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3.5">
+            <label className="theme-accent-soft flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs">
+              <span>第</span>
+              <NumericInput
+                aria-label="随记集数"
+                min={1}
+                max={9999}
+                selectOnFocus
+                value={draft.episode}
+                onValueChange={(value) => setDraft((current) => ({ ...current, episode: value }))}
+                className="theme-focus-accent w-9 rounded-md border border-transparent bg-transparent px-1 py-0.5 text-center font-mono text-[var(--text-primary)]"
+              />
+              <span>集</span>
+            </label>
+            <label className="surface-pill flex min-w-0 items-center gap-2 rounded-full px-3 py-1.5 text-xs text-[var(--text-muted)]">
+              <CalendarDaysIcon className="h-3.5 w-3.5 shrink-0" />
+              <input
+                type="date"
+                aria-label="随记日期"
+                value={draft.notedAt}
+                onChange={(event) => setDraft((current) => ({ ...current, notedAt: event.target.value }))}
+                className="min-w-0 bg-transparent text-[var(--text-secondary)] outline-none"
+              />
+            </label>
           </div>
           <textarea
             rows={4}

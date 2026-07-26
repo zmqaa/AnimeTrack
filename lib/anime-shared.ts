@@ -36,6 +36,7 @@ export interface AnimeCardItem {
   totalEpisodes?: number | null;
   durationMinutes?: number;
   notes?: string;
+  summary?: string;
   tags?: string[];
   startDate?: string;
   endDate?: string;
@@ -51,7 +52,6 @@ export interface AnimeListItem extends AnimeCardItem {
 }
 
 export interface AnimeDetailItem extends AnimeListItem {
-  summary?: string;
   premiereDate?: string;
   noteEntries?: AnimeNoteEntry[];
 }

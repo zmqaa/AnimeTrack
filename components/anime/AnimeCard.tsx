@@ -132,9 +132,9 @@ export default memo(function AnimeCard({ item, updateProgress, isUpdatingProgres
         </div>
 
         {/* 内容 */}
-        {item.notes && (
-          <p className="text-[11px] text-[var(--text-muted)] line-clamp-2 leading-relaxed h-8 italic">
-            &ldquo;{item.notes}&rdquo;
+        {item.summary && (
+          <p className="h-8 line-clamp-2 text-[11px] leading-relaxed text-[var(--text-muted)]">
+            {item.summary}
           </p>
         )}
 
