@@ -28,6 +28,9 @@ function buildQuery(params: Record<string, string | number>): string {
 /** 全量番剧列表（侧边栏统计 + 客户端筛选降级） */
 export const ANIME_LIST_KEY = '/api/anime';
 
+/** 番剧列表轻量概览（统计、标签、声优建议、最近观看） */
+export const ANIME_OVERVIEW_KEY = '/api/anime/overview';
+
 /** 番剧分页列表 */
 export function animePageKey(params: Record<string, string | number>): string {
   const qs = buildQuery(params);

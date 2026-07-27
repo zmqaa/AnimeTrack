@@ -348,4 +348,79 @@ describe('anime progress and watch history transaction', () => {
     expect(stored.progress).toBe(0);
     expect(readHistory(anime.id)).toEqual([]);
   });
+
+  it('filters paginated anime by tag and cast on the server', async () => {
+    const matching = await animeModule.createAnimeRecord({
+      title: '服务端筛选目标',
+      status: 'watching',
+      progress: 3,
+      tags: ['日常', '治愈'],
+      cast: ['Kana Hanazawa'],
+      castAliases: ['花泽香菜'],
+    });
+    await animeModule.createAnimeRecord({
+      title: '其他作品',
+      status: 'completed',
+      progress: 12,
+      tags: ['动作'],
+      cast: ['Other Actor'],
+    });
+
+    const byTag = await animeModule.listAnimeRecordsPaginated({
+      tag: '治愈',
+      limit: 12,
+    });
+    const byCast = await animeModule.listAnimeRecordsPaginated({
+      cast: '花泽香菜',
+      limit: 12,
+    });
+
+    expect(byTag.total).toBe(1);
+    expect(byTag.records.map((item) => item.id)).toEqual([matching.id]);
+    expect(byCast.total).toBe(1);
+    expect(byCast.records.map((item) => item.id)).toEqual([matching.id]);
+  });
+
+  it('builds a lightweight overview with stats, facets and recent watches', async () => {
+    const recent = await animeModule.createAnimeRecord({
+      title: '最近观看作品',
+      status: 'watching',
+      progress: 3,
+      durationMinutes: 25,
+      tags: ['日常', '治愈'],
+      cast: ['Kana Hanazawa'],
+      castAliases: ['花泽香菜'],
+    });
+    await animeModule.createAnimeRecord({
+      title: '已完成作品',
+      status: 'completed',
+      progress: 12,
+      tags: ['日常'],
+    });
+    dbModule.getRawDb().prepare(`
+      INSERT INTO watch_history (animeId, animeTitle, episode, watchedAt)
+      VALUES (?, ?, ?, ?)
+    `).run(recent.id, recent.title, 3, '2026-07-26T10:00:00.000Z');
+
+    const overview = await animeModule.getAnimeListOverview();
+
+    expect(overview.stats).toEqual({
+      total: 2,
+      watching: 1,
+      completed: 1,
+      unfinished: 1,
+      watchedEpisodes: 15,
+      totalMinutes: 363,
+    });
+    expect(overview.tagPreferences).toEqual([
+      { tag: '日常', count: 2 },
+      { tag: '治愈', count: 1 },
+    ]);
+    expect(overview.voiceActorSuggestions).toContain('花泽香菜');
+    expect(overview.recentWatchItems).toHaveLength(1);
+    expect(overview.recentWatchItems[0]).toMatchObject({
+      id: recent.id,
+      lastWatchedAt: '2026-07-26T10:00:00.000Z',
+    });
+  });
 });

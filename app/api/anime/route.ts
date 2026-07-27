@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
   const limit = Number(searchParams.get('limit') || '0');
   const offset = Number(searchParams.get('offset') || '0');
   const search = searchParams.get('search') || undefined;
+  const cast = searchParams.get('cast') || undefined;
+  const tag = searchParams.get('tag') || undefined;
   const sortBy = searchParams.get('sortBy') || undefined;
   const sortOrder = (searchParams.get('sortOrder') as 'asc' | 'desc') || undefined;
   const page = Number(searchParams.get('page') || '0');
@@ -23,6 +25,8 @@ export async function GET(request: NextRequest) {
       const result = await listAnimeRecordsPaginated({
         status: status || undefined,
         search,
+        cast,
+        tag,
         sortBy,
         sortOrder,
         limit: pageSize,

@@ -51,6 +51,22 @@ export interface AnimeListItem extends AnimeCardItem {
   updatedAt: string;
 }
 
+export interface AnimeLibraryStats {
+  total: number;
+  watching: number;
+  completed: number;
+  unfinished: number;
+  watchedEpisodes: number;
+  totalMinutes: number;
+}
+
+export interface AnimeListOverview {
+  stats: AnimeLibraryStats;
+  tagPreferences: Array<{ tag: string; count: number }>;
+  voiceActorSuggestions: string[];
+  recentWatchItems: AnimeListItem[];
+}
+
 export interface AnimeDetailItem extends AnimeListItem {
   premiereDate?: string;
   noteEntries?: AnimeNoteEntry[];

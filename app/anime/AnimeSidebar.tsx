@@ -2,11 +2,11 @@
 
 import Image from 'next/image';
 import { FireIcon, SparklesIcon, TagIcon, TvIcon } from '@heroicons/react/24/outline';
-import type { AnimeCardItem, AnimeListItem } from '@/lib/anime-shared';
-import { buildLibraryStats, formatRecentWatchDate } from './anime-page-helpers';
+import type { AnimeCardItem, AnimeLibraryStats, AnimeListItem } from '@/lib/anime-shared';
+import { formatRecentWatchDate } from './anime-page-helpers';
 
 type AnimeSidebarProps = {
-  items: AnimeListItem[];
+  stats: AnimeLibraryStats;
   tagPreferences: Array<{ tag: string; count: number }>;
   tagFilter: string;
   recentWatchItems: AnimeListItem[];
@@ -16,7 +16,7 @@ type AnimeSidebarProps = {
 };
 
 export default function AnimeSidebar({
-  items,
+  stats,
   tagPreferences,
   tagFilter,
   recentWatchItems,
@@ -24,7 +24,8 @@ export default function AnimeSidebar({
   onToggleTagFilter,
   onEdit,
 }: AnimeSidebarProps) {
-  const libraryStats = buildLibraryStats(items);
+  const totalHours = Math.floor(stats.totalMinutes / 60);
+  const totalDays = (totalHours / 24).toFixed(1);
 
   return (
     <div className="lg:col-span-4 space-y-6 sticky top-8">
@@ -40,14 +41,14 @@ export default function AnimeSidebar({
           <div className="p-5 rounded-2xl border status-watching-soft hover:brightness-110 transition-all group/stat">
             <p className="text-xs text-[var(--color-watching)] font-bold uppercase mb-3 tracking-wider group-hover/stat:translate-x-1 transition-transform">还没看完</p>
             <div className="flex items-baseline gap-2">
-              <p className="theme-stat-value text-3xl font-bold tracking-tighter leading-none">{libraryStats.unfinishedCount}</p>
+              <p className="theme-stat-value text-3xl font-bold tracking-tighter leading-none">{stats.unfinished}</p>
               <p className="text-xs text-[var(--text-muted)] font-bold">部</p>
             </div>
           </div>
           <div className="status-completed-soft rounded-2xl border p-5 transition-all group/stat">
             <p className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--color-completed)] transition-transform group-hover/stat:translate-x-1">已经看完</p>
             <div className="flex items-baseline gap-2">
-              <p className="theme-stat-value text-3xl font-bold tracking-tighter leading-none">{libraryStats.completedCount}</p>
+              <p className="theme-stat-value text-3xl font-bold tracking-tighter leading-none">{stats.completed}</p>
               <p className="text-xs text-[var(--text-muted)] font-bold">部</p>
             </div>
           </div>
@@ -57,12 +58,12 @@ export default function AnimeSidebar({
           <div className="flex justify-between items-center group/info">
             <span className="text-sm font-medium text-[var(--text-muted)] group-hover/info:text-[var(--text-secondary)] transition-colors">累计观看剧集</span>
             <span className="theme-stat-value text-lg font-mono font-bold tracking-tight">
-              {libraryStats.watchedEpisodes} <span className="text-[10px] text-[var(--text-muted)] ml-1 uppercase">Episodes</span>
+              {stats.watchedEpisodes} <span className="text-[10px] text-[var(--text-muted)] ml-1 uppercase">Episodes</span>
             </span>
           </div>
           <div className="flex justify-between items-center group/info">
             <span className="text-sm font-medium text-[var(--text-muted)] group-hover/info:text-[var(--text-secondary)] transition-colors">累计时间估计</span>
-            <span className="theme-stat-value text-lg font-mono font-bold tracking-tight">{libraryStats.totalHoursText}</span>
+            <span className="theme-stat-value text-lg font-mono font-bold tracking-tight">{totalHours}h / {totalDays}d</span>
           </div>
         </div>
       </div>

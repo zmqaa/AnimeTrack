@@ -13,25 +13,34 @@ import AnimeGrid, { type ViewMode } from '@/components/anime/AnimeGrid';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import PageContainer from '@/components/shared/PageContainer';
 import { fetchJson, fetchNdjson } from '@/lib/client-api';
-import type { AnimeStatus, AnimeSortBy, AnimeListItem, AnimeCardItem } from '@/lib/anime-shared';
+import type { AnimeStatus, AnimeSortBy, AnimeListItem, AnimeCardItem, AnimeListOverview } from '@/lib/anime-shared';
 import type { QuickRecordProgressEvent, QuickRecordStreamEvent } from '@/lib/quick-record-progress';
 import { useManageAccess } from '@/hooks/useManageAccess';
-import { ANIME_LIST_KEY, isHistoryKey, animePageKey, swrFetcher } from '@/lib/swr-config';
+import { ANIME_LIST_KEY, ANIME_OVERVIEW_KEY, isHistoryKey, animePageKey, swrFetcher } from '@/lib/swr-config';
 import AnimePagination from './AnimePagination';
 import AnimeQuickRecordPanel from './AnimeQuickRecordPanel';
 import AnimeSidebar from './AnimeSidebar';
 import {
   buildQuickRecordMessage,
-  buildRecentWatchItems,
-  buildTagPreferences,
-  buildVoiceActorSuggestions,
   buildAnimeListUrlParams,
-  filterAndSortAnimeItems,
   parseAnimeListUrlState,
   QuickRecordResponse,
 } from './anime-page-helpers';
 
 const ANIME_LIST_SCROLL_KEY = 'anime-list-scroll-y';
+const EMPTY_OVERVIEW: AnimeListOverview = {
+  stats: {
+    total: 0,
+    watching: 0,
+    completed: 0,
+    unfinished: 0,
+    watchedEpisodes: 0,
+    totalMinutes: 0,
+  },
+  tagPreferences: [],
+  voiceActorSuggestions: [],
+  recentWatchItems: [],
+};
 
 export default function AnimePageClient() {
   const { canManage: isAdmin } = useManageAccess();
@@ -43,9 +52,13 @@ export default function AnimePageClient() {
     [searchParams],
   );
 
-  // ── SWR: 全量番剧列表（侧边栏统计 + 客户端筛选降级）───────────────────
-  const { data: allItems = [], isLoading: listLoading, mutate: mutateAll } = useSWR<AnimeListItem[]>(
-    ANIME_LIST_KEY,
+  // ── SWR: 轻量概览（侧边栏统计、筛选建议、最近观看）──────────────────
+  const {
+    data: overview = EMPTY_OVERVIEW,
+    isLoading: overviewLoading,
+    mutate: mutateOverview,
+  } = useSWR<AnimeListOverview>(
+    ANIME_OVERVIEW_KEY,
     swrFetcher,
   );
 
@@ -195,14 +208,15 @@ export default function AnimePageClient() {
     urlState.tag,
   ]);
 
-  // ── SWR: 分页列表（cast/tag 筛选时暂停服务端分页，改用客户端过滤）────
+  // ── SWR: 服务端筛选、排序和分页列表 ─────────────────────────────────
   const swrPageKey = useMemo(() => {
-    if (castQuery || tagFilter) return null;
     return animePageKey({
       page: currentPage,
       pageSize,
       status: filterStatus,
       search: debouncedSearch,
+      cast: castQuery,
+      tag: tagFilter,
       sortBy,
       sortOrder,
     });
@@ -221,7 +235,7 @@ export default function AnimePageClient() {
   const totalPages = pageResult?.totalPages ?? 1;
 
   // ── 滚动位置恢复 ─────────────────────────────────────────────────────
-  const loading = listLoading;
+  const loading = pageLoading;
   useEffect(() => {
     if (loading || hasRestoredScrollRef.current) return;
 
@@ -285,11 +299,12 @@ export default function AnimePageClient() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  /** 表单保存/新建后的回调 — 刷新全量列表和当前分页 */
+  /** 表单保存/新建后的回调 — 刷新概览、当前分页和 Dashboard 缓存 */
   const handleFormSaved = useCallback(() => {
-    mutateAll();
-    if (swrPageKey) globalMutate(swrPageKey);
-  }, [mutateAll, swrPageKey]);
+    mutateOverview();
+    globalMutate(swrPageKey);
+    globalMutate(ANIME_LIST_KEY);
+  }, [mutateOverview, swrPageKey]);
 
   const toggleViewMode = useCallback((mode: ViewMode) => {
     setViewMode(mode);
@@ -328,22 +343,14 @@ export default function AnimePageClient() {
     ) => data ? { ...data, records: data.records.map(patchItem) } : data;
 
     try {
-      // 1) 乐观更新全量列表（侧边栏即时刷新）
-      await mutateAll(
-        (items) => items?.map(applyProgressPatch),
+      // 1) 乐观更新当前分页列表（网格即时刷新）
+      await globalMutate(
+        swrPageKey,
+        (data: { records: AnimeListItem[]; total: number; page: number; totalPages: number } | undefined) => patchPageRecords(data, applyProgressPatch),
         { revalidate: false },
       );
 
-      // 2) 乐观更新分页列表（网格即时刷新）
-      if (swrPageKey) {
-        await globalMutate(
-          swrPageKey,
-          (data: { records: AnimeListItem[]; total: number; page: number; totalPages: number } | undefined) => patchPageRecords(data, applyProgressPatch),
-          { revalidate: false },
-        );
-      }
-
-      // 3) 发送 API 请求
+      // 2) 发送 API 请求
       const result = await fetchJson<{ ok: true; entry: AnimeListItem }>(`/api/anime/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -356,18 +363,16 @@ export default function AnimePageClient() {
 
       const serverPatch = applyServerEntry(result.entry);
 
-      // 4) 先用服务端最终记录同步当前缓存，再后台重验证
-      await mutateAll((items) => items?.map(serverPatch), { revalidate: false });
-      if (swrPageKey) {
-        await globalMutate(
-          swrPageKey,
-          (data: { records: AnimeListItem[]; total: number; page: number; totalPages: number } | undefined) => patchPageRecords(data, serverPatch),
-          { revalidate: false },
-        );
-      }
+      // 3) 先用服务端最终记录同步当前缓存，再后台重验证
+      await globalMutate(
+        swrPageKey,
+        (data: { records: AnimeListItem[]; total: number; page: number; totalPages: number } | undefined) => patchPageRecords(data, serverPatch),
+        { revalidate: false },
+      );
 
-      mutateAll();
-      if (swrPageKey) globalMutate(swrPageKey);
+      globalMutate(swrPageKey);
+      mutateOverview();
+      globalMutate(ANIME_LIST_KEY);
       globalMutate(isHistoryKey);
 
       const isFinishing = Boolean(
@@ -382,21 +387,22 @@ export default function AnimePageClient() {
     } catch (err) {
       console.error('Update failed:', err);
       // 回滚：直接重验证
-      mutateAll();
-      if (swrPageKey) globalMutate(swrPageKey);
+      globalMutate(swrPageKey);
+      mutateOverview();
       globalMutate(isHistoryKey);
       toast.error(err instanceof Error ? err.message : '更新失败，请重试');
     } finally {
       progressMutationIdsRef.current.delete(id);
       setUpdatingProgressIds(new Set(progressMutationIdsRef.current));
     }
-  }, [mutateAll, swrPageKey]);
+  }, [mutateOverview, swrPageKey]);
 
   // ── 删除操作 ─────────────────────────────────────────────────────────
   const deleteAnime = useCallback(async (id: number) => {
-    const item = allItems.find(i => i.id === id);
+    const item = paginatedRecords.find(i => i.id === id)
+      || overview.recentWatchItems.find(i => i.id === id);
     setDeleteConfirm({ id, title: item?.title || '这部番剧' });
-  }, [allItems]);
+  }, [overview.recentWatchItems, paginatedRecords]);
 
   const confirmDelete = useCallback(async () => {
     if (!deleteConfirm || deleting) return;
@@ -406,9 +412,10 @@ export default function AnimePageClient() {
       await fetchJson<{ ok: true }>(`/api/anime/${id}`, { method: 'DELETE' }, '删除失败');
       resetForm();
       toast.success('已删除');
-      // 全局重验证：全量列表 + 当前分页 + Dashboard
+      // 全局重验证：概览 + 当前分页 + Dashboard
+      mutateOverview();
       globalMutate(ANIME_LIST_KEY);
-      if (swrPageKey) globalMutate(swrPageKey);
+      globalMutate(swrPageKey);
       globalMutate(isHistoryKey);
     } catch (err) {
       console.error('Delete failed:', err);
@@ -417,7 +424,7 @@ export default function AnimePageClient() {
       setDeleting(false);
       setDeleteConfirm(null);
     }
-  }, [deleteConfirm, deleting, resetForm, swrPageKey]);
+  }, [deleteConfirm, deleting, mutateOverview, resetForm, swrPageKey]);
 
   // ── AI 快捷录入 ─────────────────────────────────────────────────────
   const handleQuickRecord = useCallback(async () => {
@@ -454,9 +461,10 @@ export default function AnimePageClient() {
       setQuickInput('');
       toast.success('AI 录入成功');
       setQuickMessage(buildQuickRecordMessage(data));
-      // 刷新全量列表 + 当前分页
-      mutateAll();
-      if (swrPageKey) globalMutate(swrPageKey);
+      // 刷新概览 + 当前分页 + Dashboard
+      mutateOverview();
+      globalMutate(swrPageKey);
+      globalMutate(ANIME_LIST_KEY);
       globalMutate(isHistoryKey);
     } catch (error) {
       console.error('Quick record failed:', error);
@@ -476,16 +484,7 @@ export default function AnimePageClient() {
     } finally {
       setQuickLoading(false);
     }
-  }, [quickInput, mutateAll, swrPageKey]);
-
-  // ── 派生数据 ─────────────────────────────────────────────────────────
-  const voiceActorSuggestions = useMemo(() => {
-    return buildVoiceActorSuggestions(allItems);
-  }, [allItems]);
-
-  const tagPreferences = useMemo(() => {
-    return buildTagPreferences(allItems);
-  }, [allItems]);
+  }, [quickInput, mutateOverview, swrPageKey]);
 
   const toggleTagFilter = useCallback((tag: string) => {
     const nextTag = tagFilter === tag ? '' : tag;
@@ -493,28 +492,7 @@ export default function AnimePageClient() {
     updateListUrl({ tag: nextTag, page: 1 });
   }, [tagFilter, updateListUrl]);
 
-  const recentWatchItems = useMemo(() => {
-    return buildRecentWatchItems(allItems);
-  }, [allItems]);
-
-  // ── 客户端筛选降级（cast/tag 筛选时使用） ────────────────────────────
-  const filteredItems = useMemo(() => {
-    if (!castQuery && !tagFilter) return [];
-    return filterAndSortAnimeItems(allItems, {
-      filterStatus,
-      searchQuery,
-      castQuery,
-      tagFilter,
-      sortBy,
-      sortOrder,
-    });
-  }, [allItems, filterStatus, searchQuery, castQuery, tagFilter, sortBy, sortOrder]);
-
-  const useServerPagination = !castQuery && !tagFilter;
-
-  const displayTotalPages = useServerPagination
-    ? totalPages
-    : Math.max(1, Math.ceil(filteredItems.length / pageSize));
+  const displayTotalPages = totalPages;
   const safePage = Math.min(currentPage, displayTotalPages);
 
   useEffect(() => {
@@ -524,25 +502,14 @@ export default function AnimePageClient() {
     }
   }, [safePage, currentPage, loading, setCurrentPage]);
 
-  const pagedItems = useMemo(() => {
-    if (useServerPagination) return paginatedRecords;
-    const start = (safePage - 1) * pageSize;
-    return filteredItems.slice(start, start + pageSize);
-  }, [useServerPagination, paginatedRecords, filteredItems, safePage, pageSize]);
-
-  const displayTotal = useServerPagination ? totalCount : filteredItems.length;
+  const pagedItems = paginatedRecords;
+  const displayTotal = totalCount;
   const hasActiveFilters = Boolean(
     searchQuery.trim() ||
     castQuery.trim() ||
     tagFilter ||
     filterStatus !== 'all'
   );
-  const libraryStats = useMemo(() => ({
-    total: allItems.length,
-    watching: allItems.filter((item) => item.status === 'watching').length,
-    completed: allItems.filter((item) => item.status === 'completed').length,
-  }), [allItems]);
-
   const rememberListScroll = useCallback(() => {
     sessionStorage.setItem(ANIME_LIST_SCROLL_KEY, String(window.scrollY));
   }, []);
@@ -556,10 +523,10 @@ export default function AnimePageClient() {
         setShowForm={setShowForm}
         resetForm={resetForm}
         isAdmin={isAdmin}
-        totalCount={libraryStats.total}
-        watchingCount={libraryStats.watching}
-        completedCount={libraryStats.completed}
-        loading={listLoading}
+        totalCount={overview.stats.total}
+        watchingCount={overview.stats.watching}
+        completedCount={overview.stats.completed}
+        loading={overviewLoading}
       />
 
       {isAdmin && (
@@ -611,7 +578,7 @@ export default function AnimePageClient() {
               setFilterStatus={changeStatus}
               castQuery={castQuery}
               setCastQuery={changeCast}
-              voiceActorSuggestions={voiceActorSuggestions}
+              voiceActorSuggestions={overview.voiceActorSuggestions}
               sortBy={sortBy}
               setSortBy={changeSortBy}
               sortOrder={sortOrder}
@@ -651,7 +618,7 @@ export default function AnimePageClient() {
             items={pagedItems}
             updateProgress={updateProgress}
             updatingProgressIds={updatingProgressIds}
-            loading={loading || pageLoading}
+            loading={loading}
             isAdmin={isAdmin}
             viewMode={viewMode}
             detailReturnTo={returnTo}
@@ -663,7 +630,7 @@ export default function AnimePageClient() {
           />
 
           <AnimePagination
-            loading={loading || pageLoading}
+            loading={loading}
             itemsCount={displayTotal}
             currentPage={safePage}
             totalPages={displayTotalPages}
@@ -672,10 +639,10 @@ export default function AnimePageClient() {
         </div>
 
         <AnimeSidebar
-          items={allItems}
-          tagPreferences={tagPreferences}
+          stats={overview.stats}
+          tagPreferences={overview.tagPreferences}
           tagFilter={tagFilter}
-          recentWatchItems={recentWatchItems}
+          recentWatchItems={overview.recentWatchItems}
           isAdmin={isAdmin}
           onToggleTagFilter={toggleTagFilter}
           onEdit={startEdit}

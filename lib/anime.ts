@@ -1,10 +1,10 @@
 import 'server-only';
 import { getRawDb, query, type DbResult } from './db';
-import { parseJsonStringArray } from './anime-cast';
+import { containsCjkText, parseJsonStringArray, uniqueStrings } from './anime-cast';
 import { syncAnimeStartDateFromHistory } from './anime-start-date';
 import { pickBestAnimeTitleCandidate } from './anime-title-matching';
 import { formatAppDateKey, nowISO } from './date-utils';
-import type { AnimeStatus } from './anime-shared';
+import type { AnimeListOverview, AnimeStatus } from './anime-shared';
 import { deleteCoverImage, resolveDisplayCoverUrl } from './cover-image';
 
 export type { AnimeStatus };
@@ -154,6 +154,8 @@ export interface ListAnimeOptions {
   limit?: number;
   offset?: number;
   search?: string;
+  cast?: string;
+  tag?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
 }
@@ -254,9 +256,12 @@ export async function listAnimeRecordsWithLastWatched(options: ListAnimeOptions 
 }
 
 export async function listAnimeRecordsPaginated(options: ListAnimeOptions = {}): Promise<PaginatedAnimeResult> {
-  const { status, search, sortBy, sortOrder } = options;
-  const page = Math.max(1, Math.floor(Number(options.limit) ? (Number(options.offset) / Number(options.limit) + 1) : 1));
-  const pageSize = Math.min(100, Math.max(1, Math.floor(Number(options.limit) || 12)));
+  const { status, search, cast, tag, sortBy, sortOrder } = options;
+  const requestedLimit = Number(options.limit);
+  const requestedOffset = Number(options.offset);
+  const pageSize = Math.min(100, Math.max(1, Math.floor(Number.isFinite(requestedLimit) ? requestedLimit : 12)));
+  const safeRequestedOffset = Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0;
+  const page = Math.max(1, Math.floor(safeRequestedOffset / pageSize) + 1);
   const offset = (page - 1) * pageSize;
 
   const baseFrom = `
@@ -280,12 +285,27 @@ export async function listAnimeRecordsPaginated(options: ListAnimeOptions = {}):
     const pattern = `%${search}%`;
     params.push(pattern, pattern, pattern, pattern);
   }
+  if (cast) {
+    conditions.push('(anime.cast LIKE ? OR anime.cast_aliases LIKE ?)');
+    const pattern = `%${cast}%`;
+    params.push(pattern, pattern);
+  }
+  if (tag) {
+    conditions.push(`
+      EXISTS (
+        SELECT 1
+        FROM json_each(CASE WHEN json_valid(anime.tags) THEN anime.tags ELSE '[]' END)
+        WHERE json_each.value = ?
+      )
+    `);
+    params.push(tag);
+  }
 
   const whereClause = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
 
   // Count total
   const countParams = [...params];
-  const countSql = `SELECT COUNT(*) as count ${baseFrom}${whereClause}`;
+  const countSql = `SELECT COUNT(*) as count FROM anime${whereClause}`;
   const [countRow] = await query<{ count: number }[]>(countSql, countParams);
   const total = Number(countRow?.count ?? 0);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -315,6 +335,84 @@ export async function listAnimeRecordsPaginated(options: ListAnimeOptions = {}):
     page,
     pageSize,
     totalPages,
+  };
+}
+
+interface AnimeOverviewStatsRow {
+  total: number;
+  watching: number;
+  completed: number;
+  unfinished: number;
+  watchedEpisodes: number;
+  totalMinutes: number;
+}
+
+interface AnimeFacetRow {
+  tags?: string | null;
+  cast?: string | null;
+  cast_aliases?: string | null;
+}
+
+export async function getAnimeListOverview(): Promise<AnimeListOverview> {
+  const [statsRow] = await query<AnimeOverviewStatsRow[]>(`
+    SELECT
+      COUNT(*) AS total,
+      COALESCE(SUM(CASE WHEN status = 'watching' THEN 1 ELSE 0 END), 0) AS watching,
+      COALESCE(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END), 0) AS completed,
+      COALESCE(SUM(CASE WHEN status != 'completed' THEN 1 ELSE 0 END), 0) AS unfinished,
+      COALESCE(SUM(progress), 0) AS watchedEpisodes,
+      COALESCE(SUM(progress * COALESCE(NULLIF(durationMinutes, 0), 24)), 0) AS totalMinutes
+    FROM anime
+  `);
+
+  const facetRows = await query<AnimeFacetRow[]>('SELECT anime.tags, anime.cast, anime.cast_aliases FROM anime');
+  const tagCounts = new Map<string, number>();
+  const castCounts = new Map<string, number>();
+
+  for (const row of facetRows) {
+    for (const tag of parseJsonStringArray(row.tags)) {
+      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+    }
+
+    const names = uniqueStrings([
+      ...parseJsonStringArray(row.cast_aliases).filter(containsCjkText),
+      ...parseJsonStringArray(row.cast),
+    ]);
+    for (const name of names) {
+      castCounts.set(name, (castCounts.get(name) || 0) + 1);
+    }
+  }
+
+  const recentRows = await query<AnimeRow[]>(`
+    SELECT ${LIST_COLUMNS_WITH_TABLE}, latest_watch.lastWatchedAt
+    FROM anime
+    INNER JOIN (
+      SELECT animeId, MAX(watchedAt) AS lastWatchedAt
+      FROM watch_history
+      GROUP BY animeId
+    ) AS latest_watch ON latest_watch.animeId = anime.id
+    ORDER BY latest_watch.lastWatchedAt DESC
+    LIMIT 5
+  `);
+
+  return {
+    stats: {
+      total: Number(statsRow?.total || 0),
+      watching: Number(statsRow?.watching || 0),
+      completed: Number(statsRow?.completed || 0),
+      unfinished: Number(statsRow?.unfinished || 0),
+      watchedEpisodes: Number(statsRow?.watchedEpisodes || 0),
+      totalMinutes: Number(statsRow?.totalMinutes || 0),
+    },
+    tagPreferences: Array.from(tagCounts.entries())
+      .sort((left, right) => right[1] - left[1])
+      .slice(0, 18)
+      .map(([tag, count]) => ({ tag, count })),
+    voiceActorSuggestions: Array.from(castCounts.entries())
+      .sort((left, right) => right[1] - left[1])
+      .slice(0, 40)
+      .map(([name]) => name),
+    recentWatchItems: recentRows.map(mapRowToAnimeRecord),
   };
 }
 
