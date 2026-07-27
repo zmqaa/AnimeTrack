@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { AnimeRecord } from '@/lib/dashboard-types';
+import type { DashboardAnimeItem } from '@/lib/dashboard-types';
 import { formatPremiere } from '@/lib/formatters';
 import SectionTitle from '@/components/shared/SectionTitle';
 import ProgressBar from '@/components/shared/ProgressBar';
@@ -13,7 +13,7 @@ interface DashboardRightPanelProps {
   metadataRichness: number;
   tagBarData: Array<{ tag: string; count: number }>;
   tagBarMax: number;
-  recentPremiered: AnimeRecord[];
+  recentPremiered: DashboardAnimeItem[];
 }
 
 export default React.memo(function DashboardRightPanel({

@@ -16,7 +16,7 @@ import { fetchJson, fetchNdjson } from '@/lib/client-api';
 import type { AnimeStatus, AnimeSortBy, AnimeListItem, AnimeCardItem, AnimeListOverview } from '@/lib/anime-shared';
 import type { QuickRecordProgressEvent, QuickRecordStreamEvent } from '@/lib/quick-record-progress';
 import { useManageAccess } from '@/hooks/useManageAccess';
-import { ANIME_LIST_KEY, ANIME_OVERVIEW_KEY, isHistoryKey, animePageKey, swrFetcher } from '@/lib/swr-config';
+import { ANIME_LIST_KEY, ANIME_OVERVIEW_KEY, DASHBOARD_OVERVIEW_KEY, isHistoryKey, animePageKey, swrFetcher } from '@/lib/swr-config';
 import AnimePagination from './AnimePagination';
 import AnimeQuickRecordPanel from './AnimeQuickRecordPanel';
 import AnimeSidebar from './AnimeSidebar';
@@ -304,6 +304,7 @@ export default function AnimePageClient() {
     mutateOverview();
     globalMutate(swrPageKey);
     globalMutate(ANIME_LIST_KEY);
+    globalMutate(DASHBOARD_OVERVIEW_KEY);
   }, [mutateOverview, swrPageKey]);
 
   const toggleViewMode = useCallback((mode: ViewMode) => {
@@ -373,6 +374,7 @@ export default function AnimePageClient() {
       globalMutate(swrPageKey);
       mutateOverview();
       globalMutate(ANIME_LIST_KEY);
+      globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isHistoryKey);
 
       const isFinishing = Boolean(
@@ -415,6 +417,7 @@ export default function AnimePageClient() {
       // 全局重验证：概览 + 当前分页 + Dashboard
       mutateOverview();
       globalMutate(ANIME_LIST_KEY);
+      globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(swrPageKey);
       globalMutate(isHistoryKey);
     } catch (err) {
@@ -465,6 +468,7 @@ export default function AnimePageClient() {
       mutateOverview();
       globalMutate(swrPageKey);
       globalMutate(ANIME_LIST_KEY);
+      globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isHistoryKey);
     } catch (error) {
       console.error('Quick record failed:', error);

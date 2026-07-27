@@ -31,6 +31,9 @@ export const ANIME_LIST_KEY = '/api/anime';
 /** 番剧列表轻量概览（统计、标签、声优建议、最近观看） */
 export const ANIME_OVERVIEW_KEY = '/api/anime/overview';
 
+/** 首页服务端聚合数据 */
+export const DASHBOARD_OVERVIEW_KEY = '/api/dashboard';
+
 /** 番剧分页列表 */
 export function animePageKey(params: Record<string, string | number>): string {
   const qs = buildQuery(params);

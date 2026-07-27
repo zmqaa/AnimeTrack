@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { AnimeRecord } from '@/lib/dashboard-types';
+import type { DashboardAnimeItem } from '@/lib/dashboard-types';
 import { formatDate, formatPremiere, formatTime, formatUpdateDate } from '@/lib/formatters';
 import StatTile from '@/components/shared/StatTile';
 
@@ -10,7 +10,7 @@ interface HeroCardProps {
   animeCompletionRate: number;
   weeklyEpisodes: number;
   watchHours: number;
-  heroAnime: AnimeRecord | null;
+  heroAnime: DashboardAnimeItem | null;
   isLoading: boolean;
   isRefreshing: boolean;
 }

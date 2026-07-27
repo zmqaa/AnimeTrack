@@ -1,85 +1,19 @@
 "use client";
 
-import { memo, useMemo, useState } from 'react';
-import { AnimeRecord, ParsedWatchHistory } from '@/lib/dashboard-types';
+import { memo, useState } from 'react';
+import type { DashboardActivityScale, DashboardActivityStats } from '@/lib/dashboard-types';
 import SegmentedControl from '@/components/shared/SegmentedControl';
 import StatTile from '@/components/shared/StatTile';
 import ActivityLineChart from '@/components/shared/ActivityLineChart';
 import SectionTitle from '@/components/shared/SectionTitle';
-import { APP_TIME_ZONE, dateKeyToAppDate, formatAppDateKey, getAppDateTimeParts, shiftDateKey } from '@/lib/date-utils';
 
-export default memo(function AdvancedActivityStats({ history, animeList }: { history: ParsedWatchHistory[]; animeList: AnimeRecord[] }) {
-  const [scale, setScale] = useState<'week' | 'month' | 'year'>('week');
-
-  const statsData = useMemo(() => {
-    const now = new Date();
-    const data: { label: string; value: number }[] = [];
-    let totalEpisodes = 0;
-    const historyMap: Record<string, number> = {};
-    history.forEach((h) => { historyMap[h.dateStr] = (historyMap[h.dateStr] || 0) + 1; });
-
-    const todayKey = formatAppDateKey(now);
-    const nowParts = getAppDateTimeParts(now);
-    let scaleStart = dateKeyToAppDate(todayKey);
-
-    if (scale === 'week') {
-      const firstDayKey = shiftDateKey(todayKey, -6);
-      scaleStart = dateKeyToAppDate(firstDayKey);
-      for (let i = 6; i >= 0; i--) {
-        const dateStr = shiftDateKey(todayKey, -i);
-        const d = dateKeyToAppDate(dateStr);
-        const count = historyMap[dateStr] || 0;
-        totalEpisodes += count;
-        data.push({ label: d.toLocaleDateString('zh-CN', { weekday: 'short', timeZone: APP_TIME_ZONE }), value: count });
-      }
-    } else if (scale === 'month') {
-      const year = nowParts.year;
-      const month = nowParts.month - 1;
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-      scaleStart = dateKeyToAppDate(`${year}-${String(month + 1).padStart(2, '0')}-01`);
-      for (let i = 1; i <= daysInMonth; i++) {
-        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-        const count = historyMap[dateStr] || 0;
-        totalEpisodes += count;
-        data.push({ label: `${i}`, value: count });
-      }
-    } else {
-      const year = nowParts.year;
-      const monthlyMap: Record<string, number> = {};
-      scaleStart = dateKeyToAppDate(`${year}-01-01`);
-      history.forEach((h) => {
-        if (h.year === year) {
-          const monthKey = `${h.year}-${String(h.month + 1).padStart(2, '0')}`;
-          monthlyMap[monthKey] = (monthlyMap[monthKey] || 0) + 1;
-        }
-      });
-      for (let i = 0; i < 12; i++) {
-        const monthKey = `${year}-${String(i + 1).padStart(2, '0')}`;
-        const count = monthlyMap[monthKey] || 0;
-        totalEpisodes += count;
-        data.push({ label: `${i + 1}月`, value: count });
-      }
-    }
-
-    const totalMinutes = totalEpisodes * 24;
-    const scopedHistory = history.filter((item) => item.dateObj >= scaleStart);
-    const activeWindows = { '凌晨': 0, '日间': 0, '黄昏': 0, '深夜': 0 };
-    scopedHistory.forEach((item) => {
-      if (item.hour < 6) activeWindows['凌晨'] += 1;
-      else if (item.hour < 14) activeWindows['日间'] += 1;
-      else if (item.hour < 20) activeWindows['黄昏'] += 1;
-      else activeWindows['深夜'] += 1;
-    });
-
-    const mostActiveWindow = Object.entries(activeWindows).sort((a, b) => b[1] - a[1])[0] ?? ['暂无', 0];
-    const peakPoint = data.reduce((peak, point) => point.value > peak.value ? point : peak, { label: '暂无', value: 0 });
-    const activeDays = data.filter((point) => point.value > 0).length;
-    const knownEpisodes = animeList.reduce((sum, anime) => sum + (anime.totalEpisodes ?? anime.progress), 0);
-    const libraryCoverage = knownEpisodes > 0 ? Math.min(100, Math.round((totalEpisodes / knownEpisodes) * 100)) : 0;
-
-    const title = scale === 'week' ? '过去 7 日趋势' : scale === 'month' ? '本月每日趋势' : '年度每月趋势';
-    return { data, totalEpisodes, totalMinutes, title, peakPoint, activeDays, mostActiveWindow, libraryCoverage };
-  }, [animeList, history, scale]);
+export default memo(function AdvancedActivityStats({
+  activityByScale,
+}: {
+  activityByScale: Record<DashboardActivityScale, DashboardActivityStats>;
+}) {
+  const [scale, setScale] = useState<DashboardActivityScale>('week');
+  const statsData = activityByScale[scale];
 
   const maxValue = Math.max(...statsData.data.map((d) => d.value), 1);
   const averagePerUnit = scale === 'week' ? 7 : scale === 'month' ? 30 : 365;

@@ -10,7 +10,7 @@ import SegmentedControl from '@/components/shared/SegmentedControl';
 import { fetchJson } from '@/lib/client-api';
 import { useManageAccess } from '@/hooks/useManageAccess';
 import AsyncButton from '@/components/shared/AsyncButton';
-import { adminAnimeKey, adminHistoryKey, ANIME_LIST_KEY, isHistoryKey, swrFetcher } from '@/lib/swr-config';
+import { adminAnimeKey, adminHistoryKey, ANIME_LIST_KEY, DASHBOARD_OVERVIEW_KEY, isHistoryKey, swrFetcher } from '@/lib/swr-config';
 import {
   Checkbox,
   DeleteButton,
@@ -173,6 +173,7 @@ function AnimeTab() {
       // 全局缓存刷新：管理页当前页 + 番剧全量列表 + Dashboard
       mutate();
       globalMutate(ANIME_LIST_KEY);
+      globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isHistoryKey);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '删除失败');
@@ -377,6 +378,7 @@ function HistoryTab() {
       removeSelected(ids);
       // 全局缓存刷新：管理页当前页 + Dashboard 历史
       mutate();
+      globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isHistoryKey);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '删除失败');
@@ -415,6 +417,7 @@ function HistoryTab() {
       toast.success(`已回退到第 ${data.result.targetProgress} 集`);
       setConfirmUndo(null);
       mutate();
+      globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isHistoryKey);
       globalMutate((key) => typeof key === 'string' && (
         key === ANIME_LIST_KEY ||
@@ -453,6 +456,7 @@ function HistoryTab() {
       setActiveRecord(data.record);
       setEditingTime(null);
       mutate();
+      globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isHistoryKey);
       globalMutate((key) => typeof key === 'string' && (
         key.startsWith('/api/admin/history?') ||

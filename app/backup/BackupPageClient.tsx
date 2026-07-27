@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { fetchBlob, fetchJson } from '@/lib/client-api';
 import { buildExportFilename } from '@/lib/export-filename';
-import { isHistoryKey } from '@/lib/swr-config';
+import { DASHBOARD_OVERVIEW_KEY, isHistoryKey } from '@/lib/swr-config';
 import { useManageAccess } from '@/hooks/useManageAccess';
 import AsyncButton from '@/components/shared/AsyncButton';
 
@@ -200,6 +200,7 @@ export default function BackupPageClient() {
         toast.success(`已下载 ${result.downloaded} 张封面`);
       }
       await globalMutate((key) => typeof key === 'string' && key.startsWith('/api/anime'));
+      globalMutate(DASHBOARD_OVERVIEW_KEY);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '批量下载封面失败');
     } finally {
@@ -221,6 +222,7 @@ export default function BackupPageClient() {
       toast.success(`恢复完成：${result.animeCount} 部番剧，${result.historyCount} 条观看历史`);
       await Promise.all([
         globalMutate((key) => typeof key === 'string' && (
+          key === DASHBOARD_OVERVIEW_KEY ||
           key.startsWith('/api/anime') ||
           key.startsWith('/api/history') ||
           key.startsWith('/api/admin/anime') ||
@@ -252,6 +254,7 @@ export default function BackupPageClient() {
       );
       // 全局刷新缓存：番剧列表 + Dashboard 数据同步更新
       await globalMutate((key) => typeof key === 'string' && key.startsWith('/api/anime'));
+      globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isHistoryKey);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '导入失败');
