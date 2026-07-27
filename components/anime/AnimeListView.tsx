@@ -32,6 +32,7 @@ export default memo(function AnimeListView({ items, updateProgress, updatingProg
         const progressPercent = item.totalEpisodes ? (item.progress / item.totalEpisodes) * 100 : 0;
         const detailHref = `/anime/${item.id}?returnTo=${encodeURIComponent(detailReturnTo)}`;
         const isUpdatingProgress = updatingProgressIds.has(item.id);
+        const coverUrl = item.thumbnailCoverUrl || item.displayCoverUrl;
 
         return (
           <div
@@ -40,10 +41,10 @@ export default memo(function AnimeListView({ items, updateProgress, updatingProg
           >
             {/* 封面缩略图 */}
             <Link href={detailHref} onClick={onOpenDetail} className="flex-shrink-0 w-14 h-[74px] rounded-xl overflow-hidden bg-[var(--tag-bg)] relative">
-              {item.displayCoverUrl ? (
+              {coverUrl ? (
                 <Image
-                  key={item.displayCoverUrl}
-                  src={item.displayCoverUrl}
+                  key={coverUrl}
+                  src={coverUrl}
                   alt={item.title}
                   fill
                   unoptimized

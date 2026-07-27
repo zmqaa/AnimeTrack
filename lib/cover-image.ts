@@ -1,7 +1,8 @@
 import 'server-only';
 import { existsSync, mkdirSync, statSync, unlinkSync } from 'fs';
-import { writeFile, unlink, readdir } from 'fs/promises';
+import { writeFile, unlink, readdir, rename } from 'fs/promises';
 import { basename, join, resolve } from 'path';
+import sharp from 'sharp';
 import { getCoversDirectory } from '@/lib/runtime-paths';
 
 const LEGACY_COVERS_PUBLIC_PREFIX = '/covers';
@@ -11,6 +12,9 @@ const COVER_FILE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'] as const;
 /** 封面存放的公开路径前缀 */
 const MAX_COVER_BYTES = 8 * 1024 * 1024;
 const DEFAULT_ALLOWED_COVER_HOSTS = ['lain.bgm.tv', 'cdn.myanimelist.net'];
+const COVER_THUMBNAIL_WIDTH = 600;
+const COVER_THUMBNAIL_HEIGHT = 800;
+const COVER_THUMBNAIL_QUALITY = 82;
 
 function allowedCoverHosts(): Set<string> {
   const configured = (process.env.COVER_ALLOWED_HOSTS || '')
@@ -106,6 +110,28 @@ export function resolveDisplayCoverUrl(
   }
 }
 
+export function resolveThumbnailCoverUrl(
+  localCoverUrl: string | null | undefined,
+  remoteCoverUrl: string | null | undefined,
+): string | undefined {
+  const displayUrl = resolveDisplayCoverUrl(localCoverUrl, remoteCoverUrl);
+  const local = String(localCoverUrl || '').trim();
+  if (!local || !isLocalCoverPath(local)) return displayUrl;
+
+  const fileName = basename(local.split(/[?#]/, 1)[0]);
+  const match = /^(\d+)\.(?:jpg|jpeg|png|webp|gif)$/i.exec(fileName);
+  if (!match) return displayUrl;
+
+  const thumbnailName = `${match[1]}.thumb.webp`;
+  const thumbnailPath = join(getCoversDirectory(), thumbnailName);
+  try {
+    const version = Math.trunc(statSync(thumbnailPath).mtimeMs).toString(36);
+    return `${DATA_COVERS_PUBLIC_PREFIX}/${thumbnailName}?v=${version}`;
+  } catch {
+    return displayUrl;
+  }
+}
+
 /** 判断是否为系统生成的本地占位封面 */
 export function isPlaceholderCoverPath(value: string | null | undefined): boolean {
   if (!value) return false;
@@ -118,6 +144,10 @@ function coverFilePath(animeId: number): string {
   return join(getCoversDirectory(), `${animeId}.jpg`);
 }
 
+function coverThumbnailFilePath(animeId: number): string {
+  return join(getCoversDirectory(), `${animeId}.thumb.webp`);
+}
+
 /** 获取某个番剧可能拥有的全部本地封面路径（含旧版 public/covers 目录）。 */
 function coverFilePaths(animeId: number): string[] {
   const directories = new Set([
@@ -125,14 +155,41 @@ function coverFilePaths(animeId: number): string[] {
     resolve(process.cwd(), 'public', 'covers'),
   ]);
 
-  return [...directories].flatMap((directory) =>
-    COVER_FILE_EXTENSIONS.map((extension) => join(directory, `${animeId}.${extension}`)),
-  );
+  return [...directories].flatMap((directory) => [
+    ...COVER_FILE_EXTENSIONS.map((extension) => join(directory, `${animeId}.${extension}`)),
+    join(directory, `${animeId}.thumb.webp`),
+  ]);
 }
 
 /** 获取封面文件的公开 URL 路径 */
 function coverPublicPath(animeId: number): string {
   return `${DATA_COVERS_PUBLIC_PREFIX}/${animeId}.jpg`;
+}
+
+export async function generateCoverThumbnail(sourcePath: string, animeId: number): Promise<string> {
+  ensureCoversDir();
+  const outputPath = coverThumbnailFilePath(animeId);
+  const temporaryPath = join(
+    getCoversDirectory(),
+    `${animeId}.thumb-${process.pid}-${Date.now()}.webp`,
+  );
+
+  try {
+    await sharp(sourcePath)
+      .rotate()
+      .resize(COVER_THUMBNAIL_WIDTH, COVER_THUMBNAIL_HEIGHT, {
+        fit: 'cover',
+        position: 'centre',
+        withoutEnlargement: true,
+      })
+      .webp({ quality: COVER_THUMBNAIL_QUALITY, effort: 4 })
+      .toFile(temporaryPath);
+    await rename(temporaryPath, outputPath);
+    return outputPath;
+  } catch (error) {
+    await unlink(temporaryPath).catch(() => undefined);
+    throw error;
+  }
 }
 
 /**
@@ -185,7 +242,14 @@ export async function downloadCoverImage(
     }
 
     ensureCoversDir();
-    await writeFile(coverFilePath(animeId), buffer);
+    const localFilePath = coverFilePath(animeId);
+    await writeFile(localFilePath, buffer);
+    try {
+      await generateCoverThumbnail(localFilePath, animeId);
+    } catch (error) {
+      await unlink(coverThumbnailFilePath(animeId)).catch(() => undefined);
+      console.warn(`[cover] 缩略图生成失败 id=${animeId}:`, (error as Error).message);
+    }
 
     return coverPublicPath(animeId);
   } catch (error) {

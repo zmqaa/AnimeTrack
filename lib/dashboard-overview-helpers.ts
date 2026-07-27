@@ -15,6 +15,7 @@ function toDashboardAnimeItem(anime: AnimeRecord): DashboardAnimeItem {
     title: anime.title,
     originalTitle: anime.originalTitle,
     displayCoverUrl: anime.displayCoverUrl,
+    thumbnailCoverUrl: anime.thumbnailCoverUrl,
     score: anime.score,
     premiereDate: anime.premiereDate,
     summary: anime.summary,

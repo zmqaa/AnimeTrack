@@ -14,6 +14,7 @@ beforeAll(async () => {
   const coversDirectory = join(temporaryDirectory, 'covers');
   mkdirSync(coversDirectory);
   writeFileSync(join(coversDirectory, '1.jpg'), Buffer.from('test image data'));
+  writeFileSync(join(coversDirectory, '1.thumb.webp'), Buffer.from('test thumbnail data'));
   process.env.ANIMETRACK_COVERS_DIR = coversDirectory;
 
   routeModule = await import('../../app/api/local-covers/[file]/route');
@@ -48,6 +49,19 @@ describe('local cover responses', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control'))
       .toBe('public, max-age=60, must-revalidate');
+  });
+
+  it('serves generated WebP thumbnails with immutable caching', async () => {
+    const response = await routeModule.GET(
+      new Request('http://localhost/api/local-covers/1.thumb.webp?v=mtime456'),
+      { params: { file: '1.thumb.webp' } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toBe('image/webp');
+    expect(response.headers.get('Cache-Control'))
+      .toBe('public, max-age=31536000, immutable');
+    expect(Buffer.from(await response.arrayBuffer()).toString()).toBe('test thumbnail data');
   });
 
   it('still returns 404 when the cover file does not exist', async () => {

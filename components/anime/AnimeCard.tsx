@@ -41,16 +41,17 @@ export default memo(function AnimeCard({ item, updateProgress, isUpdatingProgres
     : isCompleted ? 100 : 0;
   const rewatchTag = resolveRewatchTag(item.tags);
   const detailHref = `/anime/${item.id}?returnTo=${encodeURIComponent(detailReturnTo)}`;
+  const coverUrl = item.thumbnailCoverUrl || item.displayCoverUrl;
 
   return (
     <div className="group surface-card-muted theme-hover-elevated relative rounded-2xl overflow-hidden transition-all duration-300">
       {/* 封面部分 */}
       <div className="relative aspect-[3/4] overflow-hidden bg-[var(--tag-bg)]">
         <Link href={detailHref} className="block h-full" onClick={onOpenDetail}>
-          {item.displayCoverUrl ? (
+          {coverUrl ? (
             <Image
-              key={item.displayCoverUrl}
-              src={item.displayCoverUrl}
+              key={coverUrl}
+              src={coverUrl}
               alt={item.title}
               fill
               unoptimized

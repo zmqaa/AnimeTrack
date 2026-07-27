@@ -4,7 +4,7 @@ import { normalizeStringArray } from '@/lib/anime-cast';
 import { enrichAnimeInput } from '@/lib/anime-enrichment';
 import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
 import { createAnimeSchema } from '@/lib/validations';
-import { resolveDisplayCoverUrl, resolveLocalCoverImage } from '@/lib/cover-image';
+import { resolveDisplayCoverUrl, resolveLocalCoverImage, resolveThumbnailCoverUrl } from '@/lib/cover-image';
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -100,6 +100,7 @@ export async function POST(request: NextRequest) {
       await updateAnimeRecord(newRecord.id, { localCoverUrl });
       newRecord.localCoverUrl = localCoverUrl ?? undefined;
       newRecord.displayCoverUrl = resolveDisplayCoverUrl(localCoverUrl, newRecord.coverUrl);
+      newRecord.thumbnailCoverUrl = resolveThumbnailCoverUrl(localCoverUrl, newRecord.coverUrl);
     }
 
     return apiSuccess(newRecord);

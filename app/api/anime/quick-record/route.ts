@@ -7,7 +7,7 @@ import {
 } from '@/lib/ai';
 import { enrichAnimeInput } from '@/lib/anime-enrichment';
 import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
-import { resolveDisplayCoverUrl, resolveLocalCoverImage } from '@/lib/cover-image';
+import { resolveDisplayCoverUrl, resolveLocalCoverImage, resolveThumbnailCoverUrl } from '@/lib/cover-image';
 import type {
   QuickRecordProgressEvent,
   QuickRecordProgressReporter,
@@ -114,6 +114,7 @@ async function processQuickRecordIntent(
     await updateAnimeRecord(created.id, { localCoverUrl });
     created.localCoverUrl = localCoverUrl ?? undefined;
     created.displayCoverUrl = resolveDisplayCoverUrl(localCoverUrl, created.coverUrl);
+    created.thumbnailCoverUrl = resolveThumbnailCoverUrl(localCoverUrl, created.coverUrl);
     options.reportProgress?.({
       type: 'progress',
       stage: 'cover',

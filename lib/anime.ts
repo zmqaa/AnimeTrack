@@ -5,7 +5,7 @@ import { syncAnimeStartDateFromHistory } from './anime-start-date';
 import { pickBestAnimeTitleCandidate } from './anime-title-matching';
 import { formatAppDateKey, nowISO } from './date-utils';
 import type { AnimeListOverview, AnimeStatus } from './anime-shared';
-import { deleteCoverImage, resolveDisplayCoverUrl } from './cover-image';
+import { deleteCoverImage, resolveDisplayCoverUrl, resolveThumbnailCoverUrl } from './cover-image';
 
 export type { AnimeStatus };
 
@@ -23,6 +23,7 @@ export interface AnimeRecord {
   coverUrl?: string;
   localCoverUrl?: string;
   displayCoverUrl?: string;
+  thumbnailCoverUrl?: string;
   status: AnimeStatus;
   score?: number;
   progress: number;
@@ -124,6 +125,7 @@ function mapRowToAnimeRecord(row: AnimeRow): AnimeRecord {
     coverUrl: row.coverUrl || undefined,
     localCoverUrl: row.localCoverUrl || undefined,
     displayCoverUrl: resolveDisplayCoverUrl(row.localCoverUrl, row.coverUrl),
+    thumbnailCoverUrl: resolveThumbnailCoverUrl(row.localCoverUrl, row.coverUrl),
     status: row.status as AnimeStatus,
     score: row.score != null ? Number(row.score) : undefined,
     progress: row.progress,
@@ -473,6 +475,7 @@ export async function createAnimeRecord(input: CreateAnimeDTO): Promise<AnimeRec
     coverUrl: input.coverUrl || undefined,
     localCoverUrl: input.localCoverUrl || undefined,
     displayCoverUrl: resolveDisplayCoverUrl(input.localCoverUrl, input.coverUrl),
+    thumbnailCoverUrl: resolveThumbnailCoverUrl(input.localCoverUrl, input.coverUrl),
     status: input.status,
     score: input.score,
     progress: input.progress,

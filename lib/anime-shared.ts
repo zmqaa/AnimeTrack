@@ -30,6 +30,7 @@ export interface AnimeCardItem {
   coverUrl?: string;
   localCoverUrl?: string;
   displayCoverUrl?: string;
+  thumbnailCoverUrl?: string;
   status: AnimeStatus;
   score?: number;
   progress: number;

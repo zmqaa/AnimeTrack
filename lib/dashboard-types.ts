@@ -39,6 +39,7 @@ export interface DashboardAnimeItem {
   title: string;
   originalTitle?: string;
   displayCoverUrl?: string;
+  thumbnailCoverUrl?: string;
   score?: number;
   premiereDate?: string;
   summary?: string;
