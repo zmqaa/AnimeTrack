@@ -1,6 +1,5 @@
 "use client";
 
-import { fetchAnimeMetadata } from '@/lib/anime-provider';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { fetchJson } from '@/lib/client-api';
@@ -37,30 +36,7 @@ export default function AnimeForm({
   const [startDate, setStartDate] = useState(initialData.startDate || '');
   const [endDate, setEndDate] = useState(initialData.endDate || '');
   const [isFinished, setIsFinished] = useState(initialData.isFinished || false);
-  const [isFetchingCover, setIsFetchingCover] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const fetchCover = async (silent = false) => {
-    if (!title) {
-        if (!silent) toast.error('请先输入番剧名称');
-        return;
-    }
-    setIsFetchingCover(true);
-    try {
-        const metadata = await fetchAnimeMetadata(title);
-         if (metadata) { 
-            if (metadata.coverUrl) setCoverUrl(metadata.coverUrl);
-            if (metadata.totalEpisodes && !totalEpisodes) setTotalEpisodes(String(metadata.totalEpisodes));
-            if (metadata.isFinished !== undefined) setIsFinished(metadata.isFinished);
-        } else if (!silent) {
-             toast('未找到相关动漫信息', { icon: 'ℹ️' });
-        }
-    } catch {
-        if (!silent) toast.error('获取失败，请稍后再试');
-    } finally {
-        setIsFetchingCover(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,7 +89,6 @@ export default function AnimeForm({
             <FormField label="番剧名称" required>
                 <input 
                     value={title} onChange={e => setTitle(e.target.value)}
-                    onBlur={() => { if (title && !coverUrl) fetchCover(true); }}
                     className="surface-input w-full rounded-lg px-3 py-2.5 focus-theme focus:outline-none transition text-[var(--text-primary)]"
                     placeholder="例如：葬送的芙莉莲"
                 />
@@ -124,20 +99,7 @@ export default function AnimeForm({
                      className="surface-input w-full rounded-lg px-3 py-2.5 focus-theme focus:outline-none transition font-sans text-sm text-[var(--text-primary)]"
                  />
             </FormField>
-            <FormField
-              label="封面链接 (可选)"
-              action={(
-                   <AsyncButton
-                     onClick={() => fetchCover(false)}
-                     busy={isFetchingCover}
-                     busyLabel="搜索中…"
-                     disabled={isSubmitting}
-                     className="text-[10px] text-[var(--color-watching)] hover:text-[var(--color-watching)]/80 disabled:cursor-not-allowed disabled:opacity-50"
-                   >
-                     自动获取封面
-                   </AsyncButton>
-              )}
-            >
+            <FormField label="封面链接 (可选)">
                <div className="flex gap-2">
                    <input 
                        value={coverUrl} onChange={e => setCoverUrl(e.target.value)}
@@ -240,7 +202,6 @@ export default function AnimeForm({
           type="submit"
           busy={isSubmitting}
           busyLabel={editingId ? '正在保存…' : '正在添加…'}
-          disabled={isFetchingCover}
           className="px-6 py-2 bg-[var(--text-primary)] text-[var(--bg-page)] rounded-lg hover:opacity-90 transition text-sm font-medium shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
         >
           {editingId ? '保存修改' : '立即添加'}

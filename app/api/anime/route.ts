@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
 import { listAnimeRecordsWithLastWatched, listAnimeRecordsPaginated, createAnimeRecord, updateAnimeRecord, CreateAnimeDTO, AnimeStatus } from '@/lib/anime';
 import { normalizeStringArray } from '@/lib/anime-cast';
-import { enrichAnimeInput } from '@/lib/anime-enrichment';
 import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
 import { createAnimeSchema } from '@/lib/validations';
 import { resolveDisplayCoverUrl, resolveLocalCoverImage, resolveThumbnailCoverUrl } from '@/lib/cover-image';
@@ -59,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     const v = parsed.data;
-    let data: CreateAnimeDTO = {
+    const data: CreateAnimeDTO = {
         title: v.title,
         originalTitle: v.originalTitle || undefined,
         status: v.status || 'plan_to_watch',
@@ -78,13 +77,6 @@ export async function POST(request: NextRequest) {
         premiereDate: v.premiereDate || undefined,
         isFinished: typeof v.isFinished === 'boolean' ? v.isFinished : undefined
     };
-
-    const originalUserTitle = data.title;
-
-    data = await enrichAnimeInput(data, {
-        mode: 'create',
-        originalUserTitle,
-    });
 
     // Auto-complete logic: if status is completed or has end date, set progress to total
     if ((data.status === 'completed' || data.endDate) && data.totalEpisodes) {

@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { extractSeasonNumber } from './chinese-parser';
 
 export interface AnimeMetadata {
@@ -237,14 +239,6 @@ function extractDurationMinutes(detail: BangumiV0Subject): number | undefined {
 
     const parsed = Number(minuteMatch[1]);
     return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : undefined;
-}
-
-/**
- * 尝试多个查询词依次搜索 Bangumi，返回第一个成功匹配的元数据。
- * 调用方通常按「日文原名 → 标准中文名 → 用户输入」顺序传入。
- */
-export async function fetchAnimeMetadata(title: string): Promise<AnimeMetadata | null> {
-    return fetchAnimeMetadataByQueries(title);
 }
 
 /** 仅查询 Bangumi 封面地址，供批量封面恢复使用，避免额外请求详情和角色数据。 */
