@@ -15,44 +15,109 @@ AnimeTrack 是一个个人动漫记录 Web 应用。它用来管理想看、在�
 - 多主题界面和响应式布局
 - 支持自定义数据库、备份和封面存储路径
 
-## 本地运行
+## Windows 本地运行
 
-需要 Node.js 20+。
-
-```bash
-git clone https://github.com/zmqaa/AnimeTrack.git
-cd AnimeTrack
-npm install
-cp .env.example .env.local
-npm run dev
-```
-
-Windows PowerShell 可以用：
+需要先安装 [Node.js 20+](https://nodejs.org/) 和 [Git](https://git-scm.com/)。在 PowerShell 中依次执行：
 
 ```powershell
+git clone https://github.com/zmqaa/AnimeTrack.git
+Set-Location AnimeTrack
+npm.cmd install
 Copy-Item .env.example .env.local
-npm.cmd run dev
 ```
 
-编辑 `.env.local`，至少设置：
+生成一段随机的登录密钥：
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+用记事本打开配置文件：
+
+```powershell
+notepad .env.local
+```
+
+至少修改下面两项，并把刚生成的随机字符串填入 `NEXTAUTH_SECRET`：
 
 ```dotenv
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=替换为随机长字符串
 ```
 
-SQLite 数据库默认位于 `data/animetrack.db`，不需要额外安装数据库服务。首次运行时：
+AI 功能是可选的，相关环境变量及示例见 `.env.example`。配置完成后创建管理员账号，SQLite 数据库和表会同时自动建立，不需要安装数据库服务：
 
-1. 打开 `http://localhost:3000/setup` 创建数据库并按需导入示例数据。
-2. 创建管理员账号：
+```powershell
+npm.cmd run user:create-admin -- admin '请替换为自己的密码' '管理员'
+```
 
-   ```bash
-   npm run user:create-admin -- admin 你的密码 "管理员"
-   ```
+启动 AnimeTrack：
 
-3. 打开 `http://localhost:3000/login` 登录。
+```powershell
+npm.cmd run dev
+```
 
-AI 功能是可选的，相关环境变量及说明见 `.env.example`。
+保持这个 PowerShell 窗口开启，然后访问：
+
+- `http://localhost:3000/login`：登录管理员账号
+- `http://localhost:3000`：打开 AnimeTrack
+
+需要停止时回到 PowerShell 按 `Ctrl+C`。如需导入仓库内的示例数据，可以在开发服务运行期间打开 `http://localhost:3000/setup`；正常使用不需要执行这一步。
+
+如果 PowerShell 提示无法运行 `npm.ps1`，继续使用文档中的 `npm.cmd` 即可，不需要修改系统执行策略。
+
+## Linux 与 macOS 本地运行
+
+需要 Node.js 20+ 和 Git：
+
+```bash
+git clone https://github.com/zmqaa/AnimeTrack.git
+cd AnimeTrack
+npm install
+cp .env.example .env.local
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+编辑 `.env.local`，填写正确的 `NEXTAUTH_URL`、刚生成的 `NEXTAUTH_SECRET`，并按需配置 AI。随后执行：
+
+```bash
+npm run user:create-admin -- admin '请替换为自己的密码' '管理员'
+npm run dev
+```
+
+SQLite 数据库默认保存在 `data/animetrack.db`。打开 `http://localhost:3000/login` 登录；需要停止时按 `Ctrl+C`。
+
+## Ubuntu 服务器部署
+
+生产环境的完整部署、域名、HTTPS、后台运行、升级和备份说明见：
+
+[Ubuntu 服务器部署指南](docs/ubuntu-deployment.md)
+
+## 中国大陆网络说明
+
+AnimeTrack 的 Bangumi 元数据和封面请求由运行 AnimeTrack 的服务器发起，而不是由浏览器直接请求。
+
+- 部署在能够正常访问 Bangumi 的海外服务器时，元数据和封面功能可以直接使用，用户浏览器不需要配置代理。
+- 部署在中国大陆的本地电脑或服务器时，需要确保运行 AnimeTrack 的 Node.js 进程能够访问 `api.bgm.tv` 和 `lain.bgm.tv`。最简单的方式通常是开启代理软件的 TUN 模式，再启动 AnimeTrack。
+- 仅开启浏览器代理可能无效，因为 AI 录入、资料补充和封面下载都由 Node.js 服务端执行。
+- 无法访问 Bangumi 时，手动添加和已有记录管理仍可使用，但 AI 录入与资料补充可能无法取得完整元数据和封面。
+- AI API 与 Bangumi 是两条独立连接。AI API 可以访问，不代表 Bangumi 一定可以访问；反之亦然。
+
+可以在运行 AnimeTrack 的设备上测试基础连通性。Linux、macOS 或 Git Bash：
+
+```bash
+curl -sS -o /dev/null -w "HTTP %{http_code} 连接 %{time_connect}s 总计 %{time_total}s\n" https://api.bgm.tv
+curl -sS -o /dev/null -w "HTTP %{http_code} 连接 %{time_connect}s 总计 %{time_total}s\n" https://lain.bgm.tv
+```
+
+Windows CMD 或 PowerShell：
+
+```powershell
+curl.exe -sS -o NUL -w "HTTP %{http_code} 连接 %{time_connect}s 总计 %{time_total}s\n" https://api.bgm.tv
+curl.exe -sS -o NUL -w "HTTP %{http_code} 连接 %{time_connect}s 总计 %{time_total}s\n" https://lain.bgm.tv
+```
+
+返回 400、404 或 405 等 HTTP 状态不代表连接失败；只要不是 DNS、TLS 或连接超时，通常就说明目标域名至少可以连接。AnimeTrack 不提供公共代理或 Bangumi 中转节点。
 
 ## 常用命令
 
