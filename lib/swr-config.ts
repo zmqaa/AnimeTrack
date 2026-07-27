@@ -48,11 +48,24 @@ export function animeDetailKey(id: number | string): string {
 /** Dashboard 近期观看历史，避免总览随数据增长而加载全部明细。 */
 export const DASHBOARD_HISTORY_KEY = '/api/history?days=370&limit=800';
 
-/** 时间线使用完整观看历史。 */
+/** @deprecated 时间线已改用分页明细与服务端概览，仅保留给兼容调用。 */
 export const TIMELINE_HISTORY_KEY = '/api/history?scope=all';
 
 export function isHistoryKey(key: unknown): boolean {
   return typeof key === 'string' && key.startsWith('/api/history');
+}
+
+/** 时间线服务端聚合概览。 */
+export const TIMELINE_OVERVIEW_KEY = '/api/timeline/overview';
+
+/** 时间线分页明细。 */
+export function timelineEntriesKey(params: Record<string, string | number>): string {
+  const qs = buildQuery(params);
+  return `/api/timeline/entries?${qs}`;
+}
+
+export function isTimelineKey(key: unknown): boolean {
+  return typeof key === 'string' && key.startsWith('/api/timeline/');
 }
 
 /** 管理页番剧列表 */

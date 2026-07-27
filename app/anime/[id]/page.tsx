@@ -9,7 +9,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { fetchJson } from '@/lib/client-api';
 import type { AnimeStatus, AnimeDetailItem, AnimeNoteEntry } from '@/lib/anime-shared';
 import { useManageAccess } from '@/hooks/useManageAccess';
-import { ANIME_LIST_KEY, DASHBOARD_OVERVIEW_KEY, isHistoryKey, animeDetailKey, swrFetcher } from '@/lib/swr-config';
+import { ANIME_LIST_KEY, DASHBOARD_OVERVIEW_KEY, isHistoryKey, isTimelineKey, animeDetailKey, swrFetcher } from '@/lib/swr-config';
 import {
   buildChangedPayload, resolveReturnTo, shouldRetryAnimeDetailLoad,
   type AnimeMutationResponse,
@@ -104,6 +104,7 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
       // 全局刷新番剧列表（侧边栏、Dashboard 等自动同步）
       globalMutate(ANIME_LIST_KEY);
       globalMutate(DASHBOARD_OVERVIEW_KEY);
+      globalMutate(isTimelineKey);
       setIsEditing(false);
       toast.success('保存成功');
     } catch (error) {
@@ -120,6 +121,7 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
       setFormData(response.entry);
       globalMutate(ANIME_LIST_KEY);
       globalMutate(DASHBOARD_OVERVIEW_KEY);
+      globalMutate(isTimelineKey);
       const appliedCount = Array.isArray(response.appliedFields) ? response.appliedFields.length : 0;
       if (appliedCount === 0) toast('没有可补充的空缺字段', { icon: 'ℹ️' });
       else toast.success(`已补充 ${appliedCount} 个字段`);
@@ -138,6 +140,7 @@ export default function AnimeDetailPage({ params }: { params: { id: string } }) 
       globalMutate(ANIME_LIST_KEY);
       globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isHistoryKey);
+      globalMutate(isTimelineKey);
       router.push(returnTo, { scroll: false });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '删除失败');

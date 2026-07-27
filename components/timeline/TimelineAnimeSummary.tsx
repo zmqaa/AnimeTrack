@@ -1,82 +1,20 @@
 "use client";
 
-import { memo, useMemo, useState, useEffect } from 'react';
+import { memo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
-import type { EnrichedEntry } from './TimelineEnhancedList';
-import ProgressBar from '@/components/shared/ProgressBar';
+import type { TimelineAnimeSummaryData } from '@/lib/timeline-types';
 import Panel from '@/components/shared/Panel';
 import EmptyState from '@/components/shared/EmptyState';
 
 const SUMMARY_PAGE_SIZE = 10;
 
 interface TimelineAnimeSummaryProps {
-  entries: EnrichedEntry[];
+  summaries: TimelineAnimeSummaryData[];
   searchQuery: string;
 }
-
-interface AnimeSummary {
-  animeId: number;
-  title: string;
-  originalTitle?: string;
-  coverUrl?: string;
-  displayCoverUrl?: string;
-  status: string;
-  totalWatched: number;
-  latestEpisode: number;
-  totalEpisodes?: number;
-  firstWatched: Date;
-  lastWatched: Date;
-  sessionCount: number;
-}
-
-export default memo(function TimelineAnimeSummary({ entries, searchQuery }: TimelineAnimeSummaryProps) {
+export default memo(function TimelineAnimeSummary({ summaries, searchQuery }: TimelineAnimeSummaryProps) {
   const [page, setPage] = useState(1);
-
-  const summaries = useMemo(() => {
-    const map = new Map<number, AnimeSummary>();
-
-    for (const { history: h, anime } of entries) {
-      let summary = map.get(h.animeId);
-      if (!summary) {
-        summary = {
-          animeId: h.animeId,
-          title: h.animeTitle,
-          originalTitle: anime?.originalTitle,
-          coverUrl: anime?.displayCoverUrl,
-          status: anime?.status ?? 'watching',
-          totalWatched: 0,
-          latestEpisode: 0,
-          totalEpisodes: anime?.totalEpisodes ?? undefined,
-          firstWatched: h.dateObj,
-          lastWatched: h.dateObj,
-          sessionCount: 0,
-        };
-        map.set(h.animeId, summary);
-      }
-
-      summary.totalWatched++;
-      if (h.episode > summary.latestEpisode) summary.latestEpisode = h.episode;
-      if (h.dateObj < summary.firstWatched) summary.firstWatched = h.dateObj;
-      if (h.dateObj > summary.lastWatched) summary.lastWatched = h.dateObj;
-      summary.sessionCount++;
-    }
-
-    // Apply search filter
-    let result = Array.from(map.values());
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(
-        s => s.title.toLowerCase().includes(q) ||
-             s.originalTitle?.toLowerCase().includes(q)
-      );
-    }
-
-    // Sort by total watched descending
-    result.sort((a, b) => b.totalWatched - a.totalWatched);
-
-    return result;
-  }, [entries, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(summaries.length / SUMMARY_PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -88,8 +26,8 @@ export default memo(function TimelineAnimeSummary({ entries, searchQuery }: Time
   if (summaries.length === 0) {
     return (
       <EmptyState
-        title={searchQuery ? '没有可汇总的作品' : '暂无汇总数据'}
-        description={searchQuery ? '当前搜索条件没有匹配到观看记录。' : '产生观看记录后，这里会按番剧统计集数与进度。'}
+        title={searchQuery ? '没有匹配的作品' : '暂无最近观看'}
+        description={searchQuery ? '当前搜索条件没有匹配到观看记录。' : '产生观看记录后，这里会显示最近看过的作品。'}
         size="compact"
         surface="panel"
         className="min-h-[200px]"
@@ -97,15 +35,14 @@ export default memo(function TimelineAnimeSummary({ entries, searchQuery }: Time
     );
   }
 
-  const totalWatchedAll = summaries.reduce((s, a) => s + a.totalWatched, 0);
   const totalAnime = summaries.length;
 
   return (
     <Panel
-      title="按番剧汇总"
+      title="最近观看作品"
       description={(
         <>
-          {totalAnime} 部番剧 · 共 {totalWatchedAll} 集记录
+          {totalAnime} 部番剧 · 按最近观看时间排序
           {totalPages > 1 && <span> · 第 {safePage}/{totalPages} 页</span>}
         </>
       )}
@@ -118,13 +55,11 @@ export default memo(function TimelineAnimeSummary({ entries, searchQuery }: Time
 
       {/* List */}
       <div className="flex-1 overflow-y-auto overscroll-contain divide-y divide-[var(--border-light)]">
-        {pagedSummaries.map((s) => {
-          const progressPercent = s.totalEpisodes && s.totalEpisodes > 0
-            ? Math.min(100, Math.round((s.latestEpisode / s.totalEpisodes) * 100))
-            : s.status === 'completed' ? 100 : 0;
-
-          const daysSince = Math.floor((Date.now() - s.lastWatched.getTime()) / 86400000);
+        {pagedSummaries.map((s, index) => {
+          const lastWatched = new Date(s.lastWatched);
+          const daysSince = Math.floor((Date.now() - lastWatched.getTime()) / 86400000);
           const lastWatchLabel = daysSince === 0 ? '今天' : daysSince === 1 ? '昨天' : `${daysSince}天前`;
+          const rank = (safePage - 1) * SUMMARY_PAGE_SIZE + index + 1;
 
           return (
             <Link
@@ -147,11 +82,14 @@ export default memo(function TimelineAnimeSummary({ entries, searchQuery }: Time
               {/* Info */}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-[var(--text-primary)] group-hover:text-primary transition-colors truncate">
-                    {s.title}
-                  </span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="shrink-0 text-[10px] font-bold font-mono text-primary">#{rank}</span>
+                    <span className="truncate text-sm font-medium text-[var(--text-primary)] transition-colors group-hover:text-primary">
+                      {s.title}
+                    </span>
+                  </div>
                   <span className="shrink-0 text-[11px] font-mono text-[var(--text-muted)]">
-                    {s.totalWatched}集
+                    最近 EP {s.lastEpisode}
                   </span>
                 </div>
 
@@ -159,27 +97,11 @@ export default memo(function TimelineAnimeSummary({ entries, searchQuery }: Time
                   <p className="text-[10px] text-[var(--text-muted)] truncate mt-0.5">{s.originalTitle}</p>
                 )}
 
-                {/* Progress bar */}
-                {s.totalEpisodes && s.totalEpisodes > 0 && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <ProgressBar
-                      className="flex-1"
-                      value={progressPercent}
-                      size="xs"
-                      variant={progressPercent >= 100 ? 'completed' : 'progress'}
-                      label={`${s.title} 观看进度`}
-                    />
-                    <span className="text-[10px] text-[var(--text-muted)] font-mono shrink-0">
-                      {s.latestEpisode}/{s.totalEpisodes}
-                    </span>
-                  </div>
-                )}
-
                 {/* Meta row */}
                 <div className="mt-1.5 flex items-center gap-3 text-[10px] text-[var(--text-muted)] font-mono">
-                  <span>{s.firstWatched.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })} 起</span>
-                  <span className="text-[var(--border)]">·</span>
                   <span>{lastWatchLabel}</span>
+                  <span className="text-[var(--border)]">·</span>
+                  <span>共 {s.totalWatched} 条记录</span>
                   <span className="text-[var(--border)]">·</span>
                   <span className={`${
                     s.status === 'watching' ? 'text-[var(--color-watching)]' :

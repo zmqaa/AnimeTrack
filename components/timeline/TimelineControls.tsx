@@ -11,9 +11,10 @@ import {
 } from '@heroicons/react/24/outline';
 import SegmentedControl from '@/components/shared/SegmentedControl';
 import Panel from '@/components/shared/Panel';
+import type { TimelineSortBy } from '@/lib/timeline-types';
 
 export type TimelineViewMode = 'timeline' | 'table';
-export type TimelineSortBy = 'newest' | 'oldest' | 'mostEpisodes';
+export type { TimelineSortBy } from '@/lib/timeline-types';
 
 interface TimelineControlsProps {
   viewMode: TimelineViewMode;

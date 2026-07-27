@@ -16,7 +16,7 @@ import { fetchJson, fetchNdjson } from '@/lib/client-api';
 import type { AnimeStatus, AnimeSortBy, AnimeListItem, AnimeCardItem, AnimeListOverview } from '@/lib/anime-shared';
 import type { QuickRecordProgressEvent, QuickRecordStreamEvent } from '@/lib/quick-record-progress';
 import { useManageAccess } from '@/hooks/useManageAccess';
-import { ANIME_LIST_KEY, ANIME_OVERVIEW_KEY, DASHBOARD_OVERVIEW_KEY, isHistoryKey, animePageKey, swrFetcher } from '@/lib/swr-config';
+import { ANIME_LIST_KEY, ANIME_OVERVIEW_KEY, DASHBOARD_OVERVIEW_KEY, isHistoryKey, isTimelineKey, animePageKey, swrFetcher } from '@/lib/swr-config';
 import AnimePagination from './AnimePagination';
 import AnimeQuickRecordPanel from './AnimeQuickRecordPanel';
 import AnimeSidebar from './AnimeSidebar';
@@ -305,6 +305,7 @@ export default function AnimePageClient() {
     globalMutate(swrPageKey);
     globalMutate(ANIME_LIST_KEY);
     globalMutate(DASHBOARD_OVERVIEW_KEY);
+    globalMutate(isTimelineKey);
   }, [mutateOverview, swrPageKey]);
 
   const toggleViewMode = useCallback((mode: ViewMode) => {
@@ -376,6 +377,7 @@ export default function AnimePageClient() {
       globalMutate(ANIME_LIST_KEY);
       globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isHistoryKey);
+      globalMutate(isTimelineKey);
 
       const isFinishing = Boolean(
         result.entry.totalEpisodes
@@ -392,6 +394,7 @@ export default function AnimePageClient() {
       globalMutate(swrPageKey);
       mutateOverview();
       globalMutate(isHistoryKey);
+      globalMutate(isTimelineKey);
       toast.error(err instanceof Error ? err.message : '更新失败，请重试');
     } finally {
       progressMutationIdsRef.current.delete(id);
@@ -420,6 +423,7 @@ export default function AnimePageClient() {
       globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(swrPageKey);
       globalMutate(isHistoryKey);
+      globalMutate(isTimelineKey);
     } catch (err) {
       console.error('Delete failed:', err);
       toast.error(err instanceof Error ? err.message : '删除失败，请重试');
@@ -470,6 +474,7 @@ export default function AnimePageClient() {
       globalMutate(ANIME_LIST_KEY);
       globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isHistoryKey);
+      globalMutate(isTimelineKey);
     } catch (error) {
       console.error('Quick record failed:', error);
       const message = error instanceof Error ? error.message : 'AI录入失败，请稍后重试';

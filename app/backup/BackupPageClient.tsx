@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import ConfirmDialog from '@/components/shared/ConfirmDialog';
 import { fetchBlob, fetchJson } from '@/lib/client-api';
 import { buildExportFilename } from '@/lib/export-filename';
-import { DASHBOARD_OVERVIEW_KEY, isHistoryKey } from '@/lib/swr-config';
+import { DASHBOARD_OVERVIEW_KEY, isHistoryKey, isTimelineKey } from '@/lib/swr-config';
 import { useManageAccess } from '@/hooks/useManageAccess';
 import AsyncButton from '@/components/shared/AsyncButton';
 
@@ -201,6 +201,7 @@ export default function BackupPageClient() {
       }
       await globalMutate((key) => typeof key === 'string' && key.startsWith('/api/anime'));
       globalMutate(DASHBOARD_OVERVIEW_KEY);
+      globalMutate(isTimelineKey);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '批量下载封面失败');
     } finally {
@@ -225,6 +226,7 @@ export default function BackupPageClient() {
           key === DASHBOARD_OVERVIEW_KEY ||
           key.startsWith('/api/anime') ||
           key.startsWith('/api/history') ||
+          key.startsWith('/api/timeline/') ||
           key.startsWith('/api/admin/anime') ||
           key.startsWith('/api/admin/history')
         )),
@@ -256,6 +258,7 @@ export default function BackupPageClient() {
       await globalMutate((key) => typeof key === 'string' && key.startsWith('/api/anime'));
       globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isHistoryKey);
+      globalMutate(isTimelineKey);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '导入失败');
     } finally {

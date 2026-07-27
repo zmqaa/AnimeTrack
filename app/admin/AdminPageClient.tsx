@@ -10,7 +10,7 @@ import SegmentedControl from '@/components/shared/SegmentedControl';
 import { fetchJson } from '@/lib/client-api';
 import { useManageAccess } from '@/hooks/useManageAccess';
 import AsyncButton from '@/components/shared/AsyncButton';
-import { adminAnimeKey, adminHistoryKey, ANIME_LIST_KEY, DASHBOARD_OVERVIEW_KEY, isHistoryKey, swrFetcher } from '@/lib/swr-config';
+import { adminAnimeKey, adminHistoryKey, ANIME_LIST_KEY, DASHBOARD_OVERVIEW_KEY, isHistoryKey, isTimelineKey, swrFetcher } from '@/lib/swr-config';
 import {
   Checkbox,
   DeleteButton,
@@ -175,6 +175,7 @@ function AnimeTab() {
       globalMutate(ANIME_LIST_KEY);
       globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isHistoryKey);
+      globalMutate(isTimelineKey);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '删除失败');
     } finally {
@@ -380,6 +381,7 @@ function HistoryTab() {
       mutate();
       globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isHistoryKey);
+      globalMutate(isTimelineKey);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '删除失败');
     } finally {
@@ -419,6 +421,7 @@ function HistoryTab() {
       mutate();
       globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isHistoryKey);
+      globalMutate(isTimelineKey);
       globalMutate((key) => typeof key === 'string' && (
         key === ANIME_LIST_KEY ||
         key.startsWith('/api/anime?') ||
@@ -458,6 +461,7 @@ function HistoryTab() {
       mutate();
       globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isHistoryKey);
+      globalMutate(isTimelineKey);
       globalMutate((key) => typeof key === 'string' && (
         key.startsWith('/api/admin/history?') ||
         key === ANIME_LIST_KEY ||

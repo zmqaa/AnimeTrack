@@ -3,22 +3,24 @@
 import { memo, useMemo } from 'react';
 import Link from 'next/link';
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
-import { ParsedWatchHistory, AnimeRecord } from '@/lib/dashboard-types';
+import type { ParsedWatchHistory } from '@/lib/dashboard-types';
+import type { TimelineAnimeItem } from '@/lib/timeline-types';
 import ProgressBar from '@/components/shared/ProgressBar';
 import EmptyState from '@/components/shared/EmptyState';
 import { APP_TIME_ZONE } from '@/lib/date-utils';
 
 export interface EnrichedEntry {
   history: ParsedWatchHistory;
-  anime?: AnimeRecord;
+  anime?: TimelineAnimeItem;
 }
 
 interface TimelineEnhancedListProps {
   entries: EnrichedEntry[];
   groupBy: 'day' | 'week' | 'month';
-  searchQuery: string;
+  hasSearch: boolean;
   page: number;
-  pageSize: number;
+  totalPages: number;
+  totalItems: number;
   onPageChange: (page: number) => void;
 }
 
@@ -62,7 +64,7 @@ function getMonthLabel(dateStr: string): string {
   return `${year}年${parseInt(month)}月`;
 }
 
-function Pagination({ page, totalPages, totalItems, onPageChange }: {
+export function TimelinePagination({ page, totalPages, totalItems, onPageChange }: {
   page: number; totalPages: number; totalItems: number; onPageChange: (p: number) => void;
 }) {
   if (totalPages <= 1) return null;
@@ -120,28 +122,12 @@ function Pagination({ page, totalPages, totalItems, onPageChange }: {
   );
 }
 
-export default memo(function TimelineEnhancedList({ entries, groupBy, searchQuery, page, pageSize, onPageChange }: TimelineEnhancedListProps) {
-  // Filter by search
-  const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return entries;
-    const q = searchQuery.toLowerCase();
-    return entries.filter(e =>
-      e.history.animeTitle.toLowerCase().includes(q) ||
-      (e.anime?.originalTitle?.toLowerCase().includes(q))
-    );
-  }, [entries, searchQuery]);
-
-  // Paginate flat entries, then group
-  const { grouped, totalPages, totalFiltered } = useMemo(() => {
-    const total = filtered.length;
-    const pages = Math.max(1, Math.ceil(total / pageSize));
-    const safePage = Math.min(page, pages);
-    const slice = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
-
+export default memo(function TimelineEnhancedList({ entries, groupBy, hasSearch, page, totalPages, totalItems, onPageChange }: TimelineEnhancedListProps) {
+  const grouped = useMemo(() => {
     const groups: { key: string; label: string; entries: EnrichedEntry[] }[] = [];
     const groupMap = new Map<string, EnrichedEntry[]>();
 
-    for (const entry of slice) {
+    for (const entry of entries) {
       let key: string;
       if (groupBy === 'day') {
         key = entry.history.dateStr;
@@ -165,14 +151,14 @@ export default memo(function TimelineEnhancedList({ entries, groupBy, searchQuer
       }
       groups.push({ key, label, entries: items });
     }
-    return { grouped: groups, totalPages: pages, totalFiltered: total };
-  }, [filtered, groupBy, page, pageSize]);
+    return groups;
+  }, [entries, groupBy]);
 
-  if (filtered.length === 0) {
+  if (entries.length === 0) {
     return (
       <EmptyState
-        title={searchQuery ? '没有匹配的记录' : '暂无观看记录'}
-        description={searchQuery ? '试试缩短关键词，或清除搜索条件。' : '去更新一下番剧进度，观看记录会自动出现在这里。'}
+        title={hasSearch ? '没有匹配的记录' : totalItems === 0 ? '暂无观看记录' : '当前页没有记录'}
+        description={hasSearch ? '试试缩短关键词，或清除搜索条件。' : totalItems === 0 ? '去更新一下番剧进度，观看记录会自动出现在这里。' : '请返回上一页后重试。'}
         surface="panel"
       />
     );
@@ -279,10 +265,10 @@ export default memo(function TimelineEnhancedList({ entries, groupBy, searchQuer
       </div>
 
       {/* Pagination */}
-      <Pagination
+      <TimelinePagination
         page={page}
         totalPages={totalPages}
-        totalItems={totalFiltered}
+        totalItems={totalItems}
         onPageChange={onPageChange}
       />
     </div>

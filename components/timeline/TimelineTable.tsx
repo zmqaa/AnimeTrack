@@ -1,9 +1,10 @@
 "use client";
 
-import { memo, useMemo } from 'react';
+import { memo } from 'react';
 import Link from 'next/link';
 import { ChevronUpDownIcon } from '@heroicons/react/24/outline';
 import { EnrichedEntry } from './TimelineEnhancedList';
+import { TimelinePagination } from './TimelineEnhancedList';
 import { TimelineSortBy } from './TimelineControls';
 import ProgressBar from '@/components/shared/ProgressBar';
 import EmptyState from '@/components/shared/EmptyState';
@@ -11,9 +12,13 @@ import { APP_TIME_ZONE } from '@/lib/date-utils';
 
 interface TimelineTableProps {
   entries: EnrichedEntry[];
-  searchQuery: string;
+  hasSearch: boolean;
   sortBy: TimelineSortBy;
   onSortByChange: (sort: TimelineSortBy) => void;
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  onPageChange: (page: number) => void;
 }
 
 type SortColumn = 'date' | 'anime' | 'episode' | 'progress';
@@ -27,33 +32,16 @@ function getSortIcon(currentSort: TimelineSortBy, column: SortColumn): boolean {
   return map[currentSort] === column;
 }
 
-export default memo(function TimelineTable({ entries, searchQuery, sortBy, onSortByChange }: TimelineTableProps) {
-  const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return entries;
-    const q = searchQuery.toLowerCase();
-    return entries.filter(e =>
-      e.history.animeTitle.toLowerCase().includes(q) ||
-      (e.anime?.originalTitle?.toLowerCase().includes(q))
-    );
-  }, [entries, searchQuery]);
-
-  // Sort entries
-  const sorted = useMemo(() => {
-    const arr = [...filtered];
-    switch (sortBy) {
-      case 'newest':
-        arr.sort((a, b) => b.history.dateObj.getTime() - a.history.dateObj.getTime());
-        break;
-      case 'oldest':
-        arr.sort((a, b) => a.history.dateObj.getTime() - b.history.dateObj.getTime());
-        break;
-      case 'mostEpisodes':
-        arr.sort((a, b) => b.history.episode - a.history.episode);
-        break;
-    }
-    return arr;
-  }, [filtered, sortBy]);
-
+export default memo(function TimelineTable({
+  entries,
+  hasSearch,
+  sortBy,
+  onSortByChange,
+  page,
+  totalPages,
+  totalItems,
+  onPageChange,
+}: TimelineTableProps) {
   const handleSortClick = (column: SortColumn) => {
     const map: Record<SortColumn, TimelineSortBy> = {
       date: sortBy === 'newest' ? 'oldest' : 'newest',
@@ -76,11 +64,11 @@ export default memo(function TimelineTable({ entries, searchQuery, sortBy, onSor
     </th>
   );
 
-  if (filtered.length === 0) {
+  if (entries.length === 0) {
     return (
       <EmptyState
-        title={searchQuery ? '没有匹配的记录' : '暂无观看记录'}
-        description={searchQuery ? '试试缩短关键词，或清除搜索条件。' : '更新番剧进度后，这里会生成可排序的记录表格。'}
+        title={hasSearch ? '没有匹配的记录' : totalItems === 0 ? '暂无观看记录' : '当前页没有记录'}
+        description={hasSearch ? '试试缩短关键词，或清除搜索条件。' : totalItems === 0 ? '更新番剧进度后，这里会生成可排序的记录表格。' : '请返回上一页后重试。'}
         surface="panel"
       />
     );
@@ -99,7 +87,7 @@ export default memo(function TimelineTable({ entries, searchQuery, sortBy, onSor
             </tr>
           </thead>
           <tbody>
-            {sorted.map(({ history: h, anime }) => (
+            {entries.map(({ history: h, anime }) => (
               <tr
                 key={h.id}
                 className="border-b border-[var(--border-light)] hover:bg-[var(--tag-bg)]/50 transition-colors group"
@@ -162,12 +150,22 @@ export default memo(function TimelineTable({ entries, searchQuery, sortBy, onSor
         </table>
       </div>
 
-      {/* Footer */}
-      <div className="px-4 py-3 border-t border-[var(--border)] flex items-center justify-between">
-        <span className="text-[11px] text-[var(--text-muted)] font-mono">
-          共 {sorted.length} 条记录
-        </span>
-      </div>
+      {totalPages > 1 ? (
+        <div className="px-4 pb-4">
+          <TimelinePagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            onPageChange={onPageChange}
+          />
+        </div>
+      ) : (
+        <div className="border-t border-[var(--border)] px-4 py-3">
+          <span className="text-[11px] text-[var(--text-muted)] font-mono">
+            共 {totalItems} 条记录
+          </span>
+        </div>
+      )}
     </div>
   );
 });

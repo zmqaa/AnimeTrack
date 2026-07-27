@@ -1,14 +1,13 @@
 "use client";
 
 import { memo, useMemo, useState } from 'react';
-import { ParsedWatchHistory } from '@/lib/dashboard-types';
 import ChartTooltip from '@/components/shared/ChartTooltip';
 import Panel from '@/components/shared/Panel';
 import { getBoundedTooltipPosition } from '@/components/shared/chart-utils';
 import { dateKeyToAppDate, formatAppDateKey, shiftDateKey } from '@/lib/date-utils';
 
 interface TimelineHeatmapProps {
-  history: ParsedWatchHistory[];
+  dailyCounts: Record<string, number>;
   months?: number; // default 12, for compact mode pass e.g. 6
 }
 
@@ -36,15 +35,10 @@ const CELL_SIZE = 20;
 const CELL_GAP = 6;
 const CELL_STEP = CELL_SIZE + CELL_GAP;
 
-export default memo(function TimelineHeatmap({ history, months = 12 }: TimelineHeatmapProps) {
+export default memo(function TimelineHeatmap({ dailyCounts, months = 12 }: TimelineHeatmapProps) {
   const [activeDate, setActiveDate] = useState<string | null>(null);
 
   const { cells, monthMarkers, totalDays, activeDays, maxInDay, totalWeeks } = useMemo(() => {
-    const countMap: Record<string, number> = {};
-    for (const h of history) {
-      countMap[h.dateStr] = (countMap[h.dateStr] || 0) + 1;
-    }
-
     const todayStr = formatAppDateKey(new Date());
     const [todayYear, todayMonth] = todayStr.split('-').map(Number);
 
@@ -68,7 +62,7 @@ export default memo(function TimelineHeatmap({ history, months = 12 }: TimelineH
       for (let d = 0; d < 7; d++) {
         const dateStr = shiftDateKey(startDateKey, w * 7 + d);
         const date = dateKeyToAppDate(dateStr);
-        const count = countMap[dateStr] || 0;
+        const count = dailyCounts[dateStr] || 0;
 
         if (dateStr > todayStr) {
           cellsArr.push({ date, dateStr, count: -1, level: -1, weekIdx: w, dayIdx: d, isToday: false });
@@ -90,7 +84,7 @@ export default memo(function TimelineHeatmap({ history, months = 12 }: TimelineH
     }
 
     return { cells: cellsArr, monthMarkers: monthMarkersArr, totalDays: total, activeDays: active, maxInDay: maxCount, totalWeeks: weeks };
-  }, [history, months]);
+  }, [dailyCounts, months]);
 
   // Layout — fixed cell size, horizontal scroll if needed
   const dayLabelWidth = 48;
