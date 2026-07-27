@@ -9,18 +9,18 @@ interface TimelineStatsProps {
 
 export default memo(function TimelineStats({ stats }: TimelineStatsProps) {
   const cards = [
-    { label: '总看番集数', value: stats.totalEpisodes, unit: 'EP' },
-    { label: '涉及番剧', value: stats.uniqueAnime, unit: '部' },
-    { label: '活跃天数', value: stats.activeDays, unit: '天' },
-    { label: '日均看番', value: stats.avgEpisodesPerDay, unit: 'EP' },
-    { label: '高频时段', value: stats.peakPeriod, unit: `× ${stats.peakPeriodCount}` },
+    { label: '已记录观看', value: stats.totalEpisodes, unit: 'EP' },
+    { label: '涉及记录', value: stats.uniqueAnime, unit: '条' },
+    { label: '记录活跃天数', value: stats.activeDays, unit: '天' },
+    { label: '记录期日均', value: stats.avgEpisodesPerDay, unit: 'EP' },
+    { label: '高频记录时段', value: stats.peakPeriod, unit: `× ${stats.peakPeriodCount}` },
   ];
 
   return (
     <PageHero
       className="glass-panel-strong"
       title="观看时间轴"
-      description="回顾每一次观看记录，了解自己的观看节奏与时间分布。"
+      description="回顾具有具体时间的观看记录；仅补录进度的早期作品不计入本页统计。"
       backHref="/anime"
       backLabel="返回番剧列表"
       align="start"

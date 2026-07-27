@@ -53,11 +53,16 @@ export interface AnimeListItem extends AnimeCardItem {
 }
 
 export interface AnimeLibraryStats {
-  total: number;
-  watching: number;
-  completed: number;
-  unfinished: number;
+  libraryWorks: number;
+  watchedWorks: number;
+  completedWorks: number;
+  watchingWorks: number;
+  droppedWorks: number;
+  plannedWorks: number;
+  rewatchRuns: number;
+  completedRewatchRuns: number;
   watchedEpisodes: number;
+  rewatchEpisodes: number;
   totalMinutes: number;
 }
 

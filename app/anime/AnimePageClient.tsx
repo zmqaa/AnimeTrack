@@ -30,11 +30,16 @@ import {
 const ANIME_LIST_SCROLL_KEY = 'anime-list-scroll-y';
 const EMPTY_OVERVIEW: AnimeListOverview = {
   stats: {
-    total: 0,
-    watching: 0,
-    completed: 0,
-    unfinished: 0,
+    libraryWorks: 0,
+    watchedWorks: 0,
+    completedWorks: 0,
+    watchingWorks: 0,
+    droppedWorks: 0,
+    plannedWorks: 0,
+    rewatchRuns: 0,
+    completedRewatchRuns: 0,
     watchedEpisodes: 0,
+    rewatchEpisodes: 0,
     totalMinutes: 0,
   },
   tagPreferences: [],
@@ -532,9 +537,9 @@ export default function AnimePageClient() {
         setShowForm={setShowForm}
         resetForm={resetForm}
         isAdmin={isAdmin}
-        totalCount={overview.stats.total}
-        watchingCount={overview.stats.watching}
-        completedCount={overview.stats.completed}
+        totalCount={overview.stats.libraryWorks}
+        watchingCount={overview.stats.watchingWorks}
+        completedCount={overview.stats.completedWorks}
         loading={overviewLoading}
       />
 

@@ -405,11 +405,16 @@ describe('anime progress and watch history transaction', () => {
     const overview = await animeModule.getAnimeListOverview();
 
     expect(overview.stats).toEqual({
-      total: 2,
-      watching: 1,
-      completed: 1,
-      unfinished: 1,
+      libraryWorks: 2,
+      watchedWorks: 2,
+      completedWorks: 1,
+      watchingWorks: 1,
+      droppedWorks: 0,
+      plannedWorks: 0,
+      rewatchRuns: 0,
+      completedRewatchRuns: 0,
       watchedEpisodes: 15,
+      rewatchEpisodes: 0,
       totalMinutes: 363,
     });
     expect(overview.tagPreferences).toEqual([

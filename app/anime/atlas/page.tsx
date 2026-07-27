@@ -9,6 +9,7 @@ import { YearBarChart } from '@/components/dashboard/YearBarChart';
 import { ChordDiagram } from '@/components/dashboard/ChordDiagram';
 import { CastNetwork } from '@/components/dashboard/CastNetwork';
 import { ANIME_STATUS_LABELS } from '@/lib/anime-shared';
+import { getContentTags, isRewatchRecord } from '@/lib/anime-viewing-stats';
 import StatTile from '@/components/shared/StatTile';
 import SectionTitle from '@/components/shared/SectionTitle';
 import PageHero from '@/components/shared/PageHero';
@@ -31,9 +32,10 @@ export default function AnimeAtlasPage() {
   const themeDef = getAppThemeDefinition(theme);
 
   const data = useMemo(() => {
+    const baseAnimeList = animeList.filter((anime) => !isRewatchRecord(anime));
     const castCounts: Record<string, number> = {};
 
-    animeList.forEach((anime) => {
+    baseAnimeList.forEach((anime) => {
       if (Array.isArray(anime.cast)) {
         anime.cast.forEach((name) => {
           const normalized = String(name || '').trim();
@@ -43,7 +45,7 @@ export default function AnimeAtlasPage() {
       }
     });
 
-    const scored = animeList
+    const scored = baseAnimeList
       .filter((anime) => typeof anime.score === 'number')
       .sort((left, right) => {
         const scoreDiff = (right.score ?? 0) - (left.score ?? 0);
@@ -52,19 +54,17 @@ export default function AnimeAtlasPage() {
       })
       .slice(0, 9);
 
-    const recentlyStarted = animeList
+    const recentlyStarted = baseAnimeList
       .filter((anime) => anime.startDate)
       .sort((left, right) => new Date(right.startDate ?? 0).getTime() - new Date(left.startDate ?? 0).getTime())
       .slice(0, 6);
 
     // 标签出现次数排行
     const tagCountMap: Record<string, number> = {};
-    animeList.forEach((anime) => {
+    baseAnimeList.forEach((anime) => {
       if (!Array.isArray(anime.tags)) return;
-      anime.tags.forEach((tag) => {
-        const t = String(tag || '').trim();
-        if (!t) return;
-        tagCountMap[t] = (tagCountMap[t] || 0) + 1;
+      getContentTags(anime.tags).forEach((tag) => {
+        tagCountMap[tag] = (tagCountMap[tag] || 0) + 1;
       });
     });
     const tagRanking = Object.entries(tagCountMap)
@@ -72,10 +72,10 @@ export default function AnimeAtlasPage() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    const metadataRichness = animeList.length
+    const metadataRichness = baseAnimeList.length
       ? Math.round(
-          (animeList.filter((anime) => [anime.originalTitle, anime.score, anime.totalEpisodes, Array.isArray(anime.cast) && anime.cast.length > 0 ? 'cast' : '', anime.premiereDate, anime.summary].filter(Boolean).length >= 4).length /
-            animeList.length) *
+          (baseAnimeList.filter((anime) => [anime.originalTitle, anime.score, anime.totalEpisodes, Array.isArray(anime.cast) && anime.cast.length > 0 ? 'cast' : '', anime.premiereDate, anime.summary].filter(Boolean).length >= 4).length /
+            baseAnimeList.length) *
             100
         )
       : 0;
@@ -88,9 +88,9 @@ export default function AnimeAtlasPage() {
       const matrix: Record<string, Record<string, number>> = {};
       castList.forEach(([name]) => { matrix[name] = {}; });
 
-      animeList.forEach((anime) => {
+      baseAnimeList.forEach((anime) => {
         if (!Array.isArray(anime.cast) || !Array.isArray(anime.tags)) return;
-        const animeTags = new Set(anime.tags.map((t: string) => String(t || '').trim()).filter(Boolean));
+        const animeTags = new Set(getContentTags(anime.tags));
         const castInAnime = anime.cast
           .map((c: string) => String(c || '').trim())
           .filter((c: string) => c && matrix[c]);
@@ -126,7 +126,7 @@ export default function AnimeAtlasPage() {
     const cooccurrence: Record<string, Record<string, number>> = {};
     topNetworkCast.forEach(([name]) => { cooccurrence[name] = {}; });
 
-    animeList.forEach((anime) => {
+    baseAnimeList.forEach((anime) => {
       if (!Array.isArray(anime.cast)) return;
       const castInAnime = anime.cast
         .map((c: string) => String(c || '').trim())
@@ -171,6 +171,7 @@ export default function AnimeAtlasPage() {
       networkNodes: filteredNetworkNodes,
       networkLinks,
       hasNetworkData,
+      workCount: baseAnimeList.length,
     };
   }, [animeList]);
 
@@ -191,7 +192,7 @@ export default function AnimeAtlasPage() {
         statsClassName="grid min-w-full grid-cols-2 gap-3 lg:min-w-[320px] lg:max-w-[360px]"
         stats={(
           <>
-            <StatTile surface="card" label="入库作品" value={animeList.length} unit="部" detail="当前片库收录总数" />
+            <StatTile surface="card" label="入库作品" value={data.workCount} unit="部" detail="重看轮次不重复计算" />
             <StatTile surface="card" label="档案完整度" value={`${data.metadataRichness}%`} detail="元数据填写覆盖率" />
           </>
         )}

@@ -5,6 +5,7 @@ import { syncAnimeStartDateFromHistory } from './anime-start-date';
 import { pickBestAnimeTitleCandidate } from './anime-title-matching';
 import { formatAppDateKey, nowISO } from './date-utils';
 import type { AnimeListOverview, AnimeStatus } from './anime-shared';
+import { buildAnimeViewingStats, getContentTags, isRewatchRecord } from './anime-viewing-stats';
 import { deleteCoverImage, resolveDisplayCoverUrl, resolveThumbnailCoverUrl } from './cover-image';
 
 export type { AnimeStatus };
@@ -340,39 +341,32 @@ export async function listAnimeRecordsPaginated(options: ListAnimeOptions = {}):
   };
 }
 
-interface AnimeOverviewStatsRow {
-  total: number;
-  watching: number;
-  completed: number;
-  unfinished: number;
-  watchedEpisodes: number;
-  totalMinutes: number;
-}
-
 interface AnimeFacetRow {
+  status: AnimeStatus;
+  progress: number;
+  durationMinutes?: number | null;
   tags?: string | null;
   cast?: string | null;
   cast_aliases?: string | null;
 }
 
 export async function getAnimeListOverview(): Promise<AnimeListOverview> {
-  const [statsRow] = await query<AnimeOverviewStatsRow[]>(`
-    SELECT
-      COUNT(*) AS total,
-      COALESCE(SUM(CASE WHEN status = 'watching' THEN 1 ELSE 0 END), 0) AS watching,
-      COALESCE(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END), 0) AS completed,
-      COALESCE(SUM(CASE WHEN status != 'completed' THEN 1 ELSE 0 END), 0) AS unfinished,
-      COALESCE(SUM(progress), 0) AS watchedEpisodes,
-      COALESCE(SUM(progress * COALESCE(NULLIF(durationMinutes, 0), 24)), 0) AS totalMinutes
+  const facetRows = await query<AnimeFacetRow[]>(`
+    SELECT anime.status, anime.progress, anime.durationMinutes, anime.tags, anime.cast, anime.cast_aliases
     FROM anime
   `);
-
-  const facetRows = await query<AnimeFacetRow[]>('SELECT anime.tags, anime.cast, anime.cast_aliases FROM anime');
+  const normalizedRows = facetRows.map((row) => ({
+    ...row,
+    tags: parseJsonStringArray(row.tags),
+  }));
+  const stats = buildAnimeViewingStats(normalizedRows);
   const tagCounts = new Map<string, number>();
   const castCounts = new Map<string, number>();
 
-  for (const row of facetRows) {
-    for (const tag of parseJsonStringArray(row.tags)) {
+  for (const row of normalizedRows) {
+    if (isRewatchRecord(row)) continue;
+
+    for (const tag of getContentTags(row.tags)) {
       tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
     }
 
@@ -398,14 +392,7 @@ export async function getAnimeListOverview(): Promise<AnimeListOverview> {
   `);
 
   return {
-    stats: {
-      total: Number(statsRow?.total || 0),
-      watching: Number(statsRow?.watching || 0),
-      completed: Number(statsRow?.completed || 0),
-      unfinished: Number(statsRow?.unfinished || 0),
-      watchedEpisodes: Number(statsRow?.watchedEpisodes || 0),
-      totalMinutes: Number(statsRow?.totalMinutes || 0),
-    },
+    stats,
     tagPreferences: Array.from(tagCounts.entries())
       .sort((left, right) => right[1] - left[1])
       .slice(0, 18)

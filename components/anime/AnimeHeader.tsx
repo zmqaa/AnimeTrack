@@ -56,9 +56,9 @@ export default function AnimeHeader({
       statsClassName="grid min-w-full grid-cols-1 gap-3 sm:grid-cols-3 lg:min-w-[440px] lg:max-w-[480px]"
       stats={(
         <>
-          <StatTile surface="card" label="片库作品" value={loading ? '—' : totalCount} unit="部" detail="当前收录总数" />
+          <StatTile surface="card" label="片库作品" value={loading ? '—' : totalCount} unit="部" detail="不重复计算重看轮次" />
           <StatTile surface="card" label="正在追" value={loading ? '—' : watchingCount} unit="部" detail="仍在观看中" />
-          <StatTile surface="card" label="已经看完" value={loading ? '—' : completedCount} unit="部" detail="完成观看的作品" />
+          <StatTile surface="card" label="已经看完" value={loading ? '—' : completedCount} unit="部" detail="首刷完成的不同作品" />
         </>
       )}
     />

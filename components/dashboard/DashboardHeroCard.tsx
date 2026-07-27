@@ -6,7 +6,13 @@ import { formatDate, formatPremiere, formatTime, formatUpdateDate } from '@/lib/
 import StatTile from '@/components/shared/StatTile';
 
 interface HeroCardProps {
-  animeStats: { count: number };
+  animeStats: {
+    watchedWorks: number;
+    completedWorks: number;
+    rewatchRuns: number;
+    rewatchEpisodes: number;
+    episodesWatched: number;
+  };
   animeCompletionRate: number;
   weeklyEpisodes: number;
   watchHours: number;
@@ -66,10 +72,10 @@ export default React.memo(function DashboardHeroCard({
           </div>
 
           <div className="grid grid-cols-2 gap-3 pt-1 md:grid-cols-4">
-            <StatTile label="番剧总数" value={animeStats.count} unit="部" />
-            <StatTile label="完结率" value={`${animeCompletionRate}%`} />
-            <StatTile label="本周观看" value={weeklyEpisodes} unit="集" />
-            <StatTile label="看番总时长" value={watchHours} unit="小时" />
+            <StatTile label="看过作品" value={animeStats.watchedWorks} unit="部" />
+            <StatTile label="看完作品" value={animeStats.completedWorks} unit="部" detail={`观看完成率 ${animeCompletionRate}%`} />
+            <StatTile label="重看轮次" value={animeStats.rewatchRuns} unit="次" detail={`其中 ${animeStats.rewatchEpisodes} 集`} />
+            <StatTile label="累计观看" value={animeStats.episodesWatched} unit="集" detail={`约 ${watchHours} 小时 · 本周 ${weeklyEpisodes} 集`} />
           </div>
         </div>
 

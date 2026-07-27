@@ -30,6 +30,11 @@ const EMPTY_ACTIVITY = {
 const EMPTY_OVERVIEW: DashboardOverview = {
   animeStats: {
     count: 0,
+    watchedWorks: 0,
+    completedWorks: 0,
+    rewatchRuns: 0,
+    completedRewatchRuns: 0,
+    rewatchEpisodes: 0,
     episodesWatched: 0,
     minutesWatched: 0,
     byStatus: { watching: 0, completed: 0, dropped: 0, plan_to_watch: 0 },

@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { CheckIcon, PlusIcon } from '@heroicons/react/24/outline';
 import type { AnimeCardItem, AnimeStatus } from '@/lib/anime-shared';
 import { statusLabels } from '@/lib/dashboard-types';
+import { getRewatchTag } from '@/lib/anime-viewing-stats';
 import ProgressBar from '@/components/shared/ProgressBar';
 
 const statusSoftClass: Record<AnimeStatus, string> = {
@@ -24,22 +25,12 @@ interface AnimeCardProps {
   onOpenDetail: () => void;
 }
 
-function resolveRewatchTag(tags?: string[]): string | undefined {
-  if (!Array.isArray(tags) || tags.length === 0) {
-    return undefined;
-  }
-
-  return tags
-    .map((tag) => tag.trim())
-    .find((tag) => /^([0-9]{1,3}|[一二两三四五六七八九十]+)刷$/i.test(tag));
-}
-
 export default memo(function AnimeCard({ item, updateProgress, isUpdatingProgress, isAdmin = false, detailReturnTo, onOpenDetail }: AnimeCardProps) {
   const isCompleted = item.status === 'completed';
   const progressPercent = item.totalEpisodes
     ? (item.progress / item.totalEpisodes) * 100
     : isCompleted ? 100 : 0;
-  const rewatchTag = resolveRewatchTag(item.tags);
+  const rewatchTag = getRewatchTag(item.tags);
   const detailHref = `/anime/${item.id}?returnTo=${encodeURIComponent(detailReturnTo)}`;
   const coverUrl = item.thumbnailCoverUrl || item.displayCoverUrl;
 

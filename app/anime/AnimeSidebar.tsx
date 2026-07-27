@@ -39,16 +39,16 @@ export default function AnimeSidebar({
         </h3>
         <div className="grid grid-cols-2 gap-6">
           <div className="p-5 rounded-2xl border status-watching-soft hover:brightness-110 transition-all group/stat">
-            <p className="text-xs text-[var(--color-watching)] font-bold uppercase mb-3 tracking-wider group-hover/stat:translate-x-1 transition-transform">还没看完</p>
+            <p className="text-xs text-[var(--color-watching)] font-bold uppercase mb-3 tracking-wider group-hover/stat:translate-x-1 transition-transform">看过作品</p>
             <div className="flex items-baseline gap-2">
-              <p className="theme-stat-value text-3xl font-bold tracking-tighter leading-none">{stats.unfinished}</p>
+              <p className="theme-stat-value text-3xl font-bold tracking-tighter leading-none">{stats.watchedWorks}</p>
               <p className="text-xs text-[var(--text-muted)] font-bold">部</p>
             </div>
           </div>
           <div className="status-completed-soft rounded-2xl border p-5 transition-all group/stat">
             <p className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--color-completed)] transition-transform group-hover/stat:translate-x-1">已经看完</p>
             <div className="flex items-baseline gap-2">
-              <p className="theme-stat-value text-3xl font-bold tracking-tighter leading-none">{stats.completed}</p>
+              <p className="theme-stat-value text-3xl font-bold tracking-tighter leading-none">{stats.completedWorks}</p>
               <p className="text-xs text-[var(--text-muted)] font-bold">部</p>
             </div>
           </div>
@@ -56,13 +56,27 @@ export default function AnimeSidebar({
 
         <div className="mt-8 pt-8 border-t border-[var(--border)] space-y-6">
           <div className="flex justify-between items-center group/info">
-            <span className="text-sm font-medium text-[var(--text-muted)] group-hover/info:text-[var(--text-secondary)] transition-colors">累计观看剧集</span>
+            <span className="text-sm font-medium text-[var(--text-muted)] group-hover/info:text-[var(--text-secondary)] transition-colors">重看轮次</span>
+            <span className="theme-stat-value text-lg font-mono font-bold tracking-tight">
+              {stats.rewatchRuns} <span className="ml-1 text-[10px] text-[var(--text-muted)]">次</span>
+            </span>
+          </div>
+          <div className="flex justify-between items-center group/info">
+            <span className="text-sm font-medium text-[var(--text-muted)] group-hover/info:text-[var(--text-secondary)] transition-colors">累计观看（含重看）</span>
             <span className="theme-stat-value text-lg font-mono font-bold tracking-tight">
               {stats.watchedEpisodes} <span className="text-[10px] text-[var(--text-muted)] ml-1 uppercase">Episodes</span>
             </span>
           </div>
+          {stats.rewatchEpisodes > 0 && (
+            <div className="flex justify-between items-center group/info">
+              <span className="text-sm font-medium text-[var(--text-muted)] group-hover/info:text-[var(--text-secondary)] transition-colors">其中重看</span>
+              <span className="theme-stat-value text-lg font-mono font-bold tracking-tight">
+                {stats.rewatchEpisodes} <span className="text-[10px] text-[var(--text-muted)] ml-1 uppercase">Episodes</span>
+              </span>
+            </div>
+          )}
           <div className="flex justify-between items-center group/info">
-            <span className="text-sm font-medium text-[var(--text-muted)] group-hover/info:text-[var(--text-secondary)] transition-colors">累计时间估计</span>
+            <span className="text-sm font-medium text-[var(--text-muted)] group-hover/info:text-[var(--text-secondary)] transition-colors">累计时间（含重看）</span>
             <span className="theme-stat-value text-lg font-mono font-bold tracking-tight">{totalHours}h / {totalDays}d</span>
           </div>
         </div>

@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/24/outline';
 import { useAnimeData } from '@/hooks/useAnimeData';
 import { AnimeRecord, statusLabels } from '@/lib/dashboard-types';
+import { isRewatchRecord } from '@/lib/anime-viewing-stats';
 import StatTile from '@/components/shared/StatTile';
 import PageHero from '@/components/shared/PageHero';
 import PageContainer from '@/components/shared/PageContainer';
@@ -71,7 +72,7 @@ function AnimeSeasonsPageContent() {
   const resultsRef = useRef<HTMLElement | null>(null);
 
   const seasonAnimeEntries = useMemo(
-    () => animeList.flatMap((anime) => {
+    () => animeList.filter((anime) => !isRewatchRecord(anime)).flatMap((anime) => {
       const premiere = getSeasonPremiere(anime, today);
       return premiere ? [{ anime, premiere }] : [];
     }),
@@ -286,7 +287,7 @@ function AnimeSeasonsPageContent() {
             <StatTile surface="card" label="范围作品" value={loading ? '—' : withPremiereCount} detail="当前范围内的开播作品" />
             <StatTile surface="card" label="已经开追" value={loading ? '—' : startedCount} detail="当前范围内已经开始追过" />
             <StatTile surface="card" label="已经看完" value={loading ? '—' : completedCount} detail="当前范围内已经看完" />
-            <StatTile surface="card" label="累计进度" value={loading ? '—' : totalProgressEpisodes} unit="集" detail="当前范围内的累计进度" />
+            <StatTile surface="card" label="首刷累计进度" value={loading ? '—' : totalProgressEpisodes} unit="集" detail="重看轮次不在季度作品中重复计算" />
           </>
         )}
       />
@@ -430,7 +431,7 @@ function AnimeSeasonsPageContent() {
               <div className="surface-card-muted mt-5 grid grid-cols-2 rounded-[22px] px-2 py-4 sm:grid-cols-3">
                 <div className="px-3 sm:px-5">
                   <div className="text-[10px] uppercase tracking-[0.22em] text-[var(--text-muted)]">Progress</div>
-                  <div className="mt-1 text-lg font-mono text-[var(--text-primary)]">{bucket.totalProgress} 集</div>
+                  <div className="mt-1 text-lg font-mono text-[var(--text-primary)]">{bucket.totalProgress} 集（首刷）</div>
                 </div>
                 <div className="border-l border-[var(--border)] px-3 sm:px-5">
                   <div className="text-[10px] uppercase tracking-[0.22em] text-[var(--text-muted)]">Last Watch</div>

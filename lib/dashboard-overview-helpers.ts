@@ -7,6 +7,7 @@ import type {
   ParsedWatchHistory,
   WatchHistoryRecord,
 } from './dashboard-types';
+import { buildAnimeViewingStats, getContentTags, isRewatchRecord } from './anime-viewing-stats';
 import { APP_TIME_ZONE, dateKeyToAppDate, formatAppDateKey, getAppDateTimeParts, shiftDateKey } from './date-utils';
 
 function toDashboardAnimeItem(anime: AnimeRecord): DashboardAnimeItem {
@@ -128,6 +129,8 @@ export function buildDashboardOverview(
 ): DashboardOverview {
   const history = parseHistory(historyRecords);
   const animeById = new Map(animeList.map((anime) => [anime.id, anime]));
+  const viewingStats = buildAnimeViewingStats(animeList);
+  const baseAnimeList = animeList.filter((anime) => !isRewatchRecord(anime));
   const byStatus = {
     watching: 0,
     completed: 0,
@@ -135,8 +138,6 @@ export function buildDashboardOverview(
     plan_to_watch: 0,
   };
   const tagCounts = new Map<string, number>();
-  let episodesWatched = 0;
-  let minutesWatched = 0;
   let knownEpisodes = 0;
   let hasOriginalTitle = 0;
   let hasScore = 0;
@@ -149,14 +150,14 @@ export function buildDashboardOverview(
   const premiered: Array<{ anime: AnimeRecord; time: number }> = [];
 
   for (const anime of animeList) {
-    episodesWatched += anime.progress;
-    minutesWatched += anime.progress * (anime.durationMinutes || 24);
     knownEpisodes += anime.totalEpisodes ?? anime.progress;
+  }
+
+  for (const anime of baseAnimeList) {
     byStatus[anime.status] += 1;
 
-    for (const tag of anime.tags || []) {
-      const normalized = tag.trim();
-      if (normalized) tagCounts.set(normalized, (tagCounts.get(normalized) || 0) + 1);
+    for (const tag of getContentTags(anime.tags)) {
+      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
     }
 
     if (anime.originalTitle) hasOriginalTitle += 1;
@@ -211,8 +212,7 @@ export function buildDashboardOverview(
     month: buildActivityStats('month', history, knownEpisodes, now),
     year: buildActivityStats('year', history, knownEpisodes, now),
   };
-  const relevantTotal = byStatus.completed + byStatus.dropped + byStatus.watching;
-  const totalForPercentage = animeList.length || 1;
+  const totalForPercentage = baseAnimeList.length || 1;
   const tagBarData = Array.from(tagCounts.entries())
     .sort((left, right) => right[1] - left[1])
     .slice(0, 8)
@@ -220,16 +220,21 @@ export function buildDashboardOverview(
 
   return {
     animeStats: {
-      count: animeList.length,
-      episodesWatched,
-      minutesWatched,
+      count: viewingStats.libraryWorks,
+      watchedWorks: viewingStats.watchedWorks,
+      completedWorks: viewingStats.completedWorks,
+      rewatchRuns: viewingStats.rewatchRuns,
+      completedRewatchRuns: viewingStats.completedRewatchRuns,
+      rewatchEpisodes: viewingStats.rewatchEpisodes,
+      episodesWatched: viewingStats.watchedEpisodes,
+      minutesWatched: viewingStats.totalMinutes,
       byStatus,
     },
-    animeCompletionRate: relevantTotal > 0
-      ? Math.round((byStatus.completed / relevantTotal) * 100)
+    animeCompletionRate: viewingStats.watchedWorks > 0
+      ? Math.round((viewingStats.completedWorks / viewingStats.watchedWorks) * 100)
       : 0,
     weeklyEpisodes: activityByScale.week.totalEpisodes,
-    watchHours: Math.round(minutesWatched / 60),
+    watchHours: Math.round(viewingStats.totalMinutes / 60),
     heroAnime: heroAnimeRecord ? toDashboardAnimeItem(heroAnimeRecord) : null,
     activityByScale,
     premiereChart: Array.from(premiereYears.entries())

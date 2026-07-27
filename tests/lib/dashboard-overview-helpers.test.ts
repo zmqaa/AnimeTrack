@@ -54,6 +54,11 @@ describe('dashboard overview aggregation', () => {
 
     expect(overview.animeStats).toEqual({
       count: 2,
+      watchedWorks: 2,
+      completedWorks: 1,
+      rewatchRuns: 0,
+      completedRewatchRuns: 0,
+      rewatchEpisodes: 0,
       episodesWatched: 15,
       minutesWatched: 363,
       byStatus: { watching: 1, completed: 1, dropped: 0, plan_to_watch: 0 },
@@ -87,6 +92,48 @@ describe('dashboard overview aggregation', () => {
       { label: '2026 年', value: 1 },
     ]);
     expect(overview.recentPremiered.map((item) => item.id)).toEqual([1, 2]);
+  });
+
+  it('keeps rewatch volume while excluding rewatch records from work and metadata counts', () => {
+    const animeList: AnimeRecord[] = [
+      anime({
+        id: 1,
+        title: '作品',
+        status: 'completed',
+        progress: 12,
+        totalEpisodes: 12,
+        durationMinutes: 25,
+        tags: ['日常'],
+        premiereDate: '2025-01-01',
+      }),
+      anime({
+        id: 2,
+        title: '作品',
+        status: 'completed',
+        progress: 12,
+        totalEpisodes: 12,
+        durationMinutes: 25,
+        tags: ['日常', '二刷'],
+        premiereDate: '2025-01-01',
+      }),
+    ];
+
+    const overview = buildDashboardOverview(animeList, [], new Date('2026-07-27T04:00:00.000Z'));
+
+    expect(overview.animeStats).toMatchObject({
+      count: 1,
+      watchedWorks: 1,
+      completedWorks: 1,
+      rewatchRuns: 1,
+      completedRewatchRuns: 1,
+      episodesWatched: 24,
+      rewatchEpisodes: 12,
+      minutesWatched: 600,
+      byStatus: { watching: 0, completed: 1, dropped: 0, plan_to_watch: 0 },
+    });
+    expect(overview.animeCompletionRate).toBe(100);
+    expect(overview.tagBarData).toEqual([{ tag: '日常', count: 1 }]);
+    expect(overview.premiereChart).toEqual([{ label: '2025 年', value: 1 }]);
   });
 
   it('returns stable empty dashboard values', () => {

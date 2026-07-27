@@ -50,6 +50,11 @@ export interface DashboardAnimeItem {
 export interface DashboardOverview {
   animeStats: {
     count: number;
+    watchedWorks: number;
+    completedWorks: number;
+    rewatchRuns: number;
+    completedRewatchRuns: number;
+    rewatchEpisodes: number;
     episodesWatched: number;
     minutesWatched: number;
     byStatus: Record<AnimeStatus, number>;
