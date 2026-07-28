@@ -1,6 +1,9 @@
 import type { AnimeStatus } from './anime-shared';
 
 const REWATCH_TAG_PATTERN = /^([0-9]{1,3}|[一二两三四五六七八九十]+)刷$/i;
+const NON_PREFERENCE_TAGS = new Set(['TV', '漫改', '漫画改', '轻改', '轻小说改']);
+const YEAR_TAG_PATTERN = /^(?:19|20)\d{2}$/;
+const SEASON_TAG_PATTERN = /^(?:19|20)\d{2}年(?:1|4|7|10)月$/;
 
 type ViewingRecord = {
   status: AnimeStatus;
@@ -38,7 +41,13 @@ export function isRewatchRecord(record: Pick<ViewingRecord, 'tags'>): boolean {
 export function getContentTags(tags?: string[] | null): string[] {
   return (tags || [])
     .map((tag) => tag.trim())
-    .filter((tag) => tag.length > 0 && !isRewatchTag(tag));
+    .filter((tag) => (
+      tag.length > 0
+      && !isRewatchTag(tag)
+      && !NON_PREFERENCE_TAGS.has(tag)
+      && !YEAR_TAG_PATTERN.test(tag)
+      && !SEASON_TAG_PATTERN.test(tag)
+    ));
 }
 
 export function buildAnimeViewingStats(records: ViewingRecord[]): AnimeViewingStats {

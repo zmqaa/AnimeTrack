@@ -18,6 +18,12 @@ const requiredBuildFiles = [
   path.join('server', 'app-paths-manifest.json'),
 ];
 
+const requiredRuntimeFiles = [
+  path.join('scripts', 'db', 'scheduled_backup.js'),
+  path.join('scripts', 'shared', 'db_env.js'),
+  path.join('database', 'schema.sql'),
+];
+
 function log(message) {
   const time = new Date().toISOString().replace('T', ' ').replace('Z', '');
   console.log(`[release-build ${time}] ${message}`);
@@ -83,6 +89,25 @@ function copyDirectory(sourcePath, targetPath) {
   fs.cpSync(sourcePath, targetPath, { recursive: true });
 }
 
+function copyRequiredRuntimeFiles(sourceRoot, releaseDir) {
+  for (const relativePath of requiredRuntimeFiles) {
+    const sourcePath = path.join(sourceRoot, relativePath);
+    const targetPath = path.join(releaseDir, relativePath);
+    if (!fileExists(sourcePath)) {
+      throw new Error(`Required runtime file is missing from build source: ${relativePath}`);
+    }
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    fs.copyFileSync(sourcePath, targetPath);
+  }
+
+  const missingFiles = requiredRuntimeFiles.filter(
+    (relativePath) => !fileExists(path.join(releaseDir, relativePath)),
+  );
+  if (missingFiles.length > 0) {
+    throw new Error(`Release is missing required runtime files: ${missingFiles.join(', ')}`);
+  }
+}
+
 async function main() {
   acquireLock();
   let buildSourceDir;
@@ -134,6 +159,7 @@ async function main() {
     }
 
     copyDirectory(standaloneDir, releaseDir);
+    copyRequiredRuntimeFiles(buildSourceDir, releaseDir);
     copyDirectory(path.join(buildDir, 'static'), path.join(releaseDir, '.next', 'static'));
     const publicDir = path.join(buildSourceDir, 'public');
     if (fileExists(publicDir)) {

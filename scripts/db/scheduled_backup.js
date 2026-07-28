@@ -67,14 +67,13 @@ async function main() {
     const noteRows = db.prepare(`
       SELECT id, animeId, episode, content, notedAt, createdAt, updatedAt
       FROM anime_notes
-      WHERE episode IS NOT NULL
       ORDER BY animeId ASC, notedAt ASC, id ASC
     `).all();
 
     const animeColumns = [
       'id', 'title', 'original_title', 'coverUrl', 'localCoverUrl', 'status', 'score',
       'progress', 'totalEpisodes', 'durationMinutes', 'notes', 'tags', 'summary',
-      'start_date', 'end_date', 'premiere_date',
+      'start_date', 'start_date_source', 'end_date', 'premiere_date',
       'cast', 'cast_aliases', 'isFinished', 'createdAt', 'updatedAt',
     ];
     const historyColumns = ['id', 'animeId', 'animeTitle', 'episode', 'watchedAt'];
@@ -94,7 +93,7 @@ async function main() {
       '-- Scheduled backup (scheduled_backup.js)',
       `-- Source: SQLite database`,
       `-- Generated: ${nowCSTReadable()} (UTC+8)`,
-      `-- Tables: anime (${animeRows.length}), anime_notes (${noteRows.length} episode notes), watch_history (${historyRows.length})`,
+      `-- Tables: anime (${animeRows.length}), anime_notes (${noteRows.length}), watch_history (${historyRows.length})`,
       '',
       'DELETE FROM anime_notes;',
       'DELETE FROM watch_history;',

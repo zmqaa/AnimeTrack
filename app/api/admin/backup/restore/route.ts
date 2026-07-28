@@ -7,72 +7,9 @@ import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
 import { getRawDb } from '@/lib/db';
 import { getBackupsDirectory, getDatabasePath } from '@/lib/runtime-paths';
 import { clearAllCoverImages } from '@/lib/cover-image';
+import { prepareBackupSqlForRestore } from '@/lib/sql-backup-validation';
 
 const execFileAsync = promisify(execFile);
-
-function splitSqlStatements(sql: string): string[] {
-  const statements: string[] = [];
-  let current = '';
-  let inString = false;
-
-  for (let index = 0; index < sql.length; index++) {
-    const char = sql[index];
-    const next = sql[index + 1];
-
-    if (char === "'") {
-      if (inString && next === "'") {
-        current += "''";
-        index++;
-        continue;
-      }
-      inString = !inString;
-    }
-
-    if (char === ';' && !inString) {
-      if (current.trim()) statements.push(current.trim());
-      current = '';
-      continue;
-    }
-
-    current += char;
-  }
-
-  if (inString) {
-    throw new Error('备份文件中的 SQL 字符串不完整');
-  }
-  if (current.trim()) statements.push(current.trim());
-  return statements;
-}
-
-function validateBackupSql(sql: string): void {
-  if (!sql.startsWith('-- Scheduled backup (scheduled_backup.js)')) {
-    throw new Error('只能恢复由应用创建的 SQL 备份');
-  }
-
-  const firstStatementIndex = sql.indexOf('DELETE FROM watch_history;');
-  if (firstStatementIndex < 0) {
-    throw new Error('备份文件缺少数据清理语句');
-  }
-  const statements = splitSqlStatements(sql.slice(firstStatementIndex));
-
-  if (statements.length < 2) {
-    throw new Error('备份文件内容为空或不完整');
-  }
-
-  for (const statement of statements) {
-    const executableStatement = statement.replace(/^(?:\s*--[^\r\n]*(?:\r?\n|$))+/, '').trim();
-    const normalized = executableStatement.replace(/\s+/g, ' ').trim().toUpperCase();
-    const allowed =
-      normalized === 'DELETE FROM WATCH_HISTORY' ||
-      normalized === 'DELETE FROM ANIME' ||
-      normalized.startsWith('INSERT INTO ANIME ') ||
-      normalized.startsWith('INSERT INTO WATCH_HISTORY ');
-
-    if (!allowed) {
-      throw new Error('备份文件包含不允许执行的 SQL 语句');
-    }
-  }
-}
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin('需要管理员权限');
@@ -103,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     // Read and validate the selected snapshot before creating the safety backup.
     const sql = fs.readFileSync(resolvedPath, 'utf8');
-    validateBackupSql(sql);
+    const restoreSql = prepareBackupSqlForRestore(sql);
 
     const scriptPath = path.join(process.cwd(), 'scripts/db/scheduled_backup.js');
     await execFileAsync(process.execPath, [scriptPath], {
@@ -119,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     const db = getRawDb();
     db.transaction(() => {
-      db.exec(sql);
+      db.exec(restoreSql);
       db.prepare('UPDATE anime SET localCoverUrl = NULL').run();
     })();
     await clearAllCoverImages();

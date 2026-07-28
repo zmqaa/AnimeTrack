@@ -17,6 +17,7 @@ describe('portable JSON export', () => {
       title: '备注测试',
       status: 'watching',
       progress: 3,
+      tags: ['TV', '漫画改', '2026', '2026年7月', '日常'],
       startDate: '2026-07-20',
       startDateSource: 'history',
       notes: '兼容字段不应覆盖结构化备注',
@@ -49,6 +50,7 @@ describe('portable JSON export', () => {
     expect(result.anime.records[0]).toMatchObject({
       startDate: '2026-07-20',
       startDateSource: 'history',
+      tags: ['TV', '漫画改', '2026', '2026年7月', '日常'],
     });
   });
 });

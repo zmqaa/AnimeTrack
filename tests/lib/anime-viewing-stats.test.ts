@@ -14,7 +14,10 @@ describe('anime viewing stats', () => {
     expect(isRewatchTag(' 12刷 ')).toBe(true);
     expect(isRewatchTag('治愈')).toBe(false);
     expect(getRewatchTag(['日常', '三刷'])).toBe('三刷');
-    expect(getContentTags(['日常', '二刷', ' 治愈 '])).toEqual(['日常', '治愈']);
+    expect(getContentTags([
+      '日常', '二刷', ' 治愈 ', 'TV', '漫改', '漫画改',
+      '轻改', '轻小说改', '2025', '2025年7月',
+    ])).toEqual(['日常', '治愈']);
     expect(isRewatchRecord({ tags: ['二刷'] })).toBe(true);
   });
 
