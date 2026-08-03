@@ -135,7 +135,7 @@ curl.exe -sS -o NUL -w "HTTP %{http_code} 连接 %{time_connect}s 总计 %{time_
 
 ## 服务器定时 JSON 备份
 
-`db:scheduled-json-backup` 生成与 Web 页面“导出 JSON”相同格式的完整便携备份，包含总备注和按集数记录的分集随记，默认保存到 `backups/json/`，并保留最近 30 份：
+`db:scheduled-json-backup` 生成与 Web 页面“导出 JSON”相同格式的完整便携备份，包含总备注和按集数记录的分集随记，默认保存到 `backups/json/`，并保留最近 10 份：
 
 ```bash
 npm run db:scheduled-json-backup

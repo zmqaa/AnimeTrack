@@ -3,7 +3,7 @@
  *
  * 用法：
  *   node scripts/db/scheduled_json_backup.js
- *   node scripts/db/scheduled_json_backup.js --keep 30
+ *   node scripts/db/scheduled_json_backup.js --keep 20
  *   node scripts/db/scheduled_json_backup.js --output-dir /path/to/backups
  */
 const fs = require('fs');
@@ -12,7 +12,7 @@ const { getDb, projectRoot, nowCSTTimestamp } = require('../shared/db_env');
 const { buildPortableExport } = require('../shared/portable_export');
 
 const BACKUP_PREFIX = 'anime-track-export-';
-const DEFAULT_KEEP = 30;
+const DEFAULT_KEEP = 10;
 
 function parseArgs() {
   const args = process.argv.slice(2);

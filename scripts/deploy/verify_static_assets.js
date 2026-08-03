@@ -8,6 +8,15 @@ if (!baseUrl) {
 }
 
 async function main() {
+  const legacyExportResponse = await fetch(`${baseUrl}/anime-track-export.json`, {
+    redirect: 'manual',
+  });
+  if (legacyExportResponse.status !== 404) {
+    throw new Error(
+      `/anime-track-export.json must return HTTP 404, received ${legacyExportResponse.status}`,
+    );
+  }
+
   const pageResponse = await fetch(`${baseUrl}/login`, { redirect: 'follow' });
   if (!pageResponse.ok) {
     throw new Error(`/login returned HTTP ${pageResponse.status}`);
@@ -29,7 +38,9 @@ async function main() {
     }
   }
 
-  console.log(`[asset-check] Verified ${assetPaths.length} assets from ${baseUrl}/login`);
+  console.log(
+    `[asset-check] Verified private export path and ${assetPaths.length} assets from ${baseUrl}/login`,
+  );
 }
 
 main().catch((error) => {

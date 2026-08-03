@@ -136,6 +136,7 @@ async function main() {
       '--exclude=/backups/',
       '--exclude=/logs/',
       '--exclude=/public/covers/',
+      '--exclude=/public/anime-track-export.json',
       '--exclude=/.env.local',
       `${workspaceRoot}/`,
       `${buildSourceDir}/`,
