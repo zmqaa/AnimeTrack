@@ -137,9 +137,10 @@ describe('portable data replacement import', () => {
     expect(result).toEqual({
       success: true,
       mode: 'replace',
-      anime: { replaced: 2 },
-      watchHistory: { replaced: 2, skipped: 1 },
-      manga: { replaced: 0 },
+      datasets: ['anime'],
+      anime: { selected: true, replaced: 2 },
+      watchHistory: { selected: true, replaced: 2, skipped: 1 },
+      manga: { selected: false, replaced: 0 },
     });
 
     const animeRows = listAnimeRows();
@@ -200,7 +201,7 @@ describe('portable data replacement import', () => {
       },
     });
 
-    expect(result.manga).toEqual({ replaced: 1 });
+    expect(result.manga).toEqual({ selected: true, replaced: 1 });
     expect(dbModule.getRawDb().prepare(`
       SELECT id, bangumi_id, title, current_chapter, authors FROM manga
     `).get()).toEqual({
@@ -236,5 +237,43 @@ describe('portable data replacement import', () => {
     })).rejects.toThrow('simulated import failure');
 
     expect(listAnimeRows().map((row) => row.title)).toEqual(['事务前数据']);
+  });
+
+  it('replaces only manga when a manga-only file is imported', async () => {
+    const animeId = seedExistingAnime('不受影响的番剧');
+    dbModule.getRawDb().prepare(`
+      INSERT INTO watch_history (animeId, animeTitle, episode, watchedAt)
+      VALUES (?, '不受影响的番剧', 1, '2026-08-04T00:00:00.000Z')
+    `).run(animeId);
+
+    const result = await importModule.importAnimeData({
+      formatVersion: 5,
+      datasets: ['manga'],
+      manga: { records: [{ title: '只导入的漫画', status: 'reading' }] },
+    });
+
+    expect(result.datasets).toEqual(['manga']);
+    expect(result.anime.selected).toBe(false);
+    expect(listAnimeRows().map((row) => row.title)).toEqual(['不受影响的番剧']);
+    expect(dbModule.getRawDb().prepare('SELECT COUNT(*) AS count FROM watch_history').get()).toEqual({ count: 1 });
+    expect(dbModule.getRawDb().prepare('SELECT title FROM manga').get()).toEqual({ title: '只导入的漫画' });
+  });
+
+  it('keeps manga when only the anime data group is selected from a full file', async () => {
+    dbModule.getRawDb().prepare(`
+      INSERT INTO manga (title, status, publication_status) VALUES ('保留的漫画', 'reading', 'ongoing')
+    `).run();
+
+    const result = await importModule.importAnimeData({
+      datasets: ['anime', 'manga'],
+      selectedDatasets: ['anime'],
+      anime: { records: [{ title: '新番剧', status: 'watching', progress: 1 }] },
+      watchHistory: { records: [] },
+      manga: { records: [{ title: '不导入的漫画', status: 'completed' }] },
+    });
+
+    expect(result.datasets).toEqual(['anime']);
+    expect(result.manga.selected).toBe(false);
+    expect(dbModule.getRawDb().prepare('SELECT title FROM manga').get()).toEqual({ title: '保留的漫画' });
   });
 });

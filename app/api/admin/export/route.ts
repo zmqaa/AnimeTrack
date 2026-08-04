@@ -6,94 +6,42 @@ import { buildExportFilename } from '@/lib/export-filename';
 import { buildPortableExport } from '@/scripts/shared/portable_export';
 import { listAllAnimeNotes } from '@/lib/anime-notes';
 import { listMangaRecords } from '@/lib/manga';
+import { buildExcelExport } from '@/lib/excel-export';
 
-function escapeCsvValue(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  const str = String(value);
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-    return '"' + str.replace(/"/g, '""') + '"';
-  }
-  return str;
+type ExportDataset = 'anime' | 'manga';
+
+function parseDatasets(request: NextRequest): ExportDataset[] {
+  const value = request.nextUrl.searchParams.get('datasets');
+  if (!value) return ['anime', 'manga'];
+  return Array.from(new Set(value.split(',').filter(
+    (dataset): dataset is ExportDataset => dataset === 'anime' || dataset === 'manga',
+  )));
 }
 
-/** GET — export data as JSON or CSV */
+/** GET — 将选中的动漫数据和漫画数据导出为 JSON 或 XLSX。 */
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin('需要管理员权限');
-  if (!auth.authorized) {
-    return auth.response;
-  }
+  if (!auth.authorized) return auth.response;
 
   const format = request.nextUrl.searchParams.get('format') || 'json';
-  const table = request.nextUrl.searchParams.get('table') || 'all';
-
-  const anime = table === 'history' ? [] : await listAnimeRecords();
-  const history = table === 'anime' ? [] : await getAllWatchHistory();
-  const manga = table === 'anime' || table === 'history' ? [] : await listMangaRecords();
-
-  if (format === 'csv') {
-    const lines: string[] = [];
-
-    if (table !== 'history') {
-      // Anime CSV header
-      const animeHeaders = ['ID', '标题', '原标题', '状态', '评分', '进度', '总集数',
-        '时长(分钟)', '首播日期', '开始日期', '结束日期', '标签', '备注'];
-      lines.push(animeHeaders.map(escapeCsvValue).join(','));
-
-      for (const a of anime) {
-        lines.push([
-          a.id, a.title, a.originalTitle || '', a.status, a.score ?? '',
-          a.progress, a.totalEpisodes ?? '', a.durationMinutes ?? '',
-          a.premiereDate || '', a.startDate || '', a.endDate || '',
-          (a.tags || []).join('|'), a.notes || '',
-        ].map(escapeCsvValue).join(','));
-      }
-    }
-
-    if (table === 'all' && anime.length > 0 && history.length > 0) {
-      lines.push('');
-    }
-
-    if (table !== 'anime') {
-      // History CSV header
-      const historyHeaders = ['ID', '番剧ID', '番剧名称', '集数', '观看时间'];
-      lines.push(historyHeaders.map(escapeCsvValue).join(','));
-
-      for (const h of history) {
-        lines.push([
-          h.id, h.animeId, h.animeTitle, h.episode, h.watchedAt,
-        ].map(escapeCsvValue).join(','));
-      }
-    }
-
-    if (manga.length > 0) {
-      if (lines.length > 0) lines.push('');
-      const mangaHeaders = ['漫画ID', '标题', '原名', '阅读状态', '连载状态', '评分', '当前卷', '当前话', '参考卷数', '参考话数', '作者', '开始日期', '读完日期'];
-      lines.push(mangaHeaders.map(escapeCsvValue).join(','));
-      for (const item of manga) {
-        lines.push([
-          item.id, item.title, item.originalTitle || '', item.status, item.publicationStatus,
-          item.score ?? '', item.currentVolume || '', item.currentChapter || '',
-          item.totalVolumes ?? '', item.totalChapters ?? '', item.authors.join('|'),
-          item.startDate || '', item.endDate || '',
-        ].map(escapeCsvValue).join(','));
-      }
-    }
-
-    // Add BOM for Excel compatibility
-    const bom = '\uFEFF';
-    const csv = bom + lines.join('\n');
-
-    return new NextResponse(csv, {
-      headers: {
-        'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${buildExportFilename('csv')}"`,
-      },
-    });
+  const datasets = parseDatasets(request);
+  if (datasets.length === 0) {
+    return NextResponse.json({ error: '请至少选择一类导出数据' }, { status: 400 });
+  }
+  if (format !== 'json' && format !== 'xlsx') {
+    return NextResponse.json({ error: '不支持的导出格式' }, { status: 400 });
   }
 
-  // JSON format
+  const includesAnime = datasets.includes('anime');
+  const includesManga = datasets.includes('manga');
+  const [anime, history, manga] = await Promise.all([
+    includesAnime ? listAnimeRecords() : Promise.resolve([]),
+    includesAnime ? getAllWatchHistory() : Promise.resolve([]),
+    includesManga ? listMangaRecords() : Promise.resolve([]),
+  ]);
+
   const notesByAnimeId = new Map<number, ReturnType<typeof listAllAnimeNotes>>();
-  if (table !== 'history') {
+  if (includesAnime) {
     for (const note of listAllAnimeNotes()) {
       const notes = notesByAnimeId.get(note.animeId) || [];
       notes.push(note);
@@ -104,17 +52,23 @@ export async function GET(request: NextRequest) {
     ...record,
     noteEntries: notesByAnimeId.get(record.id) || [],
   }));
-  const fullExport = buildPortableExport(animeWithNotes, history, undefined, manga);
-  const data = {
-    ...fullExport,
-    anime: table !== 'history' ? fullExport.anime : undefined,
-    watchHistory: table !== 'anime' ? fullExport.watchHistory : undefined,
-    manga: table === 'all' ? fullExport.manga : undefined,
-  };
 
-  const json = JSON.stringify(data, null, 2);
+  if (format === 'xlsx') {
+    const workbook = await buildExcelExport({
+      anime: includesAnime ? animeWithNotes : undefined,
+      history: includesAnime ? history : undefined,
+      manga: includesManga ? manga : undefined,
+    });
+    return new NextResponse(new Uint8Array(workbook), {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${buildExportFilename('xlsx')}"`,
+      },
+    });
+  }
 
-  return new NextResponse(json, {
+  const data = buildPortableExport(animeWithNotes, history, undefined, manga, datasets);
+  return new NextResponse(JSON.stringify(data, null, 2), {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
       'Content-Disposition': `attachment; filename="${buildExportFilename('json')}"`,

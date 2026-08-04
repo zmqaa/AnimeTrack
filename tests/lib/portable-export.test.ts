@@ -8,6 +8,7 @@ const { buildPortableExport } = require('../../scripts/shared/portable_export') 
     history: Array<Record<string, unknown>>,
     exportedAt?: string,
     manga?: Array<Record<string, unknown>>,
+    datasets?: Array<'anime' | 'manga'>,
   ) => Record<string, unknown>;
 };
 
@@ -39,10 +40,12 @@ describe('portable JSON export', () => {
       ],
     }], [], '2026-07-26T00:00:00.000Z') as {
       formatVersion: number;
+      datasets: string[];
       anime: { records: Array<Record<string, unknown>> };
     };
 
-    expect(result.formatVersion).toBe(4);
+    expect(result.formatVersion).toBe(5);
+    expect(result.datasets).toEqual(['anime', 'manga']);
     expect(result.anime.records[0].notes).toEqual([
       { id: 10, content: '总备注', notedAt: '2026-07-20' },
       { id: 11, episode: 3, content: '第三集随记', notedAt: '2026-07-21' },
@@ -74,5 +77,23 @@ describe('portable JSON export', () => {
       currentChapter: '87.5',
     });
     expect(result.watchHistory.count).toBe(0);
+  });
+
+  it('omits the unselected data group instead of exporting it as empty', () => {
+    const result = buildPortableExport(
+      [{ id: 1, title: '不会导出的番剧' }],
+      [{ id: 1, animeId: 1, animeTitle: '不会导出的番剧', episode: 1 }],
+      '2026-08-04T00:00:00.000Z',
+      [{ id: 2, title: '单独导出的漫画' }],
+      ['manga'],
+    );
+
+    expect(result).toMatchObject({
+      formatVersion: 5,
+      datasets: ['manga'],
+      manga: { count: 1 },
+    });
+    expect(result).not.toHaveProperty('anime');
+    expect(result).not.toHaveProperty('watchHistory');
   });
 });

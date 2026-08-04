@@ -39,25 +39,43 @@ function toPortableMangaRecord(record) {
   return portableRecord;
 }
 
-function buildPortableExport(anime, watchHistory, exportedAt = new Date().toISOString(), manga = []) {
+function buildPortableExport(
+  anime,
+  watchHistory,
+  exportedAt = new Date().toISOString(),
+  manga = [],
+  datasets = ['anime', 'manga'],
+) {
+  const includedDatasets = Array.from(new Set(datasets)).filter(
+    (dataset) => dataset === 'anime' || dataset === 'manga',
+  );
   const portableAnime = anime.map(toPortableAnimeRecord);
   const portableManga = manga.map(toPortableMangaRecord);
-  return {
-    formatVersion: 4,
+  const result = {
+    formatVersion: 5,
     exportedAt,
-    anime: {
+    datasets: includedDatasets,
+  };
+
+  if (includedDatasets.includes('anime')) {
+    result.anime = {
       count: portableAnime.length,
       records: portableAnime,
-    },
-    watchHistory: {
+    };
+    result.watchHistory = {
       count: watchHistory.length,
       records: watchHistory,
-    },
-    manga: {
+    };
+  }
+
+  if (includedDatasets.includes('manga')) {
+    result.manga = {
       count: portableManga.length,
       records: portableManga,
-    },
-  };
+    };
+  }
+
+  return result;
 }
 
 module.exports = {

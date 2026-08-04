@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from 'react';
+import type { ReactNode } from 'react';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -10,6 +11,8 @@ interface ConfirmDialogProps {
   cancelText?: string;
   variant?: 'danger' | 'warning' | 'default';
   busy?: boolean;
+  confirmDisabled?: boolean;
+  children?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -43,6 +46,8 @@ export default function ConfirmDialog({
   cancelText = '取消',
   variant = 'default',
   busy = false,
+  confirmDisabled = false,
+  children,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -81,6 +86,7 @@ export default function ConfirmDialog({
           <h3 id="confirm-title" className="text-base font-display font-semibold text-[var(--text-primary)]">{title}</h3>
           <p id="confirm-message" className="mt-2 text-sm text-[var(--text-secondary)] leading-relaxed">{message}</p>
         </div>
+        {children}
         <div className="flex items-center gap-3">
           <button
             onClick={onCancel}
@@ -91,7 +97,7 @@ export default function ConfirmDialog({
           </button>
           <button
             onClick={onConfirm}
-            disabled={busy}
+            disabled={busy || confirmDisabled}
             aria-busy={busy}
             className={`flex-1 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all disabled:cursor-wait disabled:opacity-60 ${style.button}`}
           >

@@ -156,7 +156,7 @@ mkdir -p logs
 npm run db:scheduled-json-backup
 ```
 
-可通过 `ANIMETRACK_JSON_BACKUPS_DIR` 修改保存目录，通过 `ANIMETRACK_JSON_BACKUP_KEEP` 修改默认保留份数。JSON 备份包含全部番剧和观看历史，不包含用户账号或本地封面文件。
+可通过 `ANIMETRACK_JSON_BACKUPS_DIR` 修改保存目录，通过 `ANIMETRACK_JSON_BACKUP_KEEP` 修改默认保留份数。JSON 备份包含全部番剧、观看历史和漫画，不包含用户账号或本地封面文件。
 
 ## 数据与安全
 

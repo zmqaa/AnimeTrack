@@ -20,14 +20,18 @@ interface BackupFile {
 interface ImportResult {
   success: true;
   mode: 'replace';
+  datasets: DataGroup[];
   anime: {
+    selected: boolean;
     replaced: number;
   };
   watchHistory: {
+    selected: boolean;
     replaced: number;
     skipped: number;
   };
   manga: {
+    selected: boolean;
     replaced: number;
   };
 }
@@ -46,11 +50,20 @@ interface CoverBatchResult {
   failed: number;
 }
 
-type PendingImport = {
-  payload: unknown;
+type DataGroup = 'anime' | 'manga';
+
+type DataCounts = {
   animeCount: number;
   historyCount: number;
   mangaCount: number;
+};
+
+type PendingImport = {
+  payload: Record<string, unknown>;
+  availableDatasets: DataGroup[];
+  selectedDatasets: DataGroup[];
+  fileCounts: DataCounts;
+  currentCounts: DataCounts;
 };
 
 export default function BackupPageClient() {
@@ -62,6 +75,7 @@ export default function BackupPageClient() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [exportDatasets, setExportDatasets] = useState<DataGroup[]>(['anime', 'manga']);
   const [importing, setImporting] = useState(false);
   const [downloadingCovers, setDownloadingCovers] = useState(false);
   const [restoring, setRestoring] = useState<string | null>(null);
@@ -128,10 +142,12 @@ export default function BackupPageClient() {
     }
   };
 
-  const handleExport = async (format: 'json' | 'csv') => {
+  const handleExport = async (format: 'json' | 'xlsx') => {
+    if (exportDatasets.length === 0) return;
     setExporting(format);
     try {
-      const blob = await fetchBlob(`/api/admin/export?format=${format}`, undefined, '导出失败');
+      const params = new URLSearchParams({ format, datasets: exportDatasets.join(',') });
+      const blob = await fetchBlob(`/api/admin/export?${params}`, undefined, '导出失败');
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -144,6 +160,12 @@ export default function BackupPageClient() {
     } finally {
       setExporting(null);
     }
+  };
+
+  const toggleExportDataset = (dataset: DataGroup) => {
+    setExportDatasets((current) => current.includes(dataset)
+      ? current.filter((item) => item !== dataset)
+      : [...current, dataset]);
   };
 
   const handleImportClick = () => {
@@ -169,12 +191,16 @@ export default function BackupPageClient() {
 
     try {
       const text = await file.text();
-      const payload = JSON.parse(text) as {
+      const payload = JSON.parse(text) as Record<string, unknown> & {
+        datasets?: unknown;
         records?: unknown[];
         anime?: { records?: unknown[] };
         watchHistory?: { records?: unknown[] };
         manga?: { records?: unknown[] };
       };
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+        throw new Error('导入文件格式无效');
+      }
       const animeRecords = Array.isArray(payload?.anime?.records)
         ? payload.anime.records
         : (Array.isArray(payload?.records) ? payload.records : []);
@@ -184,10 +210,30 @@ export default function BackupPageClient() {
       const mangaRecords = Array.isArray(payload?.manga?.records)
         ? payload.manga.records
         : [];
-      if (animeRecords.length === 0) {
-        throw new Error('导入文件中没有番剧记录');
+      const declaredDatasets = Array.isArray(payload.datasets)
+        ? payload.datasets.filter((dataset): dataset is DataGroup => dataset === 'anime' || dataset === 'manga')
+        : [];
+      const availableDatasets = declaredDatasets.length > 0
+        ? Array.from(new Set(declaredDatasets))
+        : [
+          ...(Object.prototype.hasOwnProperty.call(payload, 'anime')
+            || Object.prototype.hasOwnProperty.call(payload, 'watchHistory')
+            || Array.isArray(payload.records) ? ['anime' as const] : []),
+          ...(Object.prototype.hasOwnProperty.call(payload, 'manga') ? ['manga' as const] : []),
+        ];
+      if (availableDatasets.length === 0) {
+        throw new Error('导入文件中没有可识别的动漫或漫画数据');
       }
-      setPendingImport({ payload, animeCount: animeRecords.length, historyCount: historyRecords.length, mangaCount: mangaRecords.length });
+      const current = await fetchJson<{ anime: number; watchHistory: number; manga: number }>(
+        '/api/admin/import', undefined, '读取当前数据数量失败',
+      );
+      setPendingImport({
+        payload,
+        availableDatasets,
+        selectedDatasets: [...availableDatasets],
+        fileCounts: { animeCount: animeRecords.length, historyCount: historyRecords.length, mangaCount: mangaRecords.length },
+        currentCounts: { animeCount: current.anime, historyCount: current.watchHistory, mangaCount: current.manga },
+      });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '读取导入文件失败');
     }
@@ -251,19 +297,20 @@ export default function BackupPageClient() {
   };
 
   const handleConfirmImport = async () => {
-    if (!pendingImport || importing) return;
+    if (!pendingImport || importing || pendingImport.selectedDatasets.length === 0) return;
 
     setImporting(true);
     try {
       const result = await fetchJson<ImportResult>('/api/admin/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pendingImport.payload),
+        body: JSON.stringify({ ...pendingImport.payload, selectedDatasets: pendingImport.selectedDatasets }),
       }, '导入失败');
 
-      toast.success(
-        `覆盖完成：${result.anime.replaced} 部番剧，${result.manga.replaced} 部漫画，${result.watchHistory.replaced} 条历史${result.watchHistory.skipped ? `，跳过 ${result.watchHistory.skipped} 条无法匹配的历史` : ''}`
-      );
+      const summaries = [];
+      if (result.anime.selected) summaries.push(`${result.anime.replaced} 部番剧、${result.watchHistory.replaced} 条历史`);
+      if (result.manga.selected) summaries.push(`${result.manga.replaced} 部漫画`);
+      toast.success(`覆盖完成：${summaries.join('；')}${result.watchHistory.skipped ? `，跳过 ${result.watchHistory.skipped} 条无法匹配的历史` : ''}`);
       // 全局刷新缓存：番剧列表 + Dashboard 数据同步更新
       await globalMutate((key) => typeof key === 'string' && key.startsWith('/api/anime'));
       await globalMutate((key) => typeof key === 'string' && key.startsWith('/api/manga'));
@@ -276,6 +323,16 @@ export default function BackupPageClient() {
       setImporting(false);
       setPendingImport(null);
     }
+  };
+
+  const toggleImportDataset = (dataset: DataGroup) => {
+    setPendingImport((current) => {
+      if (!current || !current.availableDatasets.includes(dataset)) return current;
+      const selectedDatasets = current.selectedDatasets.includes(dataset)
+        ? current.selectedDatasets.filter((item) => item !== dataset)
+        : [...current.selectedDatasets, dataset];
+      return { ...current, selectedDatasets };
+    });
   };
 
   const formatSize = (bytes: number) => {
@@ -307,26 +364,52 @@ export default function BackupPageClient() {
       <section className="glass-panel rounded-3xl border border-[var(--border)] p-6 md:p-8">
         <h2 className="text-lg font-medium text-[var(--text-primary)] mb-2">导出数据</h2>
         <p className="text-sm text-[var(--text-muted)] mb-5">
-          导出全部番剧、漫画和观看记录。CSV 格式可以直接用 Excel 打开，JSON 适合程序处理、备份后回导或迁移。
+          自由选择动漫数据和漫画数据。动漫数据始终包含番剧信息、备注与观看历史；Excel 会将番剧信息和观看历史分别放在两个工作表中。
         </p>
+        <div className="surface-card-muted mb-5 grid gap-3 rounded-2xl p-4 sm:grid-cols-2">
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl p-2 transition-colors hover:bg-[var(--color-surface-hover)]">
+            <input
+              type="checkbox"
+              checked={exportDatasets.includes('anime')}
+              onChange={() => toggleExportDataset('anime')}
+              className="mt-1 h-4 w-4 accent-[var(--accent)]"
+            />
+            <span>
+              <span className="block text-sm font-medium text-[var(--text-primary)]">动漫数据</span>
+              <span className="mt-1 block text-xs text-[var(--text-muted)]">番剧信息、备注和观看历史</span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl p-2 transition-colors hover:bg-[var(--color-surface-hover)]">
+            <input
+              type="checkbox"
+              checked={exportDatasets.includes('manga')}
+              onChange={() => toggleExportDataset('manga')}
+              className="mt-1 h-4 w-4 accent-[var(--accent)]"
+            />
+            <span>
+              <span className="block text-sm font-medium text-[var(--text-primary)]">漫画数据</span>
+              <span className="mt-1 block text-xs text-[var(--text-muted)]">漫画资料、阅读状态和进度</span>
+            </span>
+          </label>
+        </div>
         <div className="flex flex-wrap gap-3">
           <AsyncButton
-            onClick={() => handleExport('csv')}
-            busy={exporting === 'csv'}
-            busyLabel="正在导出 CSV…"
-            disabled={exporting !== null}
+            onClick={() => handleExport('xlsx')}
+            busy={exporting === 'xlsx'}
+            busyLabel="正在导出 Excel…"
+            disabled={exporting !== null || exportDatasets.length === 0}
             className="theme-accent-soft flex items-center gap-2.5 rounded-2xl px-5 py-3 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            导出 CSV（Excel）
+            导出 Excel
           </AsyncButton>
           <AsyncButton
             onClick={() => handleExport('json')}
             busy={exporting === 'json'}
             busyLabel="正在导出 JSON…"
-            disabled={exporting !== null}
+            disabled={exporting !== null || exportDatasets.length === 0}
             className="theme-accent-soft flex items-center gap-2.5 rounded-2xl px-5 py-3 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -366,7 +449,7 @@ export default function BackupPageClient() {
           onChange={handleImportFile}
         />
         <p className="text-xs text-[var(--text-muted)] mt-4">
-          支持导入当前系统导出的 JSON 文件。导入会完整覆盖现有番剧、漫画与观看历史，并清空旧的本地番剧封面；导入后可点击“批量下载封面”重新获取。写入失败时会自动回滚，不会保留半份数据。
+          只有 JSON 可以回导。上传后可再次选择覆盖动漫数据、漫画数据或两者；文件未包含或没有勾选的数据不会改动。覆盖动漫数据会同时替换番剧、备注与观看历史，并清空旧的本地番剧封面。
         </p>
       </section>
 
@@ -457,14 +540,55 @@ export default function BackupPageClient() {
 
       <ConfirmDialog
         open={pendingImport !== null}
-        title="覆盖现有数据"
-        message={pendingImport ? `将用文件中的 ${pendingImport.animeCount} 部番剧、${pendingImport.mangaCount} 部漫画和 ${pendingImport.historyCount} 条观看历史替换当前全部数据，并清空全部本地番剧封面。此操作不会合并旧数据，建议先导出一份 JSON 备份。` : ''}
+        title="选择要覆盖的数据"
+        message="勾选的数据会被文件内容完整替换，未勾选的数据保持不变。空数据也会清空对应分组。"
         confirmText={importing ? '导入中...' : '确认覆盖'}
         variant="danger"
         busy={importing}
+        confirmDisabled={!pendingImport || pendingImport.selectedDatasets.length === 0}
         onConfirm={handleConfirmImport}
         onCancel={() => !importing && setPendingImport(null)}
-      />
+      >
+        {pendingImport && (
+          <div className="space-y-3">
+            {pendingImport.availableDatasets.includes('anime') && (
+              <label className="surface-card-muted flex cursor-pointer items-start gap-3 rounded-xl p-3 text-left">
+                <input
+                  type="checkbox"
+                  checked={pendingImport.selectedDatasets.includes('anime')}
+                  onChange={() => toggleImportDataset('anime')}
+                  disabled={importing}
+                  className="mt-1 h-4 w-4 accent-[var(--accent)]"
+                />
+                <span className="min-w-0 text-sm">
+                  <span className="block font-medium text-[var(--text-primary)]">动漫数据</span>
+                  <span className="mt-1 block text-xs text-[var(--text-muted)]">
+                    当前 {pendingImport.currentCounts.animeCount} 部 / {pendingImport.currentCounts.historyCount} 条历史
+                    {' → '}文件 {pendingImport.fileCounts.animeCount} 部 / {pendingImport.fileCounts.historyCount} 条历史
+                  </span>
+                </span>
+              </label>
+            )}
+            {pendingImport.availableDatasets.includes('manga') && (
+              <label className="surface-card-muted flex cursor-pointer items-start gap-3 rounded-xl p-3 text-left">
+                <input
+                  type="checkbox"
+                  checked={pendingImport.selectedDatasets.includes('manga')}
+                  onChange={() => toggleImportDataset('manga')}
+                  disabled={importing}
+                  className="mt-1 h-4 w-4 accent-[var(--accent)]"
+                />
+                <span className="min-w-0 text-sm">
+                  <span className="block font-medium text-[var(--text-primary)]">漫画数据</span>
+                  <span className="mt-1 block text-xs text-[var(--text-muted)]">
+                    当前 {pendingImport.currentCounts.mangaCount} 部 → 文件 {pendingImport.fileCounts.mangaCount} 部
+                  </span>
+                </span>
+              </label>
+            )}
+          </div>
+        )}
+      </ConfirmDialog>
 
       <ConfirmDialog
         open={restoreConfirm !== null}

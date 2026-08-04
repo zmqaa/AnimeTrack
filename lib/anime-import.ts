@@ -36,18 +36,24 @@ export interface ImportMangaItem {
 }
 
 export interface ImportPayload {
+  formatVersion?: number;
+  datasets?: unknown;
+  selectedDatasets?: unknown;
   records?: ImportAnimeItem[];
   anime?: { records?: ImportAnimeItem[] };
   watchHistory?: { records?: ImportHistoryItem[] };
   manga?: { records?: ImportMangaItem[] };
 }
 
+export type ImportDataset = 'anime' | 'manga';
+
 export interface ImportResult {
   success: true;
   mode: 'replace';
-  anime: { replaced: number };
-  watchHistory: { replaced: number; skipped: number };
-  manga: { replaced: number };
+  datasets: ImportDataset[];
+  anime: { selected: boolean; replaced: number };
+  watchHistory: { selected: boolean; replaced: number; skipped: number };
+  manga: { selected: boolean; replaced: number };
 }
 
 type NormalizedAnime = {
@@ -289,26 +295,54 @@ function sourceKey(value: number | string | undefined): string | undefined {
   return String(value);
 }
 
+function parseDatasetList(value: unknown): ImportDataset[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(value.filter(
+    (dataset): dataset is ImportDataset => dataset === 'anime' || dataset === 'manga',
+  )));
+}
+
+export function getAvailableImportDatasets(body: ImportPayload): ImportDataset[] {
+  const declared = parseDatasetList(body.datasets);
+  if (declared.length > 0) return declared;
+
+  const datasets: ImportDataset[] = [];
+  if (Array.isArray(body.records) || Object.prototype.hasOwnProperty.call(body, 'anime')
+    || Object.prototype.hasOwnProperty.call(body, 'watchHistory')) {
+    datasets.push('anime');
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'manga')) datasets.push('manga');
+  return datasets;
+}
+
 /**
- * 用导入文件完整替换番剧和观看历史。
+ * 只替换用户选中的数据组。动漫组始终包含番剧、备注和观看历史，漫画组独立。
  * 校验在事务开始前完成；删除与写入在同一个事务内，任一步失败都会回滚。
  */
 export async function importAnimeData(body: ImportPayload): Promise<ImportResult> {
+  const availableDatasets = getAvailableImportDatasets(body);
+  const requestedDatasets = parseDatasetList(body.selectedDatasets);
+  const selectedDatasets = Array.isArray(body.selectedDatasets) ? requestedDatasets : availableDatasets;
+  if (selectedDatasets.length === 0) throw new Error('请至少选择一类要导入的数据');
+  for (const dataset of selectedDatasets) {
+    if (!availableDatasets.includes(dataset)) throw new Error('导入文件不包含所选的数据');
+  }
+
+  const importsAnime = selectedDatasets.includes('anime');
+  const importsManga = selectedDatasets.includes('manga');
   const animeRecords = Array.isArray(body.anime?.records)
     ? body.anime.records
-    : (Array.isArray(body.records) ? body.records : null);
+    : (Array.isArray(body.records) ? body.records : []);
   const historyRecords = Array.isArray(body.watchHistory?.records) ? body.watchHistory.records : [];
   const mangaRecords = Array.isArray(body.manga?.records) ? body.manga.records : [];
 
-  if (!animeRecords || animeRecords.length === 0) {
-    throw new Error('覆盖导入必须包含至少一部番剧');
-  }
-  if (animeRecords.length > 10000 || historyRecords.length > 100000 || mangaRecords.length > 10000) {
+  if ((importsAnime && (animeRecords.length > 10000 || historyRecords.length > 100000))
+    || (importsManga && mangaRecords.length > 10000)) {
     throw new Error('导入文件过大：番剧和漫画各最多 10000 部，历史最多 100000 条');
   }
 
-  const normalizedAnime = animeRecords.map(normalizeAnime);
-  const normalizedManga = mangaRecords.map(normalizeManga);
+  const normalizedAnime = importsAnime ? animeRecords.map(normalizeAnime) : [];
+  const normalizedManga = importsManga ? mangaRecords.map(normalizeManga) : [];
   const seenSourceIds = new Set<string>();
   for (const item of normalizedAnime) {
     const key = sourceKey(item.sourceId);
@@ -322,10 +356,15 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
   let importedHistory = 0;
 
   const replaceTransaction = db.transaction(() => {
-    db.prepare('DELETE FROM watch_history').run();
-    db.prepare('DELETE FROM anime').run();
-    db.prepare('DELETE FROM manga').run();
-    db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('anime', 'anime_notes', 'watch_history', 'manga')").run();
+    if (importsAnime) {
+      db.prepare('DELETE FROM watch_history').run();
+      db.prepare('DELETE FROM anime').run();
+      db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('anime', 'anime_notes', 'watch_history')").run();
+    }
+    if (importsManga) {
+      db.prepare('DELETE FROM manga').run();
+      db.prepare("DELETE FROM sqlite_sequence WHERE name = 'manga'").run();
+    }
 
     const insertWithId = db.prepare(`
       INSERT INTO anime (id, title, original_title, coverUrl, localCoverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, start_date_source, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
@@ -381,7 +420,7 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
     `);
     const animeTitleById = db.prepare('SELECT title FROM anime WHERE id = ?');
 
-    for (let index = 0; index < historyRecords.length; index++) {
+    for (let index = 0; importsAnime && index < historyRecords.length; index++) {
       const item = historyRecords[index];
       if (!item || typeof item !== 'object') throw new Error(`第 ${index + 1} 条观看历史格式无效`);
       const episode = optionalNumber(item.episode, `第 ${index + 1} 条历史的集数`, { min: 1, integer: true });
@@ -409,7 +448,7 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
       importedHistory++;
     }
 
-    backfillMissingAnimeStartDates(db);
+    if (importsAnime) backfillMissingAnimeStartDates(db);
 
     for (const item of ordered) {
       const animeId = importedAnimeIds.get(item);
@@ -471,12 +510,13 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
   });
 
   replaceTransaction();
-  await clearAllCoverImages();
+  if (importsAnime) await clearAllCoverImages();
   return {
     success: true,
     mode: 'replace',
-    anime: { replaced: normalizedAnime.length },
-    watchHistory: { replaced: importedHistory, skipped: skippedHistory },
-    manga: { replaced: normalizedManga.length },
+    datasets: selectedDatasets,
+    anime: { selected: importsAnime, replaced: normalizedAnime.length },
+    watchHistory: { selected: importsAnime, replaced: importedHistory, skipped: skippedHistory },
+    manga: { selected: importsManga, replaced: normalizedManga.length },
   };
 }

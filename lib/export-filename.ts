@@ -1,4 +1,4 @@
-export type ExportFileFormat = 'json' | 'csv';
+export type ExportFileFormat = 'json' | 'xlsx';
 
 function padTimestampPart(value: number): string {
   return String(value).padStart(2, '0');
