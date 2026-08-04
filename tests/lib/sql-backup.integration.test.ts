@@ -54,6 +54,13 @@ describe('scheduled SQL backup', () => {
       INSERT INTO watch_history (animeId, animeTitle, episode, watchedAt)
       VALUES (1, '备份测试', 3, '2026-07-21T12:00:00.000Z')
     `).run();
+    source.prepare(`
+      INSERT INTO manga (
+        id, bangumi_id, title, status, publication_status, current_chapter,
+        authors, tags, createdAt, updatedAt
+      ) VALUES (1, 73503, '大室家', 'caught_up', 'ongoing', '80',
+        '["なもり"]', '["百合"]', '2026-07-20T00:00:00.000Z', '2026-07-21T00:00:00.000Z')
+    `).run();
     source.close();
 
     execFileSync(process.execPath, [join(projectRoot, 'scripts/db/scheduled_backup.js'), '--keep', '2'], {
@@ -127,6 +134,15 @@ describe('scheduled SQL backup', () => {
     `).all()).toEqual([
       { animeTitle: '备份测试', episode: 3, watchedAt: '2026-07-21T12:00:00.000Z' },
     ]);
+    expect(restored.prepare(`
+      SELECT bangumi_id, title, status, publication_status, current_chapter FROM manga
+    `).get()).toEqual({
+      bangumi_id: 73503,
+      title: '大室家',
+      status: 'caught_up',
+      publication_status: 'ongoing',
+      current_chapter: '80',
+    });
     restored.close();
   });
 
@@ -150,5 +166,16 @@ describe('scheduled SQL backup', () => {
     ].join('\n');
 
     expect(() => validateBackupSql(sql)).toThrow('备份文件缺少备注清理语句');
+  });
+
+  it('requires manga to be cleared before restoring manga rows', () => {
+    const sql = [
+      '-- Scheduled backup (scheduled_backup.js)',
+      'DELETE FROM watch_history;',
+      'DELETE FROM anime;',
+      "INSERT INTO manga (title, status, publication_status) VALUES ('测试', 'reading', 'ongoing');",
+    ].join('\n');
+
+    expect(() => validateBackupSql(sql)).toThrow('备份文件缺少漫画清理语句');
   });
 });

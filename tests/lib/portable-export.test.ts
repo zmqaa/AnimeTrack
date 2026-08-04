@@ -7,6 +7,7 @@ const { buildPortableExport } = require('../../scripts/shared/portable_export') 
     anime: Array<Record<string, unknown>>,
     history: Array<Record<string, unknown>>,
     exportedAt?: string,
+    manga?: Array<Record<string, unknown>>,
   ) => Record<string, unknown>;
 };
 
@@ -41,7 +42,7 @@ describe('portable JSON export', () => {
       anime: { records: Array<Record<string, unknown>> };
     };
 
-    expect(result.formatVersion).toBe(3);
+    expect(result.formatVersion).toBe(4);
     expect(result.anime.records[0].notes).toEqual([
       { id: 10, content: '总备注', notedAt: '2026-07-20' },
       { id: 11, episode: 3, content: '第三集随记', notedAt: '2026-07-21' },
@@ -52,5 +53,26 @@ describe('portable JSON export', () => {
       startDateSource: 'history',
       tags: ['TV', '漫画改', '2026', '2026年7月', '日常'],
     });
+  });
+
+  it('exports manga records without inventing reading history', () => {
+    const result = buildPortableExport([], [], '2026-08-03T00:00:00.000Z', [{
+      id: 1,
+      title: '大室家',
+      status: 'caught_up',
+      publicationStatus: 'ongoing',
+      currentChapter: '87.5',
+      authors: ['なもり'],
+    }]) as {
+      manga: { count: number; records: Array<Record<string, unknown>> };
+      watchHistory: { count: number };
+    };
+
+    expect(result.manga.count).toBe(1);
+    expect(result.manga.records[0]).toMatchObject({
+      title: '大室家',
+      currentChapter: '87.5',
+    });
+    expect(result.watchHistory.count).toBe(0);
   });
 });

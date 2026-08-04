@@ -1,7 +1,7 @@
 /**
  * 定时备份脚本 — 配合 cron 使用（SQLite 版本）
  *
- * 导出 anime + anime_notes + watch_history 为 SQL 文件，自动轮转旧备份。
+ * 导出 anime + anime_notes + watch_history + manga 为 SQL 文件，自动轮转旧备份。
  *
  * 用法：
  *   node scripts/db/scheduled_backup.js              # 默认保留 10 份
@@ -69,6 +69,7 @@ async function main() {
       FROM anime_notes
       ORDER BY animeId ASC, notedAt ASC, id ASC
     `).all();
+    const mangaRows = db.prepare('SELECT * FROM manga ORDER BY id ASC').all();
 
     const animeColumns = [
       'id', 'title', 'original_title', 'coverUrl', 'localCoverUrl', 'status', 'score',
@@ -78,6 +79,13 @@ async function main() {
     ];
     const historyColumns = ['id', 'animeId', 'animeTitle', 'episode', 'watchedAt'];
     const noteColumns = ['animeId', 'episode', 'content', 'notedAt', 'createdAt', 'updatedAt'];
+    const mangaColumns = [
+      'id', 'bangumi_id', 'title', 'original_title', 'aliases', 'coverUrl', 'status',
+      'publication_status', 'score', 'current_volume', 'current_chapter', 'total_volumes',
+      'total_chapters', 'notes', 'tags', 'summary', 'authors', 'illustrators',
+      'publishers', 'serializations', 'start_date', 'end_date', 'release_date',
+      'createdAt', 'updatedAt',
+    ];
 
     const ts = nowCSTTimestamp();
     let fileName = `${BACKUP_PREFIX}${ts}.sql`;
@@ -93,11 +101,12 @@ async function main() {
       '-- Scheduled backup (scheduled_backup.js)',
       `-- Source: SQLite database`,
       `-- Generated: ${nowCSTReadable()} (UTC+8)`,
-      `-- Tables: anime (${animeRows.length}), anime_notes (${noteRows.length}), watch_history (${historyRows.length})`,
+      `-- Tables: anime (${animeRows.length}), anime_notes (${noteRows.length}), watch_history (${historyRows.length}), manga (${mangaRows.length})`,
       '',
       'DELETE FROM anime_notes;',
       'DELETE FROM watch_history;',
       'DELETE FROM anime;',
+      'DELETE FROM manga;',
       '',
     ];
 
@@ -118,11 +127,16 @@ async function main() {
       lines.push(buildInsert('watch_history', historyColumns, row));
     }
 
+    lines.push('', '-- manga', '');
+    for (const row of mangaRows) {
+      lines.push(buildInsert('manga', mangaColumns, row));
+    }
+
     lines.push('');
 
     fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
     console.log(`[backup] 备份完成: ${fileName}`);
-    console.log(`[backup] anime: ${animeRows.length} 条, anime_notes: ${noteRows.length} 条, watch_history: ${historyRows.length} 条`);
+    console.log(`[backup] anime: ${animeRows.length} 条, anime_notes: ${noteRows.length} 条, watch_history: ${historyRows.length} 条, manga: ${mangaRows.length} 条`);
 
     rotateBackups(keep);
     console.log(`[backup] 保留策略: 最近 ${keep} 份`);

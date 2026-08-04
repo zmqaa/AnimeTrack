@@ -71,6 +71,36 @@ function mapAnimeRow(row) {
   };
 }
 
+function mapMangaRow(row) {
+  return {
+    id: row.id,
+    ...(row.bangumi_id !== null ? { bangumiId: Number(row.bangumi_id) } : {}),
+    title: row.title,
+    ...(row.original_title ? { originalTitle: row.original_title } : {}),
+    aliases: parseStringArray(row.aliases),
+    ...(row.coverUrl ? { coverUrl: row.coverUrl } : {}),
+    status: row.status,
+    publicationStatus: row.publication_status,
+    ...(row.score !== null ? { score: Number(row.score) } : {}),
+    ...(row.current_volume ? { currentVolume: row.current_volume } : {}),
+    ...(row.current_chapter ? { currentChapter: row.current_chapter } : {}),
+    ...(row.total_volumes !== null ? { totalVolumes: Number(row.total_volumes) } : {}),
+    ...(row.total_chapters !== null ? { totalChapters: Number(row.total_chapters) } : {}),
+    ...(row.notes ? { notes: row.notes } : {}),
+    tags: parseStringArray(row.tags),
+    ...(row.summary ? { summary: row.summary } : {}),
+    authors: parseStringArray(row.authors),
+    illustrators: parseStringArray(row.illustrators),
+    publishers: parseStringArray(row.publishers),
+    serializations: parseStringArray(row.serializations),
+    ...(row.start_date ? { startDate: row.start_date } : {}),
+    ...(row.end_date ? { endDate: row.end_date } : {}),
+    ...(row.release_date ? { releaseDate: row.release_date } : {}),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
 function rotateBackups(outputDir, keep) {
   const files = fs.readdirSync(outputDir)
     .filter((name) => name.startsWith(BACKUP_PREFIX) && name.endsWith('.json'))
@@ -119,7 +149,8 @@ function main() {
     const watchHistory = db.prepare(
       'SELECT id, animeId, animeTitle, episode, watchedAt FROM watch_history ORDER BY watchedAt DESC, id DESC',
     ).all();
-    const data = buildPortableExport(anime, watchHistory);
+    const manga = db.prepare('SELECT * FROM manga ORDER BY id ASC').all().map(mapMangaRow);
+    const data = buildPortableExport(anime, watchHistory, undefined, manga);
     const timestamp = nowCSTTimestamp();
     let fileName = `${BACKUP_PREFIX}${timestamp}.json`;
     let filePath = path.join(outputDir, fileName);
@@ -133,14 +164,14 @@ function main() {
 
     fs.writeFileSync(temporaryPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
     const verification = JSON.parse(fs.readFileSync(temporaryPath, 'utf8'));
-    if (verification.anime?.count !== anime.length || verification.watchHistory?.count !== watchHistory.length) {
+    if (verification.anime?.count !== anime.length || verification.watchHistory?.count !== watchHistory.length || verification.manga?.count !== manga.length) {
       throw new Error('JSON 备份写入后的数量校验失败');
     }
     fs.renameSync(temporaryPath, filePath);
 
     rotateBackups(outputDir, keep);
     console.log(`[json-backup] 备份完成: ${path.relative(projectRoot, filePath)}`);
-    console.log(`[json-backup] anime: ${anime.length} 条, watch_history: ${watchHistory.length} 条`);
+    console.log(`[json-backup] anime: ${anime.length} 条, watch_history: ${watchHistory.length} 条, manga: ${manga.length} 条`);
     console.log(`[json-backup] 保留策略: 最近 ${keep} 份`);
   } finally {
     db.close();

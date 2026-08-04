@@ -1,7 +1,7 @@
 /**
  * 全量数据备份脚本（SQLite 版本）
  *
- * 导出 anime + anime_notes + watch_history + users 表为 SQL INSERT 文件。
+ * 导出 anime + anime_notes + watch_history + manga + users 表为 SQL INSERT 文件。
  *
  * 用法：
  *   node scripts/db/export_full_backup.js                 # 默认输出到 backups/
@@ -73,6 +73,15 @@ async function main() {
     `).all();
     const noteColumns = ['animeId', 'episode', 'content', 'notedAt', 'createdAt', 'updatedAt'];
 
+    const mangaRows = db.prepare('SELECT * FROM manga ORDER BY id ASC').all();
+    const mangaColumns = [
+      'id', 'bangumi_id', 'title', 'original_title', 'aliases', 'coverUrl', 'status',
+      'publication_status', 'score', 'current_volume', 'current_chapter', 'total_volumes',
+      'total_chapters', 'notes', 'tags', 'summary', 'authors', 'illustrators',
+      'publishers', 'serializations', 'start_date', 'end_date', 'release_date',
+      'createdAt', 'updatedAt',
+    ];
+
     // users (optional)
     let userRows = [];
     const userColumns = ['id', 'username', 'password_hash', 'name', 'role', 'createdAt', 'updatedAt'];
@@ -84,11 +93,12 @@ async function main() {
       '-- Full database backup (export_full_backup.js)',
       `-- Source: SQLite database`,
       `-- Generated: ${nowCSTReadable()} (UTC+8)`,
-      `-- Tables: anime (${animeRows.length}), anime_notes (${noteRows.length} episode notes), watch_history (${historyRows.length})${includeUsers ? `, users (${userRows.length})` : ''}`,
+      `-- Tables: anime (${animeRows.length}), anime_notes (${noteRows.length} episode notes), watch_history (${historyRows.length}), manga (${mangaRows.length})${includeUsers ? `, users (${userRows.length})` : ''}`,
       '',
       'DELETE FROM anime_notes;',
       'DELETE FROM watch_history;',
       'DELETE FROM anime;',
+      'DELETE FROM manga;',
       '',
     ];
 
@@ -109,6 +119,11 @@ async function main() {
       lines.push(buildInsert('watch_history', historyColumns, row));
     }
 
+    lines.push('', '-- manga', '');
+    for (const row of mangaRows) {
+      lines.push(buildInsert('manga', mangaColumns, row));
+    }
+
     if (includeUsers && userRows.length > 0) {
       lines.push('');
       lines.push('-- users');
@@ -127,6 +142,9 @@ async function main() {
     if (historyRows.length > 0) {
       lines.push(`UPDATE sqlite_sequence SET seq = ${Number(historyRows[historyRows.length - 1].id)} WHERE name = 'watch_history';`);
     }
+    if (mangaRows.length > 0) {
+      lines.push(`UPDATE sqlite_sequence SET seq = ${Number(mangaRows[mangaRows.length - 1].id)} WHERE name = 'manga';`);
+    }
     if (userRows.length > 0) {
       lines.push(`UPDATE sqlite_sequence SET seq = ${Number(userRows[userRows.length - 1].id)} WHERE name = 'users';`);
     }
@@ -141,6 +159,7 @@ async function main() {
     console.log(`  anime:         ${animeRows.length} rows`);
     console.log(`  anime_notes:   ${noteRows.length} episode note rows`);
     console.log(`  watch_history: ${historyRows.length} rows`);
+    console.log(`  manga:         ${mangaRows.length} rows`);
     if (includeUsers) console.log(`  users:         ${userRows.length} rows`);
   } finally {
     db.close();

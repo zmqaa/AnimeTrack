@@ -33,10 +33,17 @@ function toPortableAnimeRecord(record) {
   return portableRecord;
 }
 
-function buildPortableExport(anime, watchHistory, exportedAt = new Date().toISOString()) {
+function toPortableMangaRecord(record) {
+  const portableRecord = { ...record };
+  if (!isRemoteUrl(portableRecord.coverUrl)) delete portableRecord.coverUrl;
+  return portableRecord;
+}
+
+function buildPortableExport(anime, watchHistory, exportedAt = new Date().toISOString(), manga = []) {
   const portableAnime = anime.map(toPortableAnimeRecord);
+  const portableManga = manga.map(toPortableMangaRecord);
   return {
-    formatVersion: 3,
+    formatVersion: 4,
     exportedAt,
     anime: {
       count: portableAnime.length,
@@ -46,6 +53,10 @@ function buildPortableExport(anime, watchHistory, exportedAt = new Date().toISOS
       count: watchHistory.length,
       records: watchHistory,
     },
+    manga: {
+      count: portableManga.length,
+      records: portableManga,
+    },
   };
 }
 
@@ -53,4 +64,5 @@ module.exports = {
   buildPortableExport,
   isRemoteUrl,
   toPortableAnimeRecord,
+  toPortableMangaRecord,
 };

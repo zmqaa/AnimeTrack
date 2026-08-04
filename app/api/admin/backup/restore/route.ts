@@ -56,6 +56,8 @@ export async function POST(request: NextRequest) {
 
     const db = getRawDb();
     db.transaction(() => {
+      // 兼容漫画功能加入前创建的旧备份：旧快照等价于没有漫画记录。
+      db.prepare('DELETE FROM manga').run();
       db.exec(restoreSql);
       db.prepare('UPDATE anime SET localCoverUrl = NULL').run();
     })();
@@ -63,12 +65,14 @@ export async function POST(request: NextRequest) {
 
     const animeCount = (db.prepare('SELECT COUNT(*) AS count FROM anime').get() as { count: number }).count;
     const historyCount = (db.prepare('SELECT COUNT(*) AS count FROM watch_history').get() as { count: number }).count;
+    const mangaCount = (db.prepare('SELECT COUNT(*) AS count FROM manga').get() as { count: number }).count;
 
     return apiSuccess({
       success: true,
       restored: baseName,
       animeCount,
       historyCount,
+      mangaCount,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : '恢复备份失败';

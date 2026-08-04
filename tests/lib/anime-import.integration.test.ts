@@ -26,6 +26,7 @@ beforeEach(() => {
     DROP TRIGGER IF EXISTS reject_imported_anime;
     DELETE FROM watch_history;
     DELETE FROM anime;
+    DELETE FROM manga;
   `);
 });
 
@@ -138,6 +139,7 @@ describe('portable data replacement import', () => {
       mode: 'replace',
       anime: { replaced: 2 },
       watchHistory: { replaced: 2, skipped: 1 },
+      manga: { replaced: 0 },
     });
 
     const animeRows = listAnimeRows();
@@ -180,6 +182,34 @@ describe('portable data replacement import', () => {
     })).rejects.toThrow('必须是 YYYY-MM-DD 格式');
 
     expect(listAnimeRows().map((row) => row.title)).toEqual(['应被保留']);
+  });
+
+  it('imports manga records with flexible chapter positions', async () => {
+    const result = await importModule.importAnimeData({
+      anime: { records: [{ title: '保留的番剧', status: 'watching', progress: 1 }] },
+      manga: {
+        records: [{
+          id: 3,
+          bangumiId: 230961,
+          title: '飞野同学是笨蛋',
+          status: 'reading',
+          publicationStatus: 'completed',
+          currentChapter: '42.5',
+          authors: ['筋肉☆太郎'],
+        }],
+      },
+    });
+
+    expect(result.manga).toEqual({ replaced: 1 });
+    expect(dbModule.getRawDb().prepare(`
+      SELECT id, bangumi_id, title, current_chapter, authors FROM manga
+    `).get()).toEqual({
+      id: 3,
+      bangumi_id: 230961,
+      title: '飞野同学是笨蛋',
+      current_chapter: '42.5',
+      authors: '["筋肉☆太郎"]',
+    });
   });
 
   it('rolls back deleted data when an insert fails inside the transaction', async () => {

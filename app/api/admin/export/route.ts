@@ -5,6 +5,7 @@ import { requireAdmin } from '@/lib/api-response';
 import { buildExportFilename } from '@/lib/export-filename';
 import { buildPortableExport } from '@/scripts/shared/portable_export';
 import { listAllAnimeNotes } from '@/lib/anime-notes';
+import { listMangaRecords } from '@/lib/manga';
 
 function escapeCsvValue(value: unknown): string {
   if (value === null || value === undefined) return '';
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
 
   const anime = table === 'history' ? [] : await listAnimeRecords();
   const history = table === 'anime' ? [] : await getAllWatchHistory();
+  const manga = table === 'anime' || table === 'history' ? [] : await listMangaRecords();
 
   if (format === 'csv') {
     const lines: string[] = [];
@@ -63,6 +65,20 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    if (manga.length > 0) {
+      if (lines.length > 0) lines.push('');
+      const mangaHeaders = ['漫画ID', '标题', '原名', '阅读状态', '连载状态', '评分', '当前卷', '当前话', '参考卷数', '参考话数', '作者', '开始日期', '读完日期'];
+      lines.push(mangaHeaders.map(escapeCsvValue).join(','));
+      for (const item of manga) {
+        lines.push([
+          item.id, item.title, item.originalTitle || '', item.status, item.publicationStatus,
+          item.score ?? '', item.currentVolume || '', item.currentChapter || '',
+          item.totalVolumes ?? '', item.totalChapters ?? '', item.authors.join('|'),
+          item.startDate || '', item.endDate || '',
+        ].map(escapeCsvValue).join(','));
+      }
+    }
+
     // Add BOM for Excel compatibility
     const bom = '\uFEFF';
     const csv = bom + lines.join('\n');
@@ -88,11 +104,12 @@ export async function GET(request: NextRequest) {
     ...record,
     noteEntries: notesByAnimeId.get(record.id) || [],
   }));
-  const fullExport = buildPortableExport(animeWithNotes, history);
+  const fullExport = buildPortableExport(animeWithNotes, history, undefined, manga);
   const data = {
     ...fullExport,
     anime: table !== 'history' ? fullExport.anime : undefined,
     watchHistory: table !== 'anime' ? fullExport.watchHistory : undefined,
+    manga: table === 'all' ? fullExport.manga : undefined,
   };
 
   const json = JSON.stringify(data, null, 2);

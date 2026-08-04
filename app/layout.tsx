@@ -30,7 +30,7 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Anime Track",
-  description: "专注于番剧记录、进度管理和观看历史的动漫追番工具",
+  description: "记录番剧观看与漫画阅读进度的个人动漫收藏工具",
 };
 
 export default function RootLayout({
@@ -55,4 +55,3 @@ export default function RootLayout({
     </html>
   );
 }
-

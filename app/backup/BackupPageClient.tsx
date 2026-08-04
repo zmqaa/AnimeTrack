@@ -27,6 +27,9 @@ interface ImportResult {
     replaced: number;
     skipped: number;
   };
+  manga: {
+    replaced: number;
+  };
 }
 
 interface RestoreResult {
@@ -34,6 +37,7 @@ interface RestoreResult {
   restored: string;
   animeCount: number;
   historyCount: number;
+  mangaCount: number;
 }
 
 interface CoverBatchResult {
@@ -46,6 +50,7 @@ type PendingImport = {
   payload: unknown;
   animeCount: number;
   historyCount: number;
+  mangaCount: number;
 };
 
 export default function BackupPageClient() {
@@ -168,6 +173,7 @@ export default function BackupPageClient() {
         records?: unknown[];
         anime?: { records?: unknown[] };
         watchHistory?: { records?: unknown[] };
+        manga?: { records?: unknown[] };
       };
       const animeRecords = Array.isArray(payload?.anime?.records)
         ? payload.anime.records
@@ -175,10 +181,13 @@ export default function BackupPageClient() {
       const historyRecords = Array.isArray(payload?.watchHistory?.records)
         ? payload.watchHistory.records
         : [];
+      const mangaRecords = Array.isArray(payload?.manga?.records)
+        ? payload.manga.records
+        : [];
       if (animeRecords.length === 0) {
         throw new Error('导入文件中没有番剧记录');
       }
-      setPendingImport({ payload, animeCount: animeRecords.length, historyCount: historyRecords.length });
+      setPendingImport({ payload, animeCount: animeRecords.length, historyCount: historyRecords.length, mangaCount: mangaRecords.length });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '读取导入文件失败');
     }
@@ -220,7 +229,7 @@ export default function BackupPageClient() {
         body: JSON.stringify({ name }),
       }, '恢复备份失败');
 
-      toast.success(`恢复完成：${result.animeCount} 部番剧，${result.historyCount} 条观看历史`);
+      toast.success(`恢复完成：${result.animeCount} 部番剧，${result.mangaCount} 部漫画，${result.historyCount} 条观看历史`);
       await Promise.all([
         globalMutate((key) => typeof key === 'string' && (
           key === DASHBOARD_OVERVIEW_KEY ||
@@ -229,6 +238,7 @@ export default function BackupPageClient() {
           key.startsWith('/api/timeline/') ||
           key.startsWith('/api/admin/anime') ||
           key.startsWith('/api/admin/history')
+          || key.startsWith('/api/manga')
         )),
         fetchBackups(),
       ]);
@@ -252,10 +262,11 @@ export default function BackupPageClient() {
       }, '导入失败');
 
       toast.success(
-        `覆盖完成：${result.anime.replaced} 部番剧，${result.watchHistory.replaced} 条历史${result.watchHistory.skipped ? `，跳过 ${result.watchHistory.skipped} 条无法匹配的历史` : ''}`
+        `覆盖完成：${result.anime.replaced} 部番剧，${result.manga.replaced} 部漫画，${result.watchHistory.replaced} 条历史${result.watchHistory.skipped ? `，跳过 ${result.watchHistory.skipped} 条无法匹配的历史` : ''}`
       );
       // 全局刷新缓存：番剧列表 + Dashboard 数据同步更新
       await globalMutate((key) => typeof key === 'string' && key.startsWith('/api/anime'));
+      await globalMutate((key) => typeof key === 'string' && key.startsWith('/api/manga'));
       globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isHistoryKey);
       globalMutate(isTimelineKey);
@@ -296,7 +307,7 @@ export default function BackupPageClient() {
       <section className="glass-panel rounded-3xl border border-[var(--border)] p-6 md:p-8">
         <h2 className="text-lg font-medium text-[var(--text-primary)] mb-2">导出数据</h2>
         <p className="text-sm text-[var(--text-muted)] mb-5">
-          导出全部番剧列表和观看记录。CSV 格式可以直接用 Excel 打开，JSON 适合程序处理、备份后回导或迁移。
+          导出全部番剧、漫画和观看记录。CSV 格式可以直接用 Excel 打开，JSON 适合程序处理、备份后回导或迁移。
         </p>
         <div className="flex flex-wrap gap-3">
           <AsyncButton
@@ -355,7 +366,7 @@ export default function BackupPageClient() {
           onChange={handleImportFile}
         />
         <p className="text-xs text-[var(--text-muted)] mt-4">
-          支持导入当前系统导出的 JSON 文件。导入会完整覆盖现有番剧与观看历史，并清空旧的本地封面；导入后可点击“批量下载封面”重新获取。写入失败时会自动回滚，不会保留半份数据。
+          支持导入当前系统导出的 JSON 文件。导入会完整覆盖现有番剧、漫画与观看历史，并清空旧的本地番剧封面；导入后可点击“批量下载封面”重新获取。写入失败时会自动回滚，不会保留半份数据。
         </p>
       </section>
 
@@ -376,7 +387,7 @@ export default function BackupPageClient() {
           </AsyncButton>
         </div>
         <p className="text-sm text-[var(--text-muted)] mb-6">
-          将 anime 和 watch_history 表保存到应用的备份目录，常规备份默认保留最近 10 份。可以直接恢复到某个备份时间点；恢复前会自动保存当前状态。跨设备迁移仍优先使用 JSON。
+          将番剧、漫画和观看历史保存到应用的备份目录，常规备份默认保留最近 10 份。可以直接恢复到某个备份时间点；恢复前会自动保存当前状态。跨设备迁移仍优先使用 JSON。
         </p>
 
         {loading ? (
@@ -447,7 +458,7 @@ export default function BackupPageClient() {
       <ConfirmDialog
         open={pendingImport !== null}
         title="覆盖现有数据"
-        message={pendingImport ? `将用文件中的 ${pendingImport.animeCount} 部番剧和 ${pendingImport.historyCount} 条观看历史替换当前全部数据，并清空全部本地封面。此操作不会合并旧数据，建议先导出一份 JSON 备份。` : ''}
+        message={pendingImport ? `将用文件中的 ${pendingImport.animeCount} 部番剧、${pendingImport.mangaCount} 部漫画和 ${pendingImport.historyCount} 条观看历史替换当前全部数据，并清空全部本地番剧封面。此操作不会合并旧数据，建议先导出一份 JSON 备份。` : ''}
         confirmText={importing ? '导入中...' : '确认覆盖'}
         variant="danger"
         busy={importing}
@@ -458,7 +469,7 @@ export default function BackupPageClient() {
       <ConfirmDialog
         open={restoreConfirm !== null}
         title="恢复 SQL 备份"
-        message={`确定恢复到「${restoreConfirm || ''}」吗？当前番剧、观看历史和本地封面会被替换；系统会先自动创建一份“恢复前备份”。`}
+        message={`确定恢复到「${restoreConfirm || ''}」吗？当前番剧、漫画、观看历史和本地番剧封面会被替换；系统会先自动创建一份“恢复前备份”。`}
         confirmText={restoring ? '恢复中...' : '确认恢复'}
         variant="warning"
         busy={restoring !== null}

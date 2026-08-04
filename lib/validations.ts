@@ -78,3 +78,46 @@ export const animeNoteCollectionSchema = z.array(animeNoteBodySchema).max(10000)
 
 export type CreateAnimeInput = z.infer<typeof createAnimeSchema>;
 export type UpdateAnimeInput = z.infer<typeof updateAnimeSchema>;
+
+export const mangaReadingStatusSchema = z.enum([
+  'plan_to_read', 'reading', 'caught_up', 'completed', 'paused', 'dropped',
+]);
+
+export const mangaPublicationStatusSchema = z.enum([
+  'ongoing', 'completed', 'hiatus', 'unknown',
+]);
+
+const mangaPositionSchema = z.string().trim().max(100).optional().nullable();
+
+export const createMangaSchema = z.object({
+  bangumiId: z.number().int().positive().optional().nullable(),
+  title: z.string().trim().min(1, '标题不能为空').max(500),
+  originalTitle: z.string().trim().max(500).optional().nullable(),
+  aliases: stringArraySchema,
+  coverUrl: coverUrlSchema,
+  status: mangaReadingStatusSchema.default('plan_to_read'),
+  publicationStatus: mangaPublicationStatusSchema.default('unknown'),
+  score: z.number().min(0).max(10).optional().nullable(),
+  currentVolume: mangaPositionSchema,
+  currentChapter: mangaPositionSchema,
+  totalVolumes: z.number().int().min(0).max(9999).optional().nullable(),
+  totalChapters: z.number().int().min(0).max(999999).optional().nullable(),
+  notes: z.string().max(10000).optional().nullable(),
+  tags: stringArraySchema,
+  summary: z.string().max(10000).optional().nullable(),
+  authors: stringArraySchema,
+  illustrators: stringArraySchema,
+  publishers: stringArraySchema,
+  serializations: stringArraySchema,
+  startDate: dateStringSchema,
+  endDate: dateStringSchema,
+  releaseDate: dateStringSchema,
+});
+
+export const updateMangaSchema = createMangaSchema.partial().extend({
+  status: mangaReadingStatusSchema.optional(),
+  publicationStatus: mangaPublicationStatusSchema.optional(),
+});
+
+export type CreateMangaInput = z.infer<typeof createMangaSchema>;
+export type UpdateMangaInput = z.infer<typeof updateMangaSchema>;

@@ -23,6 +23,12 @@ export const navigationItems: NavigationItem[] = [
     section: '主馆区',
   },
   {
+    label: '漫画书架',
+    href: '/manga',
+    description: '漫画收藏与阅读进度',
+    section: '主馆区',
+  },
+  {
     label: '时间轴',
     href: '/anime/timeline',
     description: '观看记录回放',

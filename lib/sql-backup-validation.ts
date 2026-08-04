@@ -44,6 +44,8 @@ export function validateBackupSql(sql: string): void {
   let deletesHistory = false;
   let deletesNotes = false;
   let insertsNotes = false;
+  let deletesManga = false;
+  let insertsManga = false;
   let executableCount = 0;
 
   for (const statement of statements) {
@@ -56,9 +58,11 @@ export function validateBackupSql(sql: string): void {
       normalized === 'DELETE FROM ANIME_NOTES' ||
       normalized === 'DELETE FROM WATCH_HISTORY' ||
       normalized === 'DELETE FROM ANIME' ||
+      normalized === 'DELETE FROM MANGA' ||
       normalized.startsWith('INSERT INTO ANIME ') ||
       normalized.startsWith('INSERT INTO ANIME_NOTES ') ||
-      normalized.startsWith('INSERT INTO WATCH_HISTORY ');
+      normalized.startsWith('INSERT INTO WATCH_HISTORY ') ||
+      normalized.startsWith('INSERT INTO MANGA ');
 
     if (!allowed) {
       throw new Error('备份文件包含不允许执行的 SQL 语句');
@@ -67,7 +71,9 @@ export function validateBackupSql(sql: string): void {
     if (normalized === 'DELETE FROM ANIME') deletesAnime = true;
     if (normalized === 'DELETE FROM WATCH_HISTORY') deletesHistory = true;
     if (normalized === 'DELETE FROM ANIME_NOTES') deletesNotes = true;
+    if (normalized === 'DELETE FROM MANGA') deletesManga = true;
     if (normalized.startsWith('INSERT INTO ANIME_NOTES ')) insertsNotes = true;
+    if (normalized.startsWith('INSERT INTO MANGA ')) insertsManga = true;
   }
 
   if (executableCount < 2 || !deletesAnime || !deletesHistory) {
@@ -75,6 +81,9 @@ export function validateBackupSql(sql: string): void {
   }
   if (insertsNotes && !deletesNotes) {
     throw new Error('备份文件缺少备注清理语句');
+  }
+  if (insertsManga && !deletesManga) {
+    throw new Error('备份文件缺少漫画清理语句');
   }
 }
 

@@ -3,9 +3,16 @@ import { getRawDb } from './db';
 import { backfillMissingAnimeStartDates } from './anime-start-date';
 import { clearAllCoverImages } from './cover-image';
 import type { AnimeStatus, CreateAnimeDTO } from './anime';
+import type { CreateMangaDTO, MangaPublicationStatus, MangaReadingStatus } from './manga';
 import { nowISO } from './date-utils';
 
 const VALID_STATUSES = new Set<AnimeStatus>(['watching', 'completed', 'dropped', 'plan_to_watch']);
+const VALID_MANGA_STATUSES = new Set<MangaReadingStatus>([
+  'plan_to_read', 'reading', 'caught_up', 'completed', 'paused', 'dropped',
+]);
+const VALID_MANGA_PUBLICATION_STATUSES = new Set<MangaPublicationStatus>([
+  'ongoing', 'completed', 'hiatus', 'unknown',
+]);
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export interface ImportAnimeItem {
@@ -22,10 +29,17 @@ export interface ImportHistoryItem {
   watchedAt?: string;
 }
 
+export interface ImportMangaItem {
+  id?: number | string;
+  title: string;
+  [key: string]: unknown;
+}
+
 export interface ImportPayload {
   records?: ImportAnimeItem[];
   anime?: { records?: ImportAnimeItem[] };
   watchHistory?: { records?: ImportHistoryItem[] };
+  manga?: { records?: ImportMangaItem[] };
 }
 
 export interface ImportResult {
@@ -33,6 +47,7 @@ export interface ImportResult {
   mode: 'replace';
   anime: { replaced: number };
   watchHistory: { replaced: number; skipped: number };
+  manga: { replaced: number };
 }
 
 type NormalizedAnime = {
@@ -50,6 +65,13 @@ type NormalizedAnime = {
     createdAt: string;
     updatedAt: string;
   };
+  createdAt: string;
+  updatedAt: string;
+};
+
+type NormalizedManga = {
+  sourceId?: number | string;
+  payload: CreateMangaDTO;
   createdAt: string;
   updatedAt: string;
 };
@@ -219,6 +241,49 @@ function normalizeAnime(item: ImportAnimeItem, index: number): NormalizedAnime {
   };
 }
 
+function normalizeManga(item: ImportMangaItem, index: number): NormalizedManga {
+  if (!item || typeof item !== 'object') throw new Error(`第 ${index + 1} 部漫画格式无效`);
+  const title = optionalString(item.title, 500, `第 ${index + 1} 部漫画的标题`);
+  if (!title) throw new Error(`第 ${index + 1} 部漫画缺少标题`);
+  const status = (optionalString(item.status, 30, `${title} 的阅读状态`) || 'plan_to_read') as MangaReadingStatus;
+  if (!VALID_MANGA_STATUSES.has(status)) throw new Error(`${title} 的阅读状态无效：${status}`);
+  const publicationStatus = (optionalString(item.publicationStatus, 30, `${title} 的连载状态`) || 'unknown') as MangaPublicationStatus;
+  if (!VALID_MANGA_PUBLICATION_STATUSES.has(publicationStatus)) {
+    throw new Error(`${title} 的连载状态无效：${publicationStatus}`);
+  }
+  const now = nowISO();
+  const importedCoverUrl = optionalString(item.coverUrl, 2000, `${title} 的封面地址`);
+  return {
+    sourceId: item.id,
+    payload: {
+      bangumiId: optionalNumber(item.bangumiId, `${title} 的 Bangumi ID`, { min: 1, integer: true }),
+      title,
+      originalTitle: optionalString(item.originalTitle, 500, `${title} 的原名`),
+      aliases: stringArray(item.aliases, `${title} 的别名`) || [],
+      coverUrl: importedCoverUrl && /^https?:\/\//i.test(importedCoverUrl) ? importedCoverUrl : undefined,
+      status,
+      publicationStatus,
+      score: optionalNumber(item.score, `${title} 的评分`, { min: 0, max: 10 }),
+      currentVolume: optionalString(item.currentVolume, 100, `${title} 的当前卷`),
+      currentChapter: optionalString(item.currentChapter, 100, `${title} 的当前话`),
+      totalVolumes: optionalNumber(item.totalVolumes, `${title} 的参考卷数`, { min: 0, max: 9999, integer: true }),
+      totalChapters: optionalNumber(item.totalChapters, `${title} 的参考话数`, { min: 0, max: 999999, integer: true }),
+      notes: optionalString(item.notes, 10000, `${title} 的笔记`),
+      tags: stringArray(item.tags, `${title} 的标签`) || [],
+      summary: optionalString(item.summary, 10000, `${title} 的简介`),
+      authors: stringArray(item.authors, `${title} 的作者`) || [],
+      illustrators: stringArray(item.illustrators, `${title} 的作画`) || [],
+      publishers: stringArray(item.publishers, `${title} 的出版社`) || [],
+      serializations: stringArray(item.serializations, `${title} 的连载平台`) || [],
+      startDate: optionalDate(item.startDate, `${title} 的开始日期`),
+      endDate: optionalDate(item.endDate, `${title} 的读完日期`),
+      releaseDate: optionalDate(item.releaseDate, `${title} 的发行日期`),
+    },
+    createdAt: normalizeTimestamp(item.createdAt, now),
+    updatedAt: normalizeTimestamp(item.updatedAt, now),
+  };
+}
+
 function sourceKey(value: number | string | undefined): string | undefined {
   if (value === undefined || value === null || value === '') return undefined;
   return String(value);
@@ -233,15 +298,17 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
     ? body.anime.records
     : (Array.isArray(body.records) ? body.records : null);
   const historyRecords = Array.isArray(body.watchHistory?.records) ? body.watchHistory.records : [];
+  const mangaRecords = Array.isArray(body.manga?.records) ? body.manga.records : [];
 
   if (!animeRecords || animeRecords.length === 0) {
     throw new Error('覆盖导入必须包含至少一部番剧');
   }
-  if (animeRecords.length > 10000 || historyRecords.length > 100000) {
-    throw new Error('导入文件过大：番剧最多 10000 部，历史最多 100000 条');
+  if (animeRecords.length > 10000 || historyRecords.length > 100000 || mangaRecords.length > 10000) {
+    throw new Error('导入文件过大：番剧和漫画各最多 10000 部，历史最多 100000 条');
   }
 
   const normalizedAnime = animeRecords.map(normalizeAnime);
+  const normalizedManga = mangaRecords.map(normalizeManga);
   const seenSourceIds = new Set<string>();
   for (const item of normalizedAnime) {
     const key = sourceKey(item.sourceId);
@@ -257,7 +324,8 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
   const replaceTransaction = db.transaction(() => {
     db.prepare('DELETE FROM watch_history').run();
     db.prepare('DELETE FROM anime').run();
-    db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('anime', 'anime_notes', 'watch_history')").run();
+    db.prepare('DELETE FROM manga').run();
+    db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('anime', 'anime_notes', 'watch_history', 'manga')").run();
 
     const insertWithId = db.prepare(`
       INSERT INTO anime (id, title, original_title, coverUrl, localCoverUrl, status, score, progress, totalEpisodes, durationMinutes, notes, tags, summary, start_date, start_date_source, end_date, premiere_date, cast, cast_aliases, isFinished, createdAt, updatedAt)
@@ -365,6 +433,41 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
         );
       }
     }
+
+    const insertMangaWithId = db.prepare(`
+      INSERT INTO manga (
+        id, bangumi_id, title, original_title, aliases, coverUrl, status, publication_status,
+        score, current_volume, current_chapter, total_volumes, total_chapters, notes,
+        tags, summary, authors, illustrators, publishers, serializations,
+        start_date, end_date, release_date, createdAt, updatedAt
+      ) VALUES (${Array.from({ length: 25 }, () => '?').join(', ')})
+    `);
+    const insertMangaWithoutId = db.prepare(`
+      INSERT INTO manga (
+        bangumi_id, title, original_title, aliases, coverUrl, status, publication_status,
+        score, current_volume, current_chapter, total_volumes, total_chapters, notes,
+        tags, summary, authors, illustrators, publishers, serializations,
+        start_date, end_date, release_date, createdAt, updatedAt
+      ) VALUES (${Array.from({ length: 24 }, () => '?').join(', ')})
+    `);
+    for (const item of normalizedManga) {
+      const p = item.payload;
+      const values = [
+        p.bangumiId ?? null, p.title, p.originalTitle || null, JSON.stringify(p.aliases || []),
+        p.coverUrl || null, p.status, p.publicationStatus, p.score ?? null,
+        p.currentVolume || null, p.currentChapter || null, p.totalVolumes ?? null,
+        p.totalChapters ?? null, p.notes || null, JSON.stringify(p.tags || []), p.summary || null,
+        JSON.stringify(p.authors || []), JSON.stringify(p.illustrators || []),
+        JSON.stringify(p.publishers || []), JSON.stringify(p.serializations || []),
+        p.startDate || null, p.endDate || null, p.releaseDate || null,
+        item.createdAt, item.updatedAt,
+      ];
+      const numericId = Number.isInteger(item.sourceId) && Number(item.sourceId) > 0
+        ? Number(item.sourceId)
+        : undefined;
+      if (numericId) insertMangaWithId.run(numericId, ...values);
+      else insertMangaWithoutId.run(...values);
+    }
   });
 
   replaceTransaction();
@@ -374,5 +477,6 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
     mode: 'replace',
     anime: { replaced: normalizedAnime.length },
     watchHistory: { replaced: importedHistory, skipped: skippedHistory },
+    manga: { replaced: normalizedManga.length },
   };
 }
