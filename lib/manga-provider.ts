@@ -144,6 +144,13 @@ async function fetchSubjectDetail(id: number): Promise<BangumiBookSubject | null
   }
 }
 
+export async function getMangaMetadataCandidate(
+  id: number,
+): Promise<MangaMetadataCandidate | null> {
+  const detail = await fetchSubjectDetail(id);
+  return detail ? toCandidate(detail, true) : null;
+}
+
 export async function searchMangaMetadataCandidates(
   title: string,
 ): Promise<MangaMetadataCandidate[]> {
@@ -163,4 +170,3 @@ export async function searchMangaMetadataCandidates(
     return detail ? toCandidate(detail, true) : toCandidate(subject, false);
   });
 }
-

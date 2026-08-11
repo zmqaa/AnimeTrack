@@ -8,6 +8,7 @@ import {
   type CreateMangaDTO,
 } from '@/lib/manga';
 import { updateMangaSchema } from '@/lib/validations';
+import { buildMangaStatusDatePatch } from '@/lib/manga-status';
 
 type RouteContext = { params: { id: string } };
 
@@ -46,14 +47,8 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (value.totalChapters !== undefined) patch.totalChapters = value.totalChapters ?? null as never;
   if (value.bangumiId !== undefined) patch.bangumiId = value.bangumiId ?? null as never;
 
-  const nextStatus = value.status || before.status;
   const today = new Date().toISOString().slice(0, 10);
-  if (['reading', 'caught_up', 'completed'].includes(nextStatus) && !before.startDate && value.startDate === undefined) {
-    patch.startDate = today;
-  }
-  if (nextStatus === 'completed' && !before.endDate && value.endDate === undefined) {
-    patch.endDate = today;
-  }
+  Object.assign(patch, buildMangaStatusDatePatch(before, value, today));
 
   try {
     const updated = await updateMangaRecord(id, patch);
@@ -76,4 +71,3 @@ export async function DELETE(_request: Request, context: RouteContext) {
     ? apiSuccess({ ok: true })
     : apiError('漫画不存在', 404);
 }
-

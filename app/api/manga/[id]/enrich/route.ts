@@ -1,0 +1,63 @@
+import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
+import {
+  getMangaRecord,
+  parseMangaId,
+  updateMangaRecord,
+  type CreateMangaDTO,
+} from '@/lib/manga';
+import { getMangaMetadataCandidate } from '@/lib/manga-provider';
+
+export async function POST(
+  _request: Request,
+  context: { params: { id: string } },
+) {
+  const auth = await requireAdmin('只有管理员可以更新漫画资料');
+  if (!auth.authorized) return auth.response;
+
+  const id = parseMangaId(context.params.id);
+  if (!id) return apiError('无效的漫画 ID', 400);
+
+  const record = await getMangaRecord(id);
+  if (!record) return apiError('漫画不存在', 404);
+  if (!record.bangumiId) return apiError('这部漫画没有关联 Bangumi 条目', 400);
+
+  const metadata = await getMangaMetadataCandidate(record.bangumiId);
+  if (!metadata) return apiError('未能从 Bangumi 读取漫画资料', 502);
+
+  const patch: Partial<CreateMangaDTO> = {};
+  const assignText = <K extends keyof CreateMangaDTO>(key: K, value: CreateMangaDTO[K] | undefined) => {
+    if (value !== undefined && value !== '') patch[key] = value;
+  };
+  const assignArray = <K extends keyof CreateMangaDTO>(key: K, value: string[]) => {
+    if (value.length > 0) patch[key] = value as CreateMangaDTO[K];
+  };
+
+  assignText('originalTitle', metadata.originalTitle);
+  if (!record.coverUrl) assignText('coverUrl', metadata.coverUrl);
+  assignText('summary', metadata.summary);
+  assignText('releaseDate', metadata.releaseDate);
+  assignText('totalVolumes', metadata.volumeCount);
+  assignText('totalChapters', metadata.chapterCount);
+  assignArray('aliases', Array.from(new Set([...record.aliases, ...metadata.aliases])));
+  assignArray('tags', Array.from(new Set([...record.tags, ...metadata.tags])));
+  assignArray('authors', metadata.authors);
+  assignArray('illustrators', metadata.illustrators);
+  assignArray('publishers', metadata.publishers);
+  assignArray('serializations', metadata.serializations);
+
+  if (metadata.isFinished === true) {
+    patch.publicationStatus = 'completed';
+  } else if (record.publicationStatus === 'unknown') {
+    patch.publicationStatus = 'ongoing';
+  }
+
+  const appliedFields = Object.keys(patch);
+  if (appliedFields.length === 0) {
+    return apiSuccess({ ok: true, appliedFields, entry: record });
+  }
+
+  const updated = await updateMangaRecord(id, patch);
+  return updated
+    ? apiSuccess({ ok: true, appliedFields, entry: updated })
+    : apiError('更新漫画资料失败', 500);
+}
