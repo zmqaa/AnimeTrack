@@ -9,9 +9,9 @@ const COVER_FILE_PATTERN = /^(?:\d+\.(?:jpg|jpeg|png|webp|gif)|\d+\.thumb\.webp)
 
 export async function GET(
   request: Request,
-  context: { params: { file: string } },
+  context: { params: Promise<{ file: string }> },
 ) {
-  const fileName = context.params.file;
+  const { file: fileName } = await context.params;
   if (!COVER_FILE_PATTERN.test(fileName) || path.basename(fileName) !== fileName) {
     return apiError('无效的封面文件名', 400);
   }

@@ -5,21 +5,23 @@ import { animeNoteBodySchema, animeNoteCollectionSchema } from '@/lib/validation
 
 export async function GET(
   _request: Request,
-  context: { params: { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
-  const animeId = parseAnimeId(context.params.id);
+  const { id } = await context.params;
+  const animeId = parseAnimeId(id);
   if (!animeId) return apiError('Invalid ID', 400);
   return apiSuccess(listAnimeNotes(animeId));
 }
 
 export async function POST(
   request: Request,
-  context: { params: { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const auth = await requireAdmin();
   if (!auth.authorized) return auth.response;
 
-  const animeId = parseAnimeId(context.params.id);
+  const { id } = await context.params;
+  const animeId = parseAnimeId(id);
   if (!animeId) return apiError('Invalid ID', 400);
 
   const parsed = animeNoteBodySchema.safeParse(await request.json());
@@ -34,12 +36,13 @@ export async function POST(
 
 export async function PUT(
   request: Request,
-  context: { params: { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const auth = await requireAdmin();
   if (!auth.authorized) return auth.response;
 
-  const animeId = parseAnimeId(context.params.id);
+  const { id } = await context.params;
+  const animeId = parseAnimeId(id);
   if (!animeId) return apiError('Invalid ID', 400);
 
   const parsed = animeNoteCollectionSchema.safeParse(await request.json());

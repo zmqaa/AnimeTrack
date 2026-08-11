@@ -8,6 +8,10 @@
 
 :root,
 [data-theme='verdant'] {
+  --font-body: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", system-ui, -apple-system, sans-serif;
+  --font-display: "Noto Serif SC", "Songti SC", STSong, SimSun, serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+
   --bg-page: #07110f;
   --bg-card: #0f1a18;
   --border: #17312a;

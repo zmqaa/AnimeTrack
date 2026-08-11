@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import useSWR, { mutate as globalMutate } from 'swr';
 import toast from 'react-hot-toast';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
@@ -20,7 +20,8 @@ import {
   type MangaDetailDraft,
 } from './manga-detail-helpers';
 
-export default function MangaDetailPage({ params }: { params: { id: string } }) {
+export default function MangaDetailPage() {
+  const params = useParams<{ id: string }>();
   const router = useRouter();
   const { canManage: isAdmin } = useManageAccess();
   const { data: record, error, isLoading, mutate } = useSWR<MangaRecord>(

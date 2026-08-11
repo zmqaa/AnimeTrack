@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import useSWR, { mutate as globalMutate } from 'swr';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
@@ -20,7 +20,8 @@ import AnimeDetailLoadError from './AnimeDetailLoadError';
 import PageContainer from '@/components/shared/PageContainer';
 import { AnimeDetailRouteSkeleton } from '@/components/shared/RouteSkeletons';
 
-export default function AnimeDetailPage({ params }: { params: { id: string } }) {
+export default function AnimeDetailPage() {
+  const params = useParams<{ id: string }>();
   const { canManage: isAdmin } = useManageAccess();
   const router = useRouter();
   const searchParams = useSearchParams();

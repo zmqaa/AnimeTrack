@@ -25,9 +25,10 @@ function areAllowedFieldValuesEqual(key: string, nextValue: unknown, currentValu
 
 export async function GET(
   _request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
-  const id = parseAnimeId(context.params.id);
+  const { id: rawId } = await context.params;
+  const id = parseAnimeId(rawId);
   if (!id) return apiError('Invalid ID', 400);
 
   const record = await getAnimeRecord(id);
@@ -38,12 +39,13 @@ export async function GET(
 
 export async function DELETE(
   _request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireAdmin();
   if (!auth.authorized) return auth.response;
 
-  const id = parseAnimeId(context.params.id);
+  const { id: rawId } = await context.params;
+  const id = parseAnimeId(rawId);
   if (!id) return apiError('Invalid ID', 400);
 
   const deleted = await deleteAnimeRecord(id);
@@ -54,12 +56,13 @@ export async function DELETE(
 
 export async function PATCH(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireAdmin();
   if (!auth.authorized) return auth.response;
 
-  const id = parseAnimeId(context.params.id);
+  const { id: rawId } = await context.params;
+  const id = parseAnimeId(rawId);
   if (!id) return apiError('Invalid ID', 400);
 
   const before = await getAnimeRecord(id);

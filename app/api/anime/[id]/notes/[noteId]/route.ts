@@ -10,13 +10,14 @@ function parseNoteId(value: string): number | null {
 
 export async function PATCH(
   request: Request,
-  context: { params: { id: string; noteId: string } },
+  context: { params: Promise<{ id: string; noteId: string }> },
 ) {
   const auth = await requireAdmin();
   if (!auth.authorized) return auth.response;
 
-  const animeId = parseAnimeId(context.params.id);
-  const noteId = parseNoteId(context.params.noteId);
+  const params = await context.params;
+  const animeId = parseAnimeId(params.id);
+  const noteId = parseNoteId(params.noteId);
   if (!animeId || !noteId) return apiError('Invalid ID', 400);
 
   const parsed = animeNoteBodySchema.safeParse(await request.json());
@@ -31,13 +32,14 @@ export async function PATCH(
 
 export async function DELETE(
   _request: Request,
-  context: { params: { id: string; noteId: string } },
+  context: { params: Promise<{ id: string; noteId: string }> },
 ) {
   const auth = await requireAdmin();
   if (!auth.authorized) return auth.response;
 
-  const animeId = parseAnimeId(context.params.id);
-  const noteId = parseNoteId(context.params.noteId);
+  const params = await context.params;
+  const animeId = parseAnimeId(params.id);
+  const noteId = parseNoteId(params.noteId);
   if (!animeId || !noteId) return apiError('Invalid ID', 400);
 
   if (!deleteAnimeNote(animeId, noteId)) return apiError('Not found', 404);

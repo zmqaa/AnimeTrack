@@ -9,12 +9,13 @@ import { getMangaMetadataCandidate } from '@/lib/manga-provider';
 
 export async function POST(
   _request: Request,
-  context: { params: { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
   const auth = await requireAdmin('只有管理员可以更新漫画资料');
   if (!auth.authorized) return auth.response;
 
-  const id = parseMangaId(context.params.id);
+  const { id: rawId } = await context.params;
+  const id = parseMangaId(rawId);
   if (!id) return apiError('无效的漫画 ID', 400);
 
   const record = await getMangaRecord(id);

@@ -31,7 +31,7 @@ describe('local cover responses', () => {
   it('allows long immutable caching for a versioned cover URL', async () => {
     const response = await routeModule.GET(
       new Request('http://localhost/api/local-covers/1.jpg?v=mtime123'),
-      { params: { file: '1.jpg' } },
+      { params: Promise.resolve({ file: '1.jpg' }) },
     );
 
     expect(response.status).toBe(200);
@@ -43,7 +43,7 @@ describe('local cover responses', () => {
   it('uses a short cache for an unversioned cover URL', async () => {
     const response = await routeModule.GET(
       new Request('http://localhost/api/local-covers/1.jpg'),
-      { params: { file: '1.jpg' } },
+      { params: Promise.resolve({ file: '1.jpg' }) },
     );
 
     expect(response.status).toBe(200);
@@ -54,7 +54,7 @@ describe('local cover responses', () => {
   it('serves generated WebP thumbnails with immutable caching', async () => {
     const response = await routeModule.GET(
       new Request('http://localhost/api/local-covers/1.thumb.webp?v=mtime456'),
-      { params: { file: '1.thumb.webp' } },
+      { params: Promise.resolve({ file: '1.thumb.webp' }) },
     );
 
     expect(response.status).toBe(200);
@@ -67,7 +67,7 @@ describe('local cover responses', () => {
   it('still returns 404 when the cover file does not exist', async () => {
     const response = await routeModule.GET(
       new Request('http://localhost/api/local-covers/404.jpg?v=missing'),
-      { params: { file: '404.jpg' } },
+      { params: Promise.resolve({ file: '404.jpg' }) },
     );
 
     expect(response.status).toBe(404);

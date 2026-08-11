@@ -7,14 +7,15 @@ import { listAnimeNotes } from '@/lib/anime-notes';
 
 export async function POST(
   _request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireAdmin('只有管理员可以执行 AI 补全');
   if (!auth.authorized) {
     return auth.response;
   }
 
-  const id = parseAnimeId(context.params.id);
+  const { id: rawId } = await context.params;
+  const id = parseAnimeId(rawId);
   if (!id) {
     return apiError('Invalid ID', 400);
   }

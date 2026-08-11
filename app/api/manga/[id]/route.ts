@@ -10,10 +10,11 @@ import {
 import { updateMangaSchema } from '@/lib/validations';
 import { buildMangaStatusDatePatch } from '@/lib/manga-status';
 
-type RouteContext = { params: { id: string } };
+type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(_request: Request, context: RouteContext) {
-  const id = parseMangaId(context.params.id);
+  const { id: rawId } = await context.params;
+  const id = parseMangaId(rawId);
   if (!id) return apiError('无效的漫画 ID', 400);
   const record = await getMangaRecord(id);
   return record ? apiSuccess(record) : apiError('漫画不存在', 404);
@@ -22,7 +23,8 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function PATCH(request: Request, context: RouteContext) {
   const auth = await requireAdmin('只有管理员可以修改漫画');
   if (!auth.authorized) return auth.response;
-  const id = parseMangaId(context.params.id);
+  const { id: rawId } = await context.params;
+  const id = parseMangaId(rawId);
   if (!id) return apiError('无效的漫画 ID', 400);
   const before = await getMangaRecord(id);
   if (!before) return apiError('漫画不存在', 404);
@@ -65,7 +67,8 @@ export async function PATCH(request: Request, context: RouteContext) {
 export async function DELETE(_request: Request, context: RouteContext) {
   const auth = await requireAdmin('只有管理员可以删除漫画');
   if (!auth.authorized) return auth.response;
-  const id = parseMangaId(context.params.id);
+  const { id: rawId } = await context.params;
+  const id = parseMangaId(rawId);
   if (!id) return apiError('无效的漫画 ID', 400);
   return await deleteMangaRecord(id)
     ? apiSuccess({ ok: true })
