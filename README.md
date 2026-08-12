@@ -162,6 +162,7 @@ npm run db:scheduled-json-backup
 
 - `data/`、`backups/`、`public/covers/` 和 `.env.local` 均被 Git 忽略。
 - 不要把数据库、备份、AI Key 或 `NEXTAUTH_SECRET` 提交到仓库。
+- 在 Linux/macOS 上，正式启动和数据库维护脚本会自动把环境变量文件、数据库及备份限制为仅当前系统账号可访问；也可运行 `npm run security:harden-files` 手动检查并修复现有文件权限。
 - 管理、备份和数据写入操作要求管理员登录。
 - 封面优先使用本地缓存，缓存缺失时回退到 `coverUrl` 保存的远程来源。
 

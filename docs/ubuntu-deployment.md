@@ -85,6 +85,12 @@ npm run user:create-admin -- admin '请替换为自己的密码' '管理员'
 
 数据库默认保存在 `data/animetrack.db`。管理员密码不要使用示例内容，也不要把 `.env.local`、数据库或备份提交到 Git。
 
+正式启动会自动把 `.env.local`、数据库及备份的权限收紧为仅当前 Ubuntu 账号可访问。需要单独检查或修复现有文件时，可执行：
+
+```bash
+npm run security:harden-files
+```
+
 ## 5. 首次启动
 
 项目的正式部署命令会：

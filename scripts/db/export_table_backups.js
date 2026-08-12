@@ -11,12 +11,19 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { getDb, projectRoot, nowCSTTimestamp, nowCSTReadable } = require('../shared/db_env');
+const {
+  ensurePrivateDirectory,
+  getDb,
+  nowCSTReadable,
+  nowCSTTimestamp,
+  projectRoot,
+  securePrivateFile,
+} = require('../shared/db_env');
 
 const BACKUP_PREFIX = 'table-backup-';
 
 function ensureDir(dirPath) {
-  if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
+  ensurePrivateDirectory(dirPath);
 }
 
 function escapeSql(value) {
@@ -118,8 +125,12 @@ function writeTableFiles(outputDir, snapshot, index) {
   }
   dataLines.push('');
 
-  fs.writeFileSync(path.join(outputDir, schemaFile), schemaLines.join('\n'), 'utf8');
-  fs.writeFileSync(path.join(outputDir, dataFile), dataLines.join('\n'), 'utf8');
+  const schemaPath = path.join(outputDir, schemaFile);
+  const dataPath = path.join(outputDir, dataFile);
+  fs.writeFileSync(schemaPath, schemaLines.join('\n'), 'utf8');
+  fs.writeFileSync(dataPath, dataLines.join('\n'), 'utf8');
+  securePrivateFile(schemaPath);
+  securePrivateFile(dataPath);
 
   return { schemaFile, dataFile };
 }
@@ -155,11 +166,13 @@ async function main() {
       console.log(`[table-backup] ${tableName}: ${snapshot.rows.length} rows`);
     }
 
+    const manifestPath = path.join(outputDir, '00-manifest.json');
     fs.writeFileSync(
-      path.join(outputDir, '00-manifest.json'),
+      manifestPath,
       `${JSON.stringify(manifest, null, 2)}\n`,
       'utf8',
     );
+    securePrivateFile(manifestPath);
 
     console.log(`[table-backup] Backup complete -> ${path.relative(projectRoot, outputDir)}`);
   } finally {

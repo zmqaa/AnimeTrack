@@ -9,7 +9,14 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { getDb, projectRoot, nowCSTTimestamp, nowCSTReadable } = require('../shared/db_env');
+const {
+  ensurePrivateDirectory,
+  getDb,
+  nowCSTReadable,
+  nowCSTTimestamp,
+  projectRoot,
+  securePrivateFile,
+} = require('../shared/db_env');
 
 const BACKUP_DIR = process.env.ANIMETRACK_BACKUPS_DIR
   ? path.resolve(process.env.ANIMETRACK_BACKUPS_DIR)
@@ -57,7 +64,7 @@ function rotateBackups(keep) {
 
 async function main() {
   const { keep } = parseArgs();
-  if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  ensurePrivateDirectory(BACKUP_DIR);
 
   const db = getDb();
 
@@ -135,6 +142,7 @@ async function main() {
     lines.push('');
 
     fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
+    securePrivateFile(filePath);
     console.log(`[backup] 备份完成: ${fileName}`);
     console.log(`[backup] anime: ${animeRows.length} 条, anime_notes: ${noteRows.length} 条, watch_history: ${historyRows.length} 条, manga: ${mangaRows.length} 条`);
 

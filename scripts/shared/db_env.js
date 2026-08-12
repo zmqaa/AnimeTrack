@@ -1,6 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 const { config: loadEnv } = require('dotenv');
+const {
+  ensurePrivateDirectory,
+  secureDatabaseFiles,
+  securePrivateFile,
+  setPrivateUmask,
+} = require('./private_files');
+
+setPrivateUmask();
 
 function resolveProjectRoot() {
   const cwd = process.cwd();
@@ -32,6 +40,7 @@ function loadDatabaseEnv() {
     const filePath = path.join(projectRoot, fileName);
     if (fs.existsSync(filePath)) {
       loadEnv({ path: filePath, override: false });
+      securePrivateFile(filePath);
     }
   }
 
@@ -47,9 +56,7 @@ function getDb() {
 
   const dbPath = getDbPath();
   const dbDir = path.dirname(dbPath);
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-  }
+  ensurePrivateDirectory(dbDir);
 
   const Database = require('better-sqlite3');
   const db = new Database(dbPath);
@@ -57,6 +64,7 @@ function getDb() {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.pragma('busy_timeout = 5000');
+  secureDatabaseFiles(dbPath);
 
   // Auto-create tables
   const schemaPath = path.join(projectRoot, 'database', 'schema.sql');
@@ -107,4 +115,6 @@ module.exports = {
   getDb,
   nowCSTTimestamp,
   nowCSTReadable,
+  ensurePrivateDirectory,
+  securePrivateFile,
 };

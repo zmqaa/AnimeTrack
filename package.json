@@ -13,6 +13,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "security:harden-files": "node scripts/security/harden_runtime_permissions.js",
     "db:apply-sql": "node scripts/db/apply_sql_files.js",
     "db:init-with-anime-data": "node scripts/db/apply_sql_files.js database/schema.sql database/seed_anime_data.sql",
     "user:create-admin": "node scripts/db/create_admin_user.js",

@@ -12,6 +12,7 @@ import {
   getDatabasePath,
   getProjectResourcePath,
 } from '@/lib/runtime-paths';
+import { ensurePrivateDirectory, securePrivateFile } from '@/scripts/shared/private_files';
 
 const LEGACY_BASELINE_VERSION = 20;
 
@@ -234,7 +235,7 @@ function createMigrationBackup(
   migration: MigrationFile,
 ): string {
   const backupDirectory = getBackupsDirectory();
-  fs.mkdirSync(backupDirectory, { recursive: true });
+  ensurePrivateDirectory(backupDirectory);
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const databaseName = path.basename(databasePath, path.extname(databasePath));
@@ -245,6 +246,7 @@ function createMigrationBackup(
   const escapedBackupPath = backupPath.replace(/'/g, "''");
 
   db.exec(`VACUUM INTO '${escapedBackupPath}'`);
+  securePrivateFile(backupPath);
   return backupPath;
 }
 

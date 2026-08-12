@@ -4,6 +4,11 @@ import path from 'path';
 import fs from 'fs';
 import { runDatabaseMigrations } from '@/lib/database-migrations';
 import { getDatabasePath, getProjectResourcePath } from '@/lib/runtime-paths';
+import {
+  ensurePrivateDirectory,
+  secureDatabaseFiles,
+  setPrivateUmask,
+} from '@/scripts/shared/private_files';
 
 const DB_PATH = getDatabasePath();
 const SCHEMA_PATH = getProjectResourcePath('database', 'schema.sql');
@@ -13,10 +18,9 @@ let _db: Database.Database | null = null;
 function getDb(): Database.Database {
   if (_db) return _db;
 
+  setPrivateUmask();
   const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+  ensurePrivateDirectory(dir);
 
   const db = new Database(DB_PATH);
 
@@ -26,6 +30,7 @@ function getDb(): Database.Database {
   // 增大缓存，减少磁盘IO
   db.pragma('cache_size = -64000');  // 64MB
   db.pragma('mmap_size = 268435456'); // 256MB memory-mapped I/O
+  secureDatabaseFiles(DB_PATH);
 
   if (fs.existsSync(SCHEMA_PATH)) {
     const schema = fs.readFileSync(SCHEMA_PATH, 'utf-8');

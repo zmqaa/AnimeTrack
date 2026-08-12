@@ -10,7 +10,14 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { getDb, projectRoot, nowCSTTimestamp, nowCSTReadable } = require('../shared/db_env');
+const {
+  ensurePrivateDirectory,
+  getDb,
+  nowCSTReadable,
+  nowCSTTimestamp,
+  projectRoot,
+  securePrivateFile,
+} = require('../shared/db_env');
 const backupsDir = path.join(projectRoot, 'backups');
 
 function escapeSql(value) {
@@ -41,7 +48,7 @@ function parseArgs() {
   }
   if (!outputFile) {
     const ts = nowCSTTimestamp();
-    if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
+    ensurePrivateDirectory(backupsDir);
     outputFile = path.join(backupsDir, `full-backup-${ts}.sql`);
   }
   return { outputFile, includeUsers };
@@ -151,8 +158,9 @@ async function main() {
     lines.push('');
 
     const dir = path.dirname(outputFile);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    ensurePrivateDirectory(dir);
     fs.writeFileSync(outputFile, lines.join('\n'), 'utf8');
+    securePrivateFile(outputFile);
 
     const rel = path.relative(projectRoot, outputFile);
     console.log(`Backup complete → ${rel}`);

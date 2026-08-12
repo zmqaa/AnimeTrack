@@ -8,7 +8,13 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { getDb, projectRoot, nowCSTTimestamp } = require('../shared/db_env');
+const {
+  ensurePrivateDirectory,
+  getDb,
+  nowCSTTimestamp,
+  projectRoot,
+  securePrivateFile,
+} = require('../shared/db_env');
 const { buildPortableExport } = require('../shared/portable_export');
 
 const BACKUP_PREFIX = 'anime-track-export-';
@@ -114,7 +120,7 @@ function rotateBackups(outputDir, keep) {
 
 function main() {
   const { keep, outputDir } = parseArgs();
-  fs.mkdirSync(outputDir, { recursive: true });
+  ensurePrivateDirectory(outputDir);
 
   const db = getDb();
   try {
@@ -163,11 +169,13 @@ function main() {
     const temporaryPath = `${filePath}.tmp`;
 
     fs.writeFileSync(temporaryPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
+    securePrivateFile(temporaryPath);
     const verification = JSON.parse(fs.readFileSync(temporaryPath, 'utf8'));
     if (verification.anime?.count !== anime.length || verification.watchHistory?.count !== watchHistory.length || verification.manga?.count !== manga.length) {
       throw new Error('JSON 备份写入后的数量校验失败');
     }
     fs.renameSync(temporaryPath, filePath);
+    securePrivateFile(filePath);
 
     rotateBackups(outputDir, keep);
     console.log(`[json-backup] 备份完成: ${path.relative(projectRoot, filePath)}`);
