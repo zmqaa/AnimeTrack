@@ -17,6 +17,7 @@ NEXT_LINK="$DEPLOY_ROOT/current-next"
 PREVIOUS_LINK="$DEPLOY_ROOT/previous"
 PREVIOUS_NEXT_LINK="$DEPLOY_ROOT/previous-next"
 LAST_BUILT_FILE="$DEPLOY_ROOT/last-built-release"
+RELEASE_KEEP="${DEPLOY_RELEASE_KEEP:-5}"
 
 log() {
   printf '[deploy:%s %s] %s\n' "$MODE" "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -145,4 +146,7 @@ if ! node "$WORKSPACE_ROOT/scripts/deploy/verify_static_assets.js" "$PRODUCTION_
 fi
 
 release_label="$(node -e "const m=require(process.argv[1]); console.log(m.releaseName)" "$release_dir/release.json")"
+if ! node "$WORKSPACE_ROOT/scripts/deploy/cleanup_artifacts.js" --apply --keep "$RELEASE_KEEP"; then
+  log "WARNING: Deployment succeeded, but old release cleanup failed"
+fi
 log "Deployment finished successfully with release $release_label"

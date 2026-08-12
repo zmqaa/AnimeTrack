@@ -8,6 +8,8 @@
     "build:next": "next build --webpack",
     "deploy:test": "bash scripts/deploy/deploy_production.sh test",
     "deploy:prod": "bash scripts/deploy/deploy_production.sh prod",
+    "deploy:cleanup": "node scripts/deploy/cleanup_artifacts.js",
+    "deploy:cleanup:apply": "node scripts/deploy/cleanup_artifacts.js --apply",
     "start": "node scripts/deploy/prod_start_guard.js",
     "start:next": "next start",
     "lint": "eslint .",
