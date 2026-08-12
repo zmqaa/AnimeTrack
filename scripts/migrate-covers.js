@@ -9,13 +9,14 @@
 
 const fs = require('fs');
 const path = require('path');
-const https = require('https');
-const http = require('http');
 const { getDb, projectRoot } = require('./shared/db_env');
+const { fetchWithValidatedRedirects } = require('./shared/safe_remote_fetch');
 
 const COVERS_DIR = path.join(projectRoot, 'public', 'covers');
 const DRY_RUN = process.argv.includes('--dry-run');
 const CONCURRENCY = Math.max(1, Math.min(10, parseInt(process.argv.find(a => a.startsWith('--concurrency='))?.split('=')[1] || '3', 10)));
+const MAX_COVER_BYTES = 8 * 1024 * 1024;
+const DEFAULT_ALLOWED_COVER_HOSTS = ['lain.bgm.tv', 'cdn.myanimelist.net'];
 
 // ── Helpers ────────────────────────────────────────────────────────
 
@@ -25,42 +26,56 @@ function ensureDir(dir) {
   }
 }
 
-function isRemoteUrl(value) {
-  if (!value || typeof value !== 'string') return false;
-  return /^https?:\/\//i.test(value.trim());
+function allowedCoverHosts() {
+  const configured = String(process.env.COVER_ALLOWED_HOSTS || '')
+    .split(',')
+    .map((host) => host.trim())
+    .filter(Boolean);
+  return new Set([...DEFAULT_ALLOWED_COVER_HOSTS, ...configured]);
 }
 
-function downloadFile(url) {
-  return new Promise((resolve, reject) => {
-    const proto = url.startsWith('https') ? https : http;
-    const req = proto.get(url, { timeout: 15000, headers: { 'User-Agent': 'AnimeTrack/1.0 (cover migrator)' } }, (res) => {
-      // Follow redirects (max 3)
-      if ([301, 302, 307, 308].includes(res.statusCode)) {
-        const redirectUrl = res.headers.location;
-        if (redirectUrl) {
-          return resolve(downloadFile(redirectUrl));
-        }
-      }
-
-      if (res.statusCode !== 200) {
-        return reject(new Error(`HTTP ${res.statusCode}`));
-      }
-
-      const chunks = [];
-      res.on('data', (chunk) => chunks.push(chunk));
-      res.on('end', () => {
-        const buffer = Buffer.concat(chunks);
-        if (buffer.length < 512) {
-          return reject(new Error(`文件过小 (${buffer.length} bytes)`));
-        }
-        resolve(buffer);
-      });
-      res.on('error', reject);
+async function downloadFile(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetchWithValidatedRedirects(url, {
+      allowedHosts: allowedCoverHosts(),
+      requestInit: {
+        signal: controller.signal,
+        headers: { 'User-Agent': 'AnimeTrack/1.0 (cover migrator)' },
+      },
     });
 
-    req.on('timeout', () => { req.destroy(); reject(new Error('超时')); });
-    req.on('error', reject);
-  });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+    if (!contentType.startsWith('image/')) throw new Error(`响应不是图片 (${contentType || 'unknown'})`);
+
+    const contentLength = Number(response.headers.get('content-length'));
+    if (Number.isFinite(contentLength) && contentLength > MAX_COVER_BYTES) {
+      throw new Error(`文件超过 ${MAX_COVER_BYTES / 1024 / 1024} MB 限制`);
+    }
+    if (!response.body) throw new Error('响应没有内容');
+
+    const reader = response.body.getReader();
+    const chunks = [];
+    let total = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_COVER_BYTES) {
+        await reader.cancel();
+        throw new Error(`文件超过 ${MAX_COVER_BYTES / 1024 / 1024} MB 限制`);
+      }
+      chunks.push(Buffer.from(value));
+    }
+
+    const buffer = Buffer.concat(chunks, total);
+    if (buffer.length < 512) throw new Error(`文件过小 (${buffer.length} bytes)`);
+    return buffer;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function saveCover(animeId, buffer) {
@@ -115,11 +130,10 @@ async function main() {
   // 并发下载
   let succeeded = 0;
   let failed = 0;
-  let skipped = 0;
   const updateStmt = DRY_RUN ? null : db.prepare('UPDATE anime SET coverUrl = ?, updatedAt = datetime(\'now\', \'localtime\') WHERE id = ?');
 
   const pool = [...rows];
-  const workers = Array.from({ length: CONCURRENCY }, async (_, workerIndex) => {
+  const workers = Array.from({ length: CONCURRENCY }, async () => {
     while (pool.length > 0) {
       const row = pool.shift();
       if (!row) break;

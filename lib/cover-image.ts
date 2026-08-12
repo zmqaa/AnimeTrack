@@ -4,6 +4,7 @@ import { writeFile, unlink, readdir, rename } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import sharp from 'sharp';
 import { getCoversDirectory } from '@/lib/runtime-paths';
+import { fetchWithValidatedRedirects } from '@/scripts/shared/safe_remote_fetch';
 
 const LEGACY_COVERS_PUBLIC_PREFIX = '/covers';
 const DATA_COVERS_PUBLIC_PREFIX = '/api/local-covers';
@@ -22,15 +23,6 @@ function allowedCoverHosts(): Set<string> {
     .map((host) => host.trim().toLowerCase())
     .filter(Boolean);
   return new Set([...DEFAULT_ALLOWED_COVER_HOSTS, ...configured]);
-}
-
-function isAllowedRemoteCoverUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'https:' && allowedCoverHosts().has(url.hostname.toLowerCase());
-  } catch {
-    return false;
-  }
 }
 
 async function readBodyWithLimit(response: Response): Promise<Buffer> {
@@ -203,18 +195,16 @@ export async function downloadCoverImage(
   const url = remoteUrl.trim();
   if (!url) return null;
 
-  if (!isAllowedRemoteCoverUrl(url)) {
-    console.warn(`[cover] 已阻止不受信任的封面地址: ${url}`);
-    return null;
-  }
-
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15000);
   try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'AnimeTrack/1.0 (cover downloader)',
+    const response = await fetchWithValidatedRedirects(url, {
+      allowedHosts: allowedCoverHosts(),
+      requestInit: {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'AnimeTrack/1.0 (cover downloader)',
+        },
       },
     });
 

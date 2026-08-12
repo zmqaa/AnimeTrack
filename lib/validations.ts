@@ -6,7 +6,7 @@ const dateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式�
 
 const stringArraySchema = z.array(z.string().max(200)).max(100).optional();
 const coverUrlSchema = z.union([
-  z.string().url().max(2000),
+  z.string().url().max(2000).refine((value) => /^https?:\/\//i.test(value), '封面地址必须使用 HTTP 或 HTTPS'),
   z.string().regex(/^\/(?:covers|api\/local-covers)\/\d+\.(?:jpg|jpeg|png|webp|gif)$/i, '无效的本地封面地址'),
   z.literal(''),
 ]).optional().nullable();

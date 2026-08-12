@@ -164,6 +164,7 @@ npm run db:scheduled-json-backup
 - 不要把数据库、备份、AI Key 或 `NEXTAUTH_SECRET` 提交到仓库。
 - 在 Linux/macOS 上，正式启动和数据库维护脚本会自动把环境变量文件、数据库及备份限制为仅当前系统账号可访问；也可运行 `npm run security:harden-files` 手动检查并修复现有文件权限。
 - 管理、备份和数据写入操作要求管理员登录。
+- 服务器下载远程封面时只允许可信的 HTTPS 域名，并会逐次检查跳转目标和 DNS 解析结果，拒绝本机、局域网及保留地址。
 - 封面优先使用本地缓存，缓存缺失时回退到 `coverUrl` 保存的远程来源。
 
 ## 技术栈

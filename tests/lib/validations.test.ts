@@ -43,4 +43,19 @@ describe('anime request validation', () => {
 
     expect(result.success).toBe(false);
   });
+
+  it('only accepts HTTP(S) or managed local cover addresses', () => {
+    expect(createAnimeSchema.safeParse({
+      title: '公网封面',
+      coverUrl: 'https://lain.bgm.tv/pic/cover.jpg',
+    }).success).toBe(true);
+    expect(createAnimeSchema.safeParse({
+      title: '本地封面',
+      coverUrl: '/api/local-covers/1.jpg',
+    }).success).toBe(true);
+    expect(createAnimeSchema.safeParse({
+      title: '不支持的协议',
+      coverUrl: 'file:///etc/passwd',
+    }).success).toBe(false);
+  });
 });
