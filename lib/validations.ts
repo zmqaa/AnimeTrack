@@ -1,8 +1,13 @@
 import { z } from 'zod';
+import { getAnimeDateOrderIssue, getMangaDateOrderIssue } from './date-validation';
+import { isValidCalendarDate } from './date-utils';
 
 const animeStatusSchema = z.enum(['watching', 'completed', 'dropped', 'plan_to_watch']);
 
-const dateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY-MM-DD').optional().nullable();
+const dateStringSchema = z.string()
+  .refine(isValidCalendarDate, '日期必须是有效的 YYYY-MM-DD 公历日期')
+  .optional()
+  .nullable();
 
 const stringArraySchema = z.array(z.string().max(200)).max(100).optional();
 const coverUrlSchema = z.union([
@@ -11,7 +16,7 @@ const coverUrlSchema = z.union([
   z.literal(''),
 ]).optional().nullable();
 
-export const createAnimeSchema = z.object({
+const animeFields = {
   title: z.string().min(1, '标题不能为空').max(500),
   originalTitle: z.string().max(500).optional().nullable(),
   coverUrl: coverUrlSchema,
@@ -29,14 +34,24 @@ export const createAnimeSchema = z.object({
   endDate: dateStringSchema,
   premiereDate: dateStringSchema,
   isFinished: z.boolean().optional().nullable(),
-});
+};
+
+function refineAnimeDateOrder(
+  value: { startDate?: string | null; endDate?: string | null },
+  context: z.RefinementCtx,
+) {
+  const issue = getAnimeDateOrderIssue(value);
+  if (issue) context.addIssue({ code: 'custom', message: issue.message, path: [issue.field] });
+}
+
+export const createAnimeSchema = z.object(animeFields).superRefine(refineAnimeDateOrder);
 
 // PATCH 字段必须保持真正可选，不能继承创建模型的默认值；否则只提交
 // progressDelta 时也会被自动补出 progress=0，造成增量请求被误判为混合提交。
-export const updateAnimeSchema = createAnimeSchema.partial().extend({
+export const updateAnimeSchema = z.object(animeFields).partial().extend({
   status: animeStatusSchema.optional(),
   progress: z.number().int().min(0).optional(),
-});
+}).superRefine(refineAnimeDateOrder);
 
 export const patchAnimeBodySchema = updateAnimeSchema.extend({
   progressDelta: z.union([z.literal(-1), z.literal(1)]).optional(),
@@ -71,7 +86,7 @@ export const patchAnimeBodySchema = updateAnimeSchema.extend({
 export const animeNoteBodySchema = z.object({
   episode: z.number().int().min(1).max(9999),
   content: z.string().trim().min(1, '备注内容不能为空').max(5000),
-  notedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, '备注日期格式应为 YYYY-MM-DD'),
+  notedAt: z.string().refine(isValidCalendarDate, '备注日期必须是有效的 YYYY-MM-DD 公历日期'),
 });
 
 export const animeNoteCollectionSchema = z.array(animeNoteBodySchema).max(10000);
@@ -89,7 +104,7 @@ export const mangaPublicationStatusSchema = z.enum([
 
 const mangaPositionSchema = z.string().trim().max(100).optional().nullable();
 
-export const createMangaSchema = z.object({
+const mangaFields = {
   bangumiId: z.number().int().positive().optional().nullable(),
   title: z.string().trim().min(1, '标题不能为空').max(500),
   originalTitle: z.string().trim().max(500).optional().nullable(),
@@ -112,12 +127,22 @@ export const createMangaSchema = z.object({
   startDate: dateStringSchema,
   endDate: dateStringSchema,
   releaseDate: dateStringSchema,
-});
+};
 
-export const updateMangaSchema = createMangaSchema.partial().extend({
+function refineMangaDateOrder(
+  value: { startDate?: string | null; endDate?: string | null },
+  context: z.RefinementCtx,
+) {
+  const issue = getMangaDateOrderIssue(value);
+  if (issue) context.addIssue({ code: 'custom', message: issue.message, path: [issue.field] });
+}
+
+export const createMangaSchema = z.object(mangaFields).superRefine(refineMangaDateOrder);
+
+export const updateMangaSchema = z.object(mangaFields).partial().extend({
   status: mangaReadingStatusSchema.optional(),
   publicationStatus: mangaPublicationStatusSchema.optional(),
-});
+}).superRefine(refineMangaDateOrder);
 
 export type CreateMangaInput = z.infer<typeof createMangaSchema>;
 export type UpdateMangaInput = z.infer<typeof updateMangaSchema>;

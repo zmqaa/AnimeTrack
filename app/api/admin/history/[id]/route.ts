@@ -1,6 +1,6 @@
 import { deleteWatchHistoryById, updateWatchHistoryTime } from '@/lib/history';
 import { getRawDb } from '@/lib/db';
-import { nowISO } from '@/lib/date-utils';
+import { isValidDateTimeString, nowISO } from '@/lib/date-utils';
 import { syncAnimeStartDateFromHistory } from '@/lib/anime-start-date';
 import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
 
@@ -126,10 +126,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return apiError('观看时间不能为空', 400);
   }
 
-  const watchedAt = new Date(body.watchedAt);
-  if (Number.isNaN(watchedAt.getTime())) {
+  if (!isValidDateTimeString(body.watchedAt)) {
     return apiError('观看时间格式无效', 400);
   }
+  const watchedAt = new Date(body.watchedAt);
 
   const record = await updateWatchHistoryTime(id, watchedAt);
   if (!record) return apiError('记录不存在', 404);

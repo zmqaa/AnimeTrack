@@ -1,0 +1,24 @@
+# 放入 /etc/nginx/snippets/animetrack-security.conf，并在 HTTPS server 块中 include。
+server_tokens off;
+
+add_header Strict-Transport-Security "max-age=31536000" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "SAMEORIGIN" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+# 远程封面来源由用户数据和外部资料决定，因此 img-src 保留 HTTP(S)；其余浏览器连接仍限制为本站。
+add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; img-src 'self' data: blob: http: https:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'" always;
+
+# 隐藏文件和常见敏感配置路径不应进入应用。
+location ~ /\.(?!well-known(?:/|$)) {
+    return 404;
+}
+
+# 提前拒绝与本项目无关的常见扫描路径，降低应用日志噪声。
+location ~* ^/(?:wp-admin|wp-content|wp-includes|wordpress|xmlrpc\.php|phpmyadmin|cgi-bin|geoserver|manager/html|global-protect|webui|actuator|vendor/phpunit|HNAP1)(?:/|$) {
+    return 404;
+}
+
+location ~* ^/(?:Dockerfile|docker-compose(?:\.[^/]*)?\.ya?ml|Gemfile|Jenkinsfile|server-status|server-info)(?:/|$) {
+    return 404;
+}

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  animeNoteBodySchema,
   createAnimeSchema,
+  createMangaSchema,
   patchAnimeBodySchema,
+  updateMangaSchema,
   updateAnimeSchema,
 } from '../../lib/validations';
 
@@ -57,5 +60,65 @@ describe('anime request validation', () => {
       title: '不支持的协议',
       coverUrl: 'file:///etc/passwd',
     }).success).toBe(false);
+  });
+
+  it('accepts real leap days and rejects impossible calendar dates', () => {
+    expect(createAnimeSchema.safeParse({
+      title: '闰年作品',
+      premiereDate: '2024-02-29',
+    }).success).toBe(true);
+    expect(createAnimeSchema.safeParse({
+      title: '错误日期作品',
+      premiereDate: '2026-02-29',
+    }).success).toBe(false);
+    expect(createMangaSchema.safeParse({
+      title: '错误日期漫画',
+      releaseDate: '2026-04-31',
+    }).success).toBe(false);
+    expect(animeNoteBodySchema.safeParse({
+      episode: 1,
+      content: '日期错误',
+      notedAt: '2026-13-01',
+    }).success).toBe(false);
+  });
+
+  it('rejects personal end dates earlier than start dates', () => {
+    const anime = createAnimeSchema.safeParse({
+      title: '顺序错误番剧',
+      startDate: '2026-08-10',
+      endDate: '2026-08-09',
+    });
+    const manga = createMangaSchema.safeParse({
+      title: '顺序错误漫画',
+      startDate: '2026-08-10',
+      endDate: '2026-08-09',
+    });
+
+    expect(anime.success).toBe(false);
+    expect(anime.success ? '' : anime.error.issues[0]?.message).toBe('看完日期不能早于开始观看日期');
+    expect(manga.success).toBe(false);
+    expect(manga.success ? '' : manga.error.issues[0]?.message).toBe('读完日期不能早于开始阅读日期');
+    expect(patchAnimeBodySchema.safeParse({
+      startDate: '2026-08-10',
+      endDate: '2026-08-09',
+    }).success).toBe(false);
+  });
+
+  it('allows premiere and release metadata to differ from personal activity dates', () => {
+    expect(createAnimeSchema.safeParse({
+      title: '提前点映',
+      startDate: '2026-08-01',
+      premiereDate: '2026-08-10',
+    }).success).toBe(true);
+    expect(createMangaSchema.safeParse({
+      title: '连载与单行本',
+      startDate: '2026-08-01',
+      releaseDate: '2026-08-10',
+    }).success).toBe(true);
+  });
+
+  it('keeps a one-field update valid so routes can merge it with existing dates', () => {
+    expect(updateAnimeSchema.safeParse({ endDate: '2026-08-10' }).success).toBe(true);
+    expect(updateMangaSchema.safeParse({ endDate: '2026-08-10' }).success).toBe(true);
   });
 });

@@ -1,0 +1,64 @@
+# 复制到 /etc/nginx/sites-available/animetrack 后替换示例域名和证书路径。
+server {
+    listen 80;
+    listen [::]:80;
+    server_name anime.example.com;
+
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name anime.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/anime.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/anime.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:AnimeTrackTLS:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    client_max_body_size 20m;
+    limit_req_status 429;
+
+    gzip on;
+    gzip_min_length 256;
+    gzip_types text/css application/javascript application/json application/x-ndjson image/svg+xml;
+
+    include /etc/nginx/snippets/animetrack-security.conf;
+
+    location = /anime-track-export.json {
+        return 404;
+    }
+
+    # 登录与首次初始化入口：连续异常请求会返回 429。
+    location ~ ^/api/auth/(?:callback|signin)/ {
+        limit_req zone=animetrack_login burst=10 nodelay;
+        include /etc/nginx/snippets/animetrack-proxy.conf;
+    }
+
+    location = /api/setup/bootstrap {
+        limit_req zone=animetrack_login burst=5 nodelay;
+        include /etc/nginx/snippets/animetrack-proxy.conf;
+    }
+
+    # AI、Bangumi 查询和资料补充属于高成本入口。关闭缓冲以兼容快速录入的 NDJSON 流。
+    location ~ ^/api/(?:anime/quick-record|settings/ai/test|manga/lookup|anime/[0-9]+/enrich|manga/[0-9]+/enrich)/?$ {
+        limit_req zone=animetrack_ai burst=6 nodelay;
+        proxy_buffering off;
+        proxy_cache off;
+        gzip off;
+        include /etc/nginx/snippets/animetrack-proxy.conf;
+    }
+
+    # 导入、创建 SQL 备份和恢复均为低频数据操作。
+    location ~ ^/api/admin/(?:import|backup|backup/restore)/?$ {
+        limit_req zone=animetrack_data_write burst=3 nodelay;
+        include /etc/nginx/snippets/animetrack-proxy.conf;
+    }
+
+    location / {
+        include /etc/nginx/snippets/animetrack-proxy.conf;
+    }
+}

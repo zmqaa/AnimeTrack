@@ -131,6 +131,7 @@ curl.exe -sS -o NUL -w "HTTP %{http_code} 连接 %{time_connect}s 总计 %{time_
 | `npm run lint` | 运行 ESLint |
 | `npm test` | 运行测试 |
 | `npm run build:next` | 执行 Next.js 生产构建 |
+| `npm run nginx:check-example` | 校验仓库内的 Nginx 入口示例配置 |
 | `npm run db:full-backup` | 导出不含管理员账号的完整数据 SQL 备份 |
 | `npm run db:scheduled-json-backup` | 生成可回导的 JSON 备份并自动轮转 |
 | `npm run user:create-admin -- <用户名> <密码> [显示名]` | 创建或更新管理员 |

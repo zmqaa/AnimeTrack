@@ -9,6 +9,8 @@ import {
 } from '@/lib/manga';
 import { updateMangaSchema } from '@/lib/validations';
 import { buildMangaStatusDatePatch } from '@/lib/manga-status';
+import { getMangaDateOrderIssue } from '@/lib/date-validation';
+import { formatAppDateKey } from '@/lib/date-utils';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -49,8 +51,14 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (value.totalChapters !== undefined) patch.totalChapters = value.totalChapters ?? null as never;
   if (value.bangumiId !== undefined) patch.bangumiId = value.bangumiId ?? null as never;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = formatAppDateKey(new Date());
   Object.assign(patch, buildMangaStatusDatePatch(before, value, today));
+
+  const dateOrderIssue = getMangaDateOrderIssue({
+    startDate: patch.startDate !== undefined ? patch.startDate : before.startDate,
+    endDate: patch.endDate !== undefined ? patch.endDate : before.endDate,
+  });
+  if (dateOrderIssue) return apiError(dateOrderIssue.message, 400);
 
   try {
     const updated = await updateMangaRecord(id, patch);

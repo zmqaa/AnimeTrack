@@ -10,6 +10,8 @@ import {
   type MangaReadingStatus,
 } from '@/lib/manga';
 import { createMangaSchema } from '@/lib/validations';
+import { getMangaDateOrderIssue } from '@/lib/date-validation';
+import { formatAppDateKey } from '@/lib/date-utils';
 
 const READING_STATUSES = new Set<MangaReadingStatus>([
   'plan_to_read', 'reading', 'caught_up', 'completed', 'paused', 'dropped',
@@ -41,7 +43,7 @@ export async function POST(request: Request) {
     const parsed = createMangaSchema.safeParse(await request.json());
     if (!parsed.success) return apiError(parsed.error.issues[0]?.message || '参数校验失败', 400);
     const value = parsed.data;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = formatAppDateKey(new Date());
     const shouldStart = ['reading', 'caught_up', 'completed'].includes(value.status);
     const data: CreateMangaDTO = {
       ...value,
@@ -65,6 +67,8 @@ export async function POST(request: Request) {
       totalVolumes: value.totalVolumes ?? undefined,
       totalChapters: value.totalChapters ?? undefined,
     };
+    const dateOrderIssue = getMangaDateOrderIssue(data);
+    if (dateOrderIssue) return apiError(dateOrderIssue.message, 400);
     return apiSuccess(await createMangaRecord(data), 201);
   } catch (error) {
     const message = error instanceof Error ? error.message : '漫画创建失败';

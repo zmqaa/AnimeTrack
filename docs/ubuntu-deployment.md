@@ -192,10 +192,43 @@ sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d anime.example.com
 ```
 
+证书签发成功后，可以使用仓库内的完整入口模板替换第 6 节的基础配置。模板包含安全响应头、20MB 上传限制、代理超时、流式响应支持，以及登录、AI、导入和恢复入口的适度限流。先在项目目录验证模板：
+
+```bash
+npm run nginx:check-example
+```
+
+再复制配置；这些命令不会自动执行，已有站点配置应先自行备份和对比：
+
+```bash
+sudo install -m 0644 config/nginx/animetrack-rate-limits.conf.example /etc/nginx/conf.d/animetrack-rate-limits.conf
+sudo install -m 0644 config/nginx/animetrack-proxy.conf.example /etc/nginx/snippets/animetrack-proxy.conf
+sudo install -m 0644 config/nginx/animetrack-security.conf.example /etc/nginx/snippets/animetrack-security.conf
+sudo install -m 0644 config/nginx/animetrack-site.conf.example /etc/nginx/sites-available/animetrack
+sudo nano /etc/nginx/sites-available/animetrack
+```
+
+必须把 `anime.example.com` 和两条证书路径替换为实际值。模板默认 Nginx 是直接面向公网的入口，此时 `$remote_addr` 就是真实客户端地址。如果前面还有 Cloudflare 等 CDN，应只信任服务商公布的 IP 段并配置 `real_ip_header`，不要直接信任任意请求传入的 `X-Forwarded-For`。
+
+应用前检查语法，再平滑重载：
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+限流只覆盖低频高成本入口，触发时返回 HTTP 429；普通页面浏览不受影响。AI 快速录入关闭代理缓冲并保留 300 秒读取超时，以便 NDJSON（逐行 JSON）进度流及时到达浏览器。CSP（内容安全策略）允许 HTTP(S) 远程封面，但脚本、接口连接和表单仍限制在本站。
+
 完成后确认：
 
 ```text
 https://anime.example.com/login
+```
+
+建议依次人工确认：首页与封面、管理员登录、AI 快速录入进度、JSON 导入导出、SQL 备份下载和恢复。响应头可用以下命令抽查：
+
+```bash
+curl -sSI https://anime.example.com/login | grep -Ei 'strict-transport-security|content-security-policy|x-content-type-options|referrer-policy'
 ```
 
 如果此前在 `.env.local` 中临时填写了 HTTP 地址，请改为最终的 HTTPS 地址并重新部署。

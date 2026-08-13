@@ -1,4 +1,5 @@
 import 'server-only';
+import { isValidCalendarDate } from './date-utils';
 
 const BANGUMI_SEARCH_URL = 'https://api.bgm.tv/v0/search/subjects?limit=10';
 const BANGUMI_SUBJECT_URL = 'https://api.bgm.tv/v0/subjects';
@@ -76,7 +77,8 @@ function parsePositiveInteger(value: unknown): number | undefined {
 function parseDate(value: unknown): string | undefined {
   const match = String(value || '').match(/(\d{4})[-年/.](\d{1,2})[-月/.](\d{1,2})/);
   if (!match) return undefined;
-  return `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+  const date = `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+  return isValidCalendarDate(date) ? date : undefined;
 }
 
 function firstInfoboxValue(subject: BangumiBookSubject, keys: RegExp) {

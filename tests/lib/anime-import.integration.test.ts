@@ -183,9 +183,55 @@ describe('portable data replacement import', () => {
     });
 
     await expect(importPromise).rejects.toBeInstanceOf(importModule.ImportValidationError);
-    await expect(importPromise).rejects.toThrow('必须是 YYYY-MM-DD 格式');
+    await expect(importPromise).rejects.toThrow('必须是有效的 YYYY-MM-DD 公历日期');
 
     expect(listAnimeRows().map((row) => row.title)).toEqual(['应被保留']);
+  });
+
+  it('rejects reversed anime and manga activity dates before replacement', async () => {
+    seedExistingAnime('应继续保留');
+
+    await expect(importModule.importAnimeData({
+      anime: {
+        records: [{
+          title: '顺序错误番剧',
+          startDate: '2026-08-10',
+          endDate: '2026-08-09',
+        }],
+      },
+      manga: {
+        records: [{
+          title: '顺序错误漫画',
+          startDate: '2026-08-10',
+          endDate: '2026-08-09',
+        }],
+      },
+    })).rejects.toThrow('看完日期不能早于开始观看日期');
+
+    expect(listAnimeRows().map((row) => row.title)).toEqual(['应继续保留']);
+  });
+
+  it('rejects impossible note and history dates without replacing existing data', async () => {
+    seedExistingAnime('事务前数据');
+
+    await expect(importModule.importAnimeData({
+      anime: {
+        records: [{
+          id: 1,
+          title: '备注日期错误',
+          notes: [{ episode: 1, content: '错误日期', notedAt: '2026-02-31' }],
+        }],
+      },
+    })).rejects.toThrow('备注日期 必须是有效的 YYYY-MM-DD 公历日期');
+
+    await expect(importModule.importAnimeData({
+      anime: { records: [{ id: 1, title: '观看日期错误' }] },
+      watchHistory: {
+        records: [{ animeId: 1, episode: 1, watchedAt: '2026-02-31T12:00:00.000Z' }],
+      },
+    })).rejects.toThrow('缺少有效的集数或时间');
+
+    expect(listAnimeRows().map((row) => row.title)).toEqual(['事务前数据']);
   });
 
   it('imports manga records with flexible chapter positions', async () => {

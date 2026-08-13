@@ -1,0 +1,11 @@
+# 放入 /etc/nginx/conf.d/animetrack-rate-limits.conf。
+# limit_req_zone 只能位于 Nginx 的 http 上下文，不能写入 server 块。
+
+map $http_upgrade $animetrack_connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+limit_req_zone $binary_remote_addr zone=animetrack_login:10m rate=10r/m;
+limit_req_zone $binary_remote_addr zone=animetrack_ai:10m rate=12r/m;
+limit_req_zone $binary_remote_addr zone=animetrack_data_write:10m rate=6r/m;

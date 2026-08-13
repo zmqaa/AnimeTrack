@@ -4,6 +4,9 @@ import {
   dateKeyToAppDate,
   formatAppDateKey,
   getAppDateTimeParts,
+  isValidCalendarDate,
+  isValidDateTimeString,
+  normalizeDateString,
   shiftDateKey,
 } from '../../lib/date-utils';
 
@@ -35,5 +38,33 @@ describe('application date helpers', () => {
 
   it('rejects malformed date keys', () => {
     expect(() => shiftDateKey('2026/07/25', 1)).toThrow('无效日期键');
+    expect(() => shiftDateKey('2026-02-29', 1)).toThrow('无效日期键');
+    expect(() => dateKeyToAppDate('2026-04-31')).toThrow('无效日期键');
+  });
+
+  it.each([
+    ['2024-02-29', true],
+    ['2000-02-29', true],
+    ['1900-02-29', false],
+    ['2026-02-29', false],
+    ['2026-04-31', false],
+    ['2026-13-01', false],
+    ['0000-01-01', false],
+    ['2026-2-01', false],
+  ])('validates calendar date %s', (value, expected) => {
+    expect(isValidCalendarDate(value)).toBe(expected);
+  });
+
+  it('does not normalize an impossible formatted date into another month', () => {
+    expect(normalizeDateString('2026-02-31')).toBeUndefined();
+    expect(normalizeDateString('2026/02/31 12:00:00')).toBeUndefined();
+    expect(normalizeDateString('2024-02-29')).toBe('2024-02-29');
+    expect(normalizeDateString('2024-2-29 12:00:00')).toBe('2024-02-29');
+  });
+
+  it('validates the calendar part of timestamps before parsing them', () => {
+    expect(isValidDateTimeString('2026-08-13T14:30:00.000Z')).toBe(true);
+    expect(isValidDateTimeString('2026-08-13 14:30:00')).toBe(true);
+    expect(isValidDateTimeString('2026-02-31T14:30:00.000Z')).toBe(false);
   });
 });

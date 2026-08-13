@@ -48,6 +48,18 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function isValidCalendarDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1 || month < 1 || month > 12 || day < 1) return false;
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return day <= days[month - 1];
+}
+
 function normalizeTitleForExactMatch(value) {
   return String(value || '')
     .normalize('NFKC')
@@ -269,9 +281,9 @@ function extractIsFinished(detail) {
   if (!Array.isArray(detail?.infobox)) return null;
   const endEntry = detail.infobox.find(i => i.key === '播放结束' || i.key === '放送结束');
   if (!endEntry?.value) return null;
-  const dateStr = String(endEntry.value).replace(/(\d{4})年(\d{1,2})月(\d{1,2})日/, '$1-$2-$3');
-  const endDate = new Date(dateStr);
-  if (isNaN(endDate.getTime())) return null;
+  const dateStr = extractPremiereDate({ date: endEntry.value });
+  if (!dateStr) return null;
+  const endDate = new Date(`${dateStr}T00:00:00Z`);
   return endDate < new Date() ? 1 : 0;
 }
 
@@ -283,10 +295,10 @@ function extractPremiereDate(subject, detail) {
   const raw = detail?.date || subject?.date;
   if (!raw) return null;
   const trimmed = String(raw).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
-  const parsed = new Date(trimmed);
-  if (isNaN(parsed.getTime())) return null;
-  return parsed.toISOString().slice(0, 10);
+  const match = trimmed.match(/^(\d{4})[-年/.](\d{1,2})[-月/.](\d{1,2})/);
+  if (!match) return null;
+  const normalized = `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+  return isValidCalendarDate(normalized) ? normalized : null;
 }
 
 // ─── 主流程 ─────────────────────────────────────────────────────────────────

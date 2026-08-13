@@ -4,7 +4,8 @@ import { backfillMissingAnimeStartDates } from './anime-start-date';
 import { clearAllCoverImages } from './cover-image';
 import type { AnimeStatus, CreateAnimeDTO } from './anime';
 import type { CreateMangaDTO, MangaPublicationStatus, MangaReadingStatus } from './manga';
-import { nowISO } from './date-utils';
+import { getAnimeDateOrderIssue, getMangaDateOrderIssue } from './date-validation';
+import { isValidCalendarDate, isValidDateTimeString, nowISO } from './date-utils';
 
 const VALID_STATUSES = new Set<AnimeStatus>(['watching', 'completed', 'dropped', 'plan_to_watch']);
 const VALID_MANGA_STATUSES = new Set<MangaReadingStatus>([
@@ -13,7 +14,6 @@ const VALID_MANGA_STATUSES = new Set<MangaReadingStatus>([
 const VALID_MANGA_PUBLICATION_STATUSES = new Set<MangaPublicationStatus>([
   'ongoing', 'completed', 'hiatus', 'unknown',
 ]);
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export class ImportValidationError extends Error {
   constructor(message: string) {
@@ -122,9 +122,8 @@ function optionalBoolean(value: unknown, field: string): boolean | undefined {
 function optionalDate(value: unknown, field: string): string | undefined {
   const normalized = optionalString(value, 10, field);
   if (!normalized) return undefined;
-  const parsed = new Date(`${normalized}T00:00:00Z`);
-  if (!DATE_PATTERN.test(normalized) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== normalized) {
-    throw new ImportValidationError(`${field} 必须是 YYYY-MM-DD 格式`);
+  if (!isValidCalendarDate(normalized)) {
+    throw new ImportValidationError(`${field} 必须是有效的 YYYY-MM-DD 公历日期`);
   }
   return normalized;
 }
@@ -144,8 +143,7 @@ function stringArray(value: unknown, field: string): string[] | undefined {
 
 function normalizeTimestamp(value: unknown, fallback: string): string {
   if (typeof value !== 'string' || !value.trim()) return fallback;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? fallback : value.trim();
+  return isValidDateTimeString(value) ? value.trim() : fallback;
 }
 
 function normalizeNotes(
@@ -224,6 +222,11 @@ function normalizeAnime(item: ImportAnimeItem, index: number): NormalizedAnime {
   const portableCoverUrl = importedCoverUrl && /^https?:\/\//i.test(importedCoverUrl)
     ? importedCoverUrl
     : undefined;
+  const startDate = optionalDate(item.startDate, `${title} 的开始日期`);
+  const endDate = optionalDate(item.endDate, `${title} 的结束日期`);
+  const premiereDate = optionalDate(item.premiereDate, `${title} 的首播日期`);
+  const dateOrderIssue = getAnimeDateOrderIssue({ startDate, endDate });
+  if (dateOrderIssue) throw new ImportValidationError(`${title} 的${dateOrderIssue.message}`);
   return {
     sourceId: item.id,
     payload: {
@@ -241,10 +244,10 @@ function normalizeAnime(item: ImportAnimeItem, index: number): NormalizedAnime {
       cast: stringArray(item.cast, `${title} 的声优`),
       castAliases: stringArray(item.castAliases, `${title} 的声优别名`),
       summary: optionalString(item.summary, 10000, `${title} 的简介`),
-      startDate: optionalDate(item.startDate, `${title} 的开始日期`),
+      startDate,
       startDateSource: item.startDateSource === 'history' ? 'history' : undefined,
-      endDate: optionalDate(item.endDate, `${title} 的结束日期`),
-      premiereDate: optionalDate(item.premiereDate, `${title} 的首播日期`),
+      endDate,
+      premiereDate,
       isFinished: optionalBoolean(item.isFinished, `${title} 的完结状态`),
     },
     episodeNotes: normalizedNotes.episodeNotes,
@@ -266,6 +269,11 @@ function normalizeManga(item: ImportMangaItem, index: number): NormalizedManga {
   }
   const now = nowISO();
   const importedCoverUrl = optionalString(item.coverUrl, 2000, `${title} 的封面地址`);
+  const startDate = optionalDate(item.startDate, `${title} 的开始日期`);
+  const endDate = optionalDate(item.endDate, `${title} 的读完日期`);
+  const releaseDate = optionalDate(item.releaseDate, `${title} 的发行日期`);
+  const dateOrderIssue = getMangaDateOrderIssue({ startDate, endDate });
+  if (dateOrderIssue) throw new ImportValidationError(`${title} 的${dateOrderIssue.message}`);
   return {
     sourceId: item.id,
     payload: {
@@ -288,9 +296,9 @@ function normalizeManga(item: ImportMangaItem, index: number): NormalizedManga {
       illustrators: stringArray(item.illustrators, `${title} 的作画`) || [],
       publishers: stringArray(item.publishers, `${title} 的出版社`) || [],
       serializations: stringArray(item.serializations, `${title} 的连载平台`) || [],
-      startDate: optionalDate(item.startDate, `${title} 的开始日期`),
-      endDate: optionalDate(item.endDate, `${title} 的读完日期`),
-      releaseDate: optionalDate(item.releaseDate, `${title} 的发行日期`),
+      startDate,
+      endDate,
+      releaseDate,
     },
     createdAt: normalizeTimestamp(item.createdAt, now),
     updatedAt: normalizeTimestamp(item.updatedAt, now),
@@ -432,7 +440,7 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
       if (!item || typeof item !== 'object') throw new ImportValidationError(`第 ${index + 1} 条观看历史格式无效`);
       const episode = optionalNumber(item.episode, `第 ${index + 1} 条历史的集数`, { min: 1, integer: true });
       const watchedAt = optionalString(item.watchedAt, 100, `第 ${index + 1} 条历史的时间`);
-      if (!episode || !watchedAt || Number.isNaN(new Date(watchedAt).getTime())) {
+      if (!episode || !watchedAt || !isValidDateTimeString(watchedAt)) {
         throw new ImportValidationError(`第 ${index + 1} 条观看历史缺少有效的集数或时间`);
       }
 

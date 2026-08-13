@@ -5,6 +5,7 @@ import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
 import { resolveLocalCoverImage } from '@/lib/cover-image';
 import { patchAnimeBodySchema } from '@/lib/validations';
 import { nowISO } from '@/lib/date-utils';
+import { getAnimeDateOrderIssue } from '@/lib/date-validation';
 import { listAnimeNotes } from '@/lib/anime-notes';
 
 function areAllowedFieldValuesEqual(key: string, nextValue: unknown, currentValue: unknown) {
@@ -145,6 +146,12 @@ export async function PATCH(
       updateData.endDate = nowISO().slice(0, 10);
     }
   }
+
+  const dateOrderIssue = getAnimeDateOrderIssue({
+    startDate: updateData.startDate !== undefined ? updateData.startDate : before.startDate,
+    endDate: updateData.endDate !== undefined ? updateData.endDate : before.endDate,
+  });
+  if (dateOrderIssue) return apiError(dateOrderIssue.message, 400);
 
   // 如果更新了 coverUrl，同步下载封面到本地
   if (updateData.coverUrl !== undefined) {
