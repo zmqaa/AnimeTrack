@@ -56,6 +56,7 @@ describe('portable JSON export', () => {
       startDateSource: 'history',
       tags: ['TV', '漫画改', '2026', '2026年7月', '日常'],
     });
+    expect(result).not.toHaveProperty('users');
   });
 
   it('exports manga records without inventing reading history', () => {

@@ -1,11 +1,11 @@
 /**
  * 全量数据备份脚本（SQLite 版本）
  *
- * 导出 anime + anime_notes + watch_history + manga + users 表为 SQL INSERT 文件。
+ * 导出 anime + anime_notes + watch_history + manga 表为 SQL INSERT 文件。
+ * 管理员账号不属于业务数据，不导出 users 表。
  *
  * 用法：
  *   node scripts/db/export_full_backup.js                 # 默认输出到 backups/
- *   node scripts/db/export_full_backup.js --no-users      # 不包含 users 表
  *   node scripts/db/export_full_backup.js -o path/to.sql  # 指定输出路径
  */
 const fs = require('fs');
@@ -36,10 +36,12 @@ function buildInsert(table, columns, row) {
 function parseArgs() {
   const args = process.argv.slice(2);
   let outputFile = null;
-  let includeUsers = true;
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--no-users') {
-      includeUsers = false;
+    if (args[i] === '--include-users') {
+      throw new Error('不支持导出管理员账号；账号丢失时请使用 user:create-admin 重新创建');
+    } else if (args[i] === '--no-users') {
+      // 兼容旧命令；账号现在默认排除。
+      continue;
     } else if (args[i] === '-o' && args[i + 1]) {
       outputFile = path.resolve(args[++i]);
     } else if (!args[i].startsWith('-')) {
@@ -51,11 +53,11 @@ function parseArgs() {
     ensurePrivateDirectory(backupsDir);
     outputFile = path.join(backupsDir, `full-backup-${ts}.sql`);
   }
-  return { outputFile, includeUsers };
+  return { outputFile };
 }
 
 async function main() {
-  const { outputFile, includeUsers } = parseArgs();
+  const { outputFile } = parseArgs();
   const db = getDb();
 
   try {
@@ -89,18 +91,12 @@ async function main() {
       'createdAt', 'updatedAt',
     ];
 
-    // users (optional)
-    let userRows = [];
-    const userColumns = ['id', 'username', 'password_hash', 'name', 'role', 'createdAt', 'updatedAt'];
-    if (includeUsers) {
-      userRows = db.prepare('SELECT id, username, password_hash, name, role, createdAt, updatedAt FROM users ORDER BY id ASC').all();
-    }
-
     const lines = [
       '-- Full database backup (export_full_backup.js)',
       `-- Source: SQLite database`,
       `-- Generated: ${nowCSTReadable()} (UTC+8)`,
-      `-- Tables: anime (${animeRows.length}), anime_notes (${noteRows.length} episode notes), watch_history (${historyRows.length}), manga (${mangaRows.length})${includeUsers ? `, users (${userRows.length})` : ''}`,
+      `-- Tables: anime (${animeRows.length}), anime_notes (${noteRows.length} episode notes), watch_history (${historyRows.length}), manga (${mangaRows.length})`,
+      '-- Accounts: not exported; restoring this file preserves existing users.',
       '',
       'DELETE FROM anime_notes;',
       'DELETE FROM watch_history;',
@@ -131,16 +127,6 @@ async function main() {
       lines.push(buildInsert('manga', mangaColumns, row));
     }
 
-    if (includeUsers && userRows.length > 0) {
-      lines.push('');
-      lines.push('-- users');
-      lines.push('DELETE FROM users;');
-      lines.push('');
-      for (const row of userRows) {
-        lines.push(buildInsert('users', userColumns, row));
-      }
-    }
-
     // Update sqlite_sequence
     lines.push('');
     if (animeRows.length > 0) {
@@ -151,9 +137,6 @@ async function main() {
     }
     if (mangaRows.length > 0) {
       lines.push(`UPDATE sqlite_sequence SET seq = ${Number(mangaRows[mangaRows.length - 1].id)} WHERE name = 'manga';`);
-    }
-    if (userRows.length > 0) {
-      lines.push(`UPDATE sqlite_sequence SET seq = ${Number(userRows[userRows.length - 1].id)} WHERE name = 'users';`);
     }
     lines.push('');
 
@@ -168,7 +151,7 @@ async function main() {
     console.log(`  anime_notes:   ${noteRows.length} episode note rows`);
     console.log(`  watch_history: ${historyRows.length} rows`);
     console.log(`  manga:         ${mangaRows.length} rows`);
-    if (includeUsers) console.log(`  users:         ${userRows.length} rows`);
+    console.log('  users:         not exported (recreate administrators when needed)');
   } finally {
     db.close();
   }

@@ -131,11 +131,13 @@ curl.exe -sS -o NUL -w "HTTP %{http_code} 连接 %{time_connect}s 总计 %{time_
 | `npm run lint` | 运行 ESLint |
 | `npm test` | 运行测试 |
 | `npm run build:next` | 执行 Next.js 生产构建 |
-| `npm run db:full-backup` | 导出完整 SQL 备份 |
+| `npm run db:full-backup` | 导出不含管理员账号的完整数据 SQL 备份 |
 | `npm run db:scheduled-json-backup` | 生成可回导的 JSON 备份并自动轮转 |
 | `npm run user:create-admin -- <用户名> <密码> [显示名]` | 创建或更新管理员 |
 
 其他数据库、封面和元数据维护命令见 `package.json`。
+
+`db:full-backup` 不导出 `users` 表，恢复时会保留目标数据库中已有的管理员账号。完整 SQL 可通过 `npm run db:apply-sql -- <备份文件>` 恢复；如果账号丢失，使用 `npm run user:create-admin -- <用户名> <密码> [显示名]` 重新创建即可。JSON 便携备份同样不包含账号。
 
 ## 服务器定时 JSON 备份
 

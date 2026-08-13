@@ -266,6 +266,14 @@ backups/
 
 至少应定期备份 `data/animetrack.db` 和 `public/covers/`。完整 JSON 备份默认写入 `backups/json/`，不包含管理员账号和本地封面文件。
 
+需要生成便于数据库维护的完整 SQL 时，可执行：
+
+```bash
+npm run db:full-backup
+```
+
+该命令不导出 `users` 表，恢复时保留目标数据库已有账号。使用 `npm run db:apply-sql -- <备份文件>` 恢复即可；如果管理员账号丢失，执行 `npm run user:create-admin -- <用户名> <密码> [显示名]` 重新创建。JSON 便携备份同样不包含账号。
+
 ## 常见问题
 
 ### `npm run deploy:prod` 提示 Git 工作区不干净

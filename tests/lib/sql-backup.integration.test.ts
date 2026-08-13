@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -179,5 +179,85 @@ describe('scheduled SQL backup', () => {
     ].join('\n');
 
     expect(() => validateBackupSql(sql)).toThrow('备份文件缺少漫画清理语句');
+  });
+});
+
+describe('full SQL backup account policy', () => {
+  function createSourceDatabase(directory: string) {
+    const sourcePath = join(directory, 'source.db');
+    const source = new Database(sourcePath);
+    source.exec(schema);
+    source.prepare(`
+      INSERT INTO anime (id, title, status, progress, createdAt, updatedAt)
+      VALUES (1, '全量备份测试', 'watching', 2, '2026-08-13T00:00:00.000Z', '2026-08-13T00:00:00.000Z')
+    `).run();
+    source.prepare(`
+      INSERT INTO users (id, username, password_hash, name, role, createdAt, updatedAt)
+      VALUES (1, 'source-admin', 'source-password-hash', '源管理员', 'admin',
+        '2026-08-13T00:00:00.000Z', '2026-08-13T00:00:00.000Z')
+    `).run();
+    source.close();
+    return sourcePath;
+  }
+
+  function exportFullBackup(sourcePath: string, outputPath: string) {
+    const args = [join(projectRoot, 'scripts/db/export_full_backup.js'), '-o', outputPath];
+
+    const result = spawnSync(process.execPath, args, {
+      cwd: projectRoot,
+      env: { ...process.env, DB_PATH: sourcePath },
+      encoding: 'utf8',
+    });
+    expect(result.status, result.stderr).toBe(0);
+    return result;
+  }
+
+  it('never exports account credentials and preserves target accounts on restore', () => {
+    const directory = makeTemporaryDirectory();
+    const sourcePath = createSourceDatabase(directory);
+    const backupPath = join(directory, 'default-full-backup.sql');
+
+    const result = exportFullBackup(sourcePath, backupPath);
+    const sql = readFileSync(backupPath, 'utf8');
+    expect(sql).not.toContain('password_hash');
+    expect(sql).not.toMatch(/(?:DELETE FROM|INSERT INTO) users/i);
+    expect(sql).not.toContain('source-password-hash');
+    expect(result.stdout).toContain('users:         not exported');
+
+    const restored = new Database(join(directory, 'default-restored.db'));
+    restored.exec(schema);
+    restored.prepare(`
+      INSERT INTO users (username, password_hash, name, role)
+      VALUES ('target-admin', 'target-password-hash', '目标管理员', 'admin')
+    `).run();
+    restored.exec(sql);
+
+    expect(restored.prepare('SELECT title FROM anime').pluck().all()).toEqual(['全量备份测试']);
+    expect(restored.prepare('SELECT username, password_hash FROM users').get()).toEqual({
+      username: 'target-admin',
+      password_hash: 'target-password-hash',
+    });
+    restored.close();
+  });
+
+  it('rejects the removed --include-users option', () => {
+    const directory = makeTemporaryDirectory();
+    const sourcePath = createSourceDatabase(directory);
+    const backupPath = join(directory, 'account-full-backup.sql');
+
+    const result = spawnSync(process.execPath, [
+      join(projectRoot, 'scripts/db/export_full_backup.js'),
+      '--include-users',
+      '-o',
+      backupPath,
+    ], {
+      cwd: projectRoot,
+      env: { ...process.env, DB_PATH: sourcePath },
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('不支持导出管理员账号');
+    expect(() => readFileSync(backupPath, 'utf8')).toThrow();
   });
 });
