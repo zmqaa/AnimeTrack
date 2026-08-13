@@ -8,6 +8,13 @@ import { uniqueStrings } from '@/lib/anime-cast';
 import type { AnimeRecord } from '@/lib/anime';
 import type { ParsedQuickRecordIntent } from '@/lib/ai';
 
+export class QuickRecordValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'QuickRecordValidationError';
+  }
+}
+
 // ── 重刷 (rewatch) 工具 ──
 
 export function parseRewatchCountToken(token: string): number | undefined {
@@ -77,7 +84,7 @@ export function validateSeasonSelection(rawText: string, parsed: Pick<ParsedQuic
   );
 
   if (!userNamedOfficialEntry) {
-    throw new Error('没有明确指定季度，已停止录入，避免误识别为续作');
+    throw new QuickRecordValidationError('没有明确指定季度，已停止录入，避免误识别为续作');
   }
 }
 

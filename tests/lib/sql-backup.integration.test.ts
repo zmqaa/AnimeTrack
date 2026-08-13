@@ -7,6 +7,7 @@ import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  BackupValidationError,
   prepareBackupSqlForRestore,
   validateBackupSql,
 } from '../../lib/sql-backup-validation';
@@ -154,6 +155,7 @@ describe('scheduled SQL backup', () => {
       'DELETE FROM anime;',
     ].join('\n');
 
+    expect(() => validateBackupSql(sql)).toThrow(BackupValidationError);
     expect(() => validateBackupSql(sql)).toThrow('备份文件包含不允许执行的 SQL 语句');
   });
 

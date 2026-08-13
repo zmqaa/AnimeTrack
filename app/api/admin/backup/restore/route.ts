@@ -3,11 +3,11 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
-import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
+import { apiError, apiInternalError, apiSuccess, requireAdmin } from '@/lib/api-response';
 import { getRawDb } from '@/lib/db';
 import { getBackupsDirectory, getDatabasePath } from '@/lib/runtime-paths';
 import { clearAllCoverImages } from '@/lib/cover-image';
-import { prepareBackupSqlForRestore } from '@/lib/sql-backup-validation';
+import { BackupValidationError, prepareBackupSqlForRestore } from '@/lib/sql-backup-validation';
 
 const execFileAsync = promisify(execFile);
 
@@ -17,8 +17,14 @@ export async function POST(request: NextRequest) {
     return auth.response;
   }
 
+  let body: { name?: unknown };
   try {
-    const body = await request.json() as { name?: unknown };
+    body = await request.json() as { name?: unknown };
+  } catch {
+    return apiError('请求内容不是有效的 JSON', 400);
+  }
+
+  try {
     if (typeof body.name !== 'string') {
       return apiError('缺少备份文件名', 400);
     }
@@ -75,7 +81,12 @@ export async function POST(request: NextRequest) {
       mangaCount,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : '恢复备份失败';
-    return apiError(message, 500);
+    if (error instanceof BackupValidationError) {
+      return apiError(error.message, 400);
+    }
+    return apiInternalError(error, {
+      operation: '恢复数据库备份',
+      message: '恢复备份失败，请检查服务器日志后确认当前数据状态',
+    });
   }
 }

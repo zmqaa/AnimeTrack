@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 
 import { normalizeStringArray } from '@/lib/anime-cast';
-import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
+import { apiError, apiInternalError, apiSuccess, requireAdmin } from '@/lib/api-response';
 import {
   createMangaRecord,
   listMangaRecords,
@@ -71,8 +71,9 @@ export async function POST(request: Request) {
     if (/UNIQUE constraint failed: manga\.bangumi_id/i.test(message)) {
       return apiError('这部 Bangumi 漫画已经加入书架', 409);
     }
-    console.error('Manga create error:', error);
-    return apiError(message, 500);
+    return apiInternalError(error, {
+      operation: '创建漫画记录',
+      message: '创建漫画失败，请稍后重试',
+    });
   }
 }
-

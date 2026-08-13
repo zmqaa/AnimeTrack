@@ -1,4 +1,4 @@
-import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
+import { apiError, apiInternalError, apiSuccess, requireAdmin } from '@/lib/api-response';
 import { createAiRuntimeConfig, requestAiJson } from '@/lib/ai-runtime';
 
 export async function POST() {
@@ -34,6 +34,10 @@ export async function POST() {
       elapsedMs: Date.now() - startedAt,
     });
   } catch (error) {
-    return apiError(error instanceof Error ? error.message : 'AI 连接测试失败', 500);
+    return apiInternalError(error, {
+      operation: '测试 AI 连接',
+      message: 'AI 连接测试失败，请检查配置或稍后重试',
+      status: 502,
+    });
   }
 }

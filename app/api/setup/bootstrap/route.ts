@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { getRawDb } from '@/lib/db';
-import { apiError, apiSuccess } from '@/lib/api-response';
+import { apiError, apiInternalError, apiSuccess, logApiInternalError } from '@/lib/api-response';
 
 type SetupStatus = {
   allowed: boolean;
@@ -66,12 +66,13 @@ async function getSetupStatus(): Promise<SetupStatus> {
       missingEnvKeys: [], envFileHint: '环境变量已就绪。',
     };
   } catch (error) {
+    logApiInternalError(error, '读取初始化数据库状态');
     return {
       allowed: true, envReady: true, databaseReachable: false,
       seeded: false, animeCount: 0, historyCount: 0,
-      message: error instanceof Error ? error.message : '读取初始化状态失败。',
+      message: '无法连接数据库，请检查服务器配置和日志。',
       missingEnvKeys: [], envFileHint: '环境变量已就绪，但数据库操作失败。',
-      databaseError: error instanceof Error ? error.message : '未知数据库错误。',
+      databaseError: '数据库暂时不可用。',
     };
   }
 }
@@ -102,7 +103,9 @@ export async function POST() {
     const status = await getSetupStatus();
     return apiSuccess({ ok: true, status });
   } catch (error) {
-    const message = error instanceof Error ? error.message : '初始化失败';
-    return apiError(message, 500);
+    return apiInternalError(error, {
+      operation: '初始化数据库',
+      message: '初始化失败，请检查服务器日志',
+    });
   }
 }

@@ -1,5 +1,12 @@
 const BACKUP_HEADER = '-- Scheduled backup (scheduled_backup.js)';
 
+export class BackupValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'BackupValidationError';
+  }
+}
+
 export function splitSqlStatements(sql: string): string[] {
   const statements: string[] = [];
   let current = '';
@@ -28,7 +35,7 @@ export function splitSqlStatements(sql: string): string[] {
   }
 
   if (inString) {
-    throw new Error('备份文件中的 SQL 字符串不完整');
+    throw new BackupValidationError('备份文件中的 SQL 字符串不完整');
   }
   if (current.trim()) statements.push(current.trim());
   return statements;
@@ -36,7 +43,7 @@ export function splitSqlStatements(sql: string): string[] {
 
 export function validateBackupSql(sql: string): void {
   if (!sql.startsWith(BACKUP_HEADER)) {
-    throw new Error('只能恢复由应用创建的 SQL 备份');
+    throw new BackupValidationError('只能恢复由应用创建的 SQL 备份');
   }
 
   const statements = splitSqlStatements(sql);
@@ -65,7 +72,7 @@ export function validateBackupSql(sql: string): void {
       normalized.startsWith('INSERT INTO MANGA ');
 
     if (!allowed) {
-      throw new Error('备份文件包含不允许执行的 SQL 语句');
+      throw new BackupValidationError('备份文件包含不允许执行的 SQL 语句');
     }
 
     if (normalized === 'DELETE FROM ANIME') deletesAnime = true;
@@ -77,13 +84,13 @@ export function validateBackupSql(sql: string): void {
   }
 
   if (executableCount < 2 || !deletesAnime || !deletesHistory) {
-    throw new Error('备份文件内容为空或不完整');
+    throw new BackupValidationError('备份文件内容为空或不完整');
   }
   if (insertsNotes && !deletesNotes) {
-    throw new Error('备份文件缺少备注清理语句');
+    throw new BackupValidationError('备份文件缺少备注清理语句');
   }
   if (insertsManga && !deletesManga) {
-    throw new Error('备份文件缺少漫画清理语句');
+    throw new BackupValidationError('备份文件缺少漫画清理语句');
   }
 }
 

@@ -1,4 +1,4 @@
-import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
+import { apiSuccess, apiError, apiInternalError, requireAdmin } from '@/lib/api-response';
 import { deleteAnimeRecords, listAnimeRecordsWithLastWatched } from '@/lib/anime';
 import { query } from '@/lib/db';
 
@@ -28,8 +28,11 @@ export async function GET(request: Request) {
     const total = Number(totalResult[0]?.total ?? 0);
     return apiSuccess({ records: all, total, page, pageSize });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : '读取失败';
-    return apiError(message);
+    return apiInternalError(error, {
+      operation: '读取后台动漫列表',
+      message: '读取动漫列表失败，请稍后重试',
+      context: { page, pageSize, hasSearch: Boolean(search) },
+    });
   }
 }
 
@@ -50,7 +53,10 @@ export async function DELETE(request: Request) {
     const deleted = await deleteAnimeRecords(ids);
     return apiSuccess({ deleted });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : '删除失败';
-    return apiError(message);
+    return apiInternalError(error, {
+      operation: '批量删除动漫',
+      message: '删除动漫失败，请稍后重试',
+      context: { recordCount: ids.length },
+    });
   }
 }

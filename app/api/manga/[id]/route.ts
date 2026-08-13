@@ -1,5 +1,5 @@
 import { normalizeStringArray } from '@/lib/anime-cast';
-import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
+import { apiError, apiInternalError, apiSuccess, requireAdmin } from '@/lib/api-response';
 import {
   deleteMangaRecord,
   getMangaRecord,
@@ -60,7 +60,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (/UNIQUE constraint failed: manga\.bangumi_id/i.test(message)) {
       return apiError('该 Bangumi 条目已经关联到另一部漫画', 409);
     }
-    return apiError(message, 500);
+    return apiInternalError(error, {
+      operation: '更新漫画记录',
+      message: '更新漫画失败，请稍后重试',
+      context: { mangaId: id },
+    });
   }
 }
 

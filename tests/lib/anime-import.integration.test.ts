@@ -171,7 +171,7 @@ describe('portable data replacement import', () => {
   it('keeps existing data when validation fails before replacement', async () => {
     seedExistingAnime('应被保留');
 
-    await expect(importModule.importAnimeData({
+    const importPromise = importModule.importAnimeData({
       anime: {
         records: [{
           id: 1,
@@ -180,7 +180,10 @@ describe('portable data replacement import', () => {
           premiereDate: '2026-02-30',
         }],
       },
-    })).rejects.toThrow('必须是 YYYY-MM-DD 格式');
+    });
+
+    await expect(importPromise).rejects.toBeInstanceOf(importModule.ImportValidationError);
+    await expect(importPromise).rejects.toThrow('必须是 YYYY-MM-DD 格式');
 
     expect(listAnimeRows().map((row) => row.title)).toEqual(['应被保留']);
   });

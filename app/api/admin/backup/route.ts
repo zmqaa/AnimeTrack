@@ -3,7 +3,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
-import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
+import { apiError, apiInternalError, apiSuccess, requireAdmin } from '@/lib/api-response';
 import { getBackupsDirectory, getDatabasePath } from '@/lib/runtime-paths';
 
 const execFileAsync = promisify(execFile);
@@ -16,24 +16,31 @@ export async function GET() {
     return auth.response;
   }
 
-  const backupsDirectory = getBackupsDirectory();
-  if (!fs.existsSync(backupsDirectory)) {
-    return apiSuccess({ backups: [] });
+  try {
+    const backupsDirectory = getBackupsDirectory();
+    if (!fs.existsSync(backupsDirectory)) {
+      return apiSuccess({ backups: [] });
+    }
+
+    const files = fs.readdirSync(backupsDirectory)
+      .filter((f) => f.endsWith('.sql'))
+      .map((name) => {
+        const stat = fs.statSync(path.join(backupsDirectory, name));
+        return {
+          name,
+          size: stat.size,
+          createdAt: stat.mtime.toISOString(),
+        };
+      })
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+
+    return apiSuccess({ backups: files });
+  } catch (error) {
+    return apiInternalError(error, {
+      operation: '读取备份列表',
+      message: '读取备份列表失败，请稍后重试',
+    });
   }
-
-  const files = fs.readdirSync(backupsDirectory)
-    .filter((f) => f.endsWith('.sql'))
-    .map((name) => {
-      const stat = fs.statSync(path.join(backupsDirectory, name));
-      return {
-        name,
-        size: stat.size,
-        createdAt: stat.mtime.toISOString(),
-      };
-    })
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-
-  return apiSuccess({ backups: files });
 }
 
 /** POST — create a new backup */
@@ -73,8 +80,10 @@ export async function POST() {
 
     return apiSuccess({ success: true, backup: fileInfo, output });
   } catch (err) {
-    const message = err instanceof Error ? err.message : '备份失败';
-    return apiError(message, 500);
+    return apiInternalError(err, {
+      operation: '创建数据库备份',
+      message: '创建备份失败，请检查服务器日志',
+    });
   }
 }
 
@@ -85,7 +94,12 @@ export async function DELETE(request: NextRequest) {
     return auth.response;
   }
 
-  const { name } = await request.json();
+  let name: unknown;
+  try {
+    ({ name } = await request.json() as { name?: unknown });
+  } catch {
+    return apiError('请求内容不是有效的 JSON', 400);
+  }
   if (!name || typeof name !== 'string') {
     return apiError('缺少文件名', 400);
   }
@@ -96,11 +110,18 @@ export async function DELETE(request: NextRequest) {
     return apiError('无效的文件名', 400);
   }
 
-  const filePath = path.join(getBackupsDirectory(), baseName);
-  if (!fs.existsSync(filePath)) {
-    return apiError('文件不存在', 404);
-  }
+  try {
+    const filePath = path.join(getBackupsDirectory(), baseName);
+    if (!fs.existsSync(filePath)) {
+      return apiError('文件不存在', 404);
+    }
 
-  fs.unlinkSync(filePath);
-  return apiSuccess({ success: true });
+    fs.unlinkSync(filePath);
+    return apiSuccess({ success: true });
+  } catch (error) {
+    return apiInternalError(error, {
+      operation: '删除数据库备份',
+      message: '删除备份失败，请稍后重试',
+    });
+  }
 }

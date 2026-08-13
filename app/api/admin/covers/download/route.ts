@@ -1,4 +1,4 @@
-import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
+import { apiInternalError, apiSuccess, requireAdmin } from '@/lib/api-response';
 import { downloadAllRemoteCovers } from '@/lib/cover-batch';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +12,9 @@ export async function POST() {
     const result = await downloadAllRemoteCovers();
     return apiSuccess(result);
   } catch (error) {
-    const message = error instanceof Error ? error.message : '批量下载封面失败';
-    return apiError(message, 500);
+    return apiInternalError(error, {
+      operation: '批量下载远程封面',
+      message: '批量下载封面失败，请稍后重试',
+    });
   }
 }

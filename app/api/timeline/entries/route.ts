@@ -1,4 +1,4 @@
-import { apiError, apiSuccess } from '@/lib/api-response';
+import { apiInternalError, apiSuccess } from '@/lib/api-response';
 import { getTimelineEntries } from '@/lib/timeline-queries';
 import type { TimelineSortBy } from '@/lib/timeline-types';
 
@@ -24,7 +24,10 @@ export async function GET(request: Request) {
     });
     return apiSuccess(result, 200, { 'Cache-Control': 'no-store' });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : '读取时间线明细失败';
-    return apiError(message);
+    return apiInternalError(error, {
+      operation: '读取时间线明细',
+      message: '读取时间线明细失败，请稍后重试',
+      context: { page, pageSize, sortBy, hasSearch: Boolean(searchParams.get('search')) },
+    });
   }
 }

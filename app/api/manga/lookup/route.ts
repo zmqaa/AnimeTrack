@@ -1,4 +1,4 @@
-import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
+import { apiError, apiSuccess, logApiInternalError, requireAdmin } from '@/lib/api-response';
 import { lookupMangaTitle, type MangaLookupResult } from '@/lib/manga-lookup';
 
 const MAX_TITLES = 10;
@@ -31,10 +31,11 @@ export async function POST(request: Request) {
   }
 
   const results: MangaLookupResult[] = [];
-  for (const title of titles) {
+  for (const [index, title] of titles.entries()) {
     try {
       results.push(await lookupMangaTitle(title));
     } catch (error) {
+      logApiInternalError(error, '查询漫画外部资料', { itemIndex: index + 1 });
       results.push({
         input: title,
         selected: null,
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
         confidence: null,
         method: 'none',
         needsConfirmation: false,
-        reason: error instanceof Error ? error.message : '漫画资料查询失败',
+        reason: '漫画资料查询暂时失败，请稍后重试',
         candidates: [],
         warnings: ['本次查询失败，没有写入任何数据'],
       });
@@ -51,4 +52,3 @@ export async function POST(request: Request) {
 
   return apiSuccess({ results });
 }
-

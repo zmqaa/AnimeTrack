@@ -15,6 +15,13 @@ const VALID_MANGA_PUBLICATION_STATUSES = new Set<MangaPublicationStatus>([
 ]);
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+export class ImportValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ImportValidationError';
+  }
+}
+
 export interface ImportAnimeItem {
   id?: number | string;
   title: string;
@@ -84,10 +91,10 @@ type NormalizedManga = {
 
 function optionalString(value: unknown, maxLength: number, field: string): string | undefined {
   if (value === null || value === undefined || value === '') return undefined;
-  if (typeof value !== 'string') throw new Error(`${field} 必须是字符串`);
+  if (typeof value !== 'string') throw new ImportValidationError(`${field} 必须是字符串`);
   const normalized = value.trim();
   if (!normalized) return undefined;
-  if (normalized.length > maxLength) throw new Error(`${field} 不能超过 ${maxLength} 个字符`);
+  if (normalized.length > maxLength) throw new ImportValidationError(`${field} 不能超过 ${maxLength} 个字符`);
   return normalized;
 }
 
@@ -98,10 +105,10 @@ function optionalNumber(
 ): number | undefined {
   if (value === null || value === undefined || value === '') return undefined;
   const parsed = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(parsed)) throw new Error(`${field} 必须是有效数字`);
-  if (options.integer && !Number.isInteger(parsed)) throw new Error(`${field} 必须是整数`);
-  if (options.min !== undefined && parsed < options.min) throw new Error(`${field} 不能小于 ${options.min}`);
-  if (options.max !== undefined && parsed > options.max) throw new Error(`${field} 不能大于 ${options.max}`);
+  if (!Number.isFinite(parsed)) throw new ImportValidationError(`${field} 必须是有效数字`);
+  if (options.integer && !Number.isInteger(parsed)) throw new ImportValidationError(`${field} 必须是整数`);
+  if (options.min !== undefined && parsed < options.min) throw new ImportValidationError(`${field} 不能小于 ${options.min}`);
+  if (options.max !== undefined && parsed > options.max) throw new ImportValidationError(`${field} 不能大于 ${options.max}`);
   return parsed;
 }
 
@@ -109,7 +116,7 @@ function optionalBoolean(value: unknown, field: string): boolean | undefined {
   if (value === null || value === undefined || value === '') return undefined;
   if (value === true || value === 1 || value === '1' || value === 'true') return true;
   if (value === false || value === 0 || value === '0' || value === 'false') return false;
-  throw new Error(`${field} 必须是布尔值`);
+  throw new ImportValidationError(`${field} 必须是布尔值`);
 }
 
 function optionalDate(value: unknown, field: string): string | undefined {
@@ -117,19 +124,19 @@ function optionalDate(value: unknown, field: string): string | undefined {
   if (!normalized) return undefined;
   const parsed = new Date(`${normalized}T00:00:00Z`);
   if (!DATE_PATTERN.test(normalized) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== normalized) {
-    throw new Error(`${field} 必须是 YYYY-MM-DD 格式`);
+    throw new ImportValidationError(`${field} 必须是 YYYY-MM-DD 格式`);
   }
   return normalized;
 }
 
 function stringArray(value: unknown, field: string): string[] | undefined {
   if (value === null || value === undefined) return undefined;
-  if (!Array.isArray(value)) throw new Error(`${field} 必须是字符串数组`);
-  if (value.length > 100) throw new Error(`${field} 最多包含 100 项`);
+  if (!Array.isArray(value)) throw new ImportValidationError(`${field} 必须是字符串数组`);
+  if (value.length > 100) throw new ImportValidationError(`${field} 最多包含 100 项`);
   const result = Array.from(new Set(value.map((item) => {
-    if (typeof item !== 'string') throw new Error(`${field} 只能包含字符串`);
+    if (typeof item !== 'string') throw new ImportValidationError(`${field} 只能包含字符串`);
     const normalized = item.trim();
-    if (normalized.length > 200) throw new Error(`${field} 的单项不能超过 200 个字符`);
+    if (normalized.length > 200) throw new ImportValidationError(`${field} 的单项不能超过 200 个字符`);
     return normalized;
   }).filter(Boolean)));
   return result.length > 0 ? result : undefined;
@@ -160,9 +167,9 @@ function normalizeNotes(
     };
   }
   if (!Array.isArray(value)) {
-    throw new Error(`${title} 的备注必须是字符串或备注数组`);
+    throw new ImportValidationError(`${title} 的备注必须是字符串或备注数组`);
   }
-  if (value.length > 10000) throw new Error(`${title} 的备注最多包含 10000 条`);
+  if (value.length > 10000) throw new ImportValidationError(`${title} 的备注最多包含 10000 条`);
 
   let overallNote: string | undefined;
   let overallNoteDetails: NormalizedAnime['overallNoteDetails'];
@@ -170,18 +177,18 @@ function normalizeNotes(
   for (let index = 0; index < value.length; index++) {
     const note = value[index];
     if (!note || typeof note !== 'object') {
-      throw new Error(`${title} 的第 ${index + 1} 条备注格式无效`);
+      throw new ImportValidationError(`${title} 的第 ${index + 1} 条备注格式无效`);
     }
     const record = note as Record<string, unknown>;
     const content = optionalString(record.content, 5000, `${title} 的第 ${index + 1} 条备注`);
-    if (!content) throw new Error(`${title} 的第 ${index + 1} 条备注内容为空`);
+    if (!content) throw new ImportValidationError(`${title} 的第 ${index + 1} 条备注内容为空`);
     const episode = optionalNumber(record.episode, `${title} 的第 ${index + 1} 条备注集数`, {
       min: 1,
       max: 9999,
       integer: true,
     });
     if (episode === undefined) {
-      if (overallNote !== undefined) throw new Error(`${title} 只能包含一条总备注`);
+      if (overallNote !== undefined) throw new ImportValidationError(`${title} 只能包含一条总备注`);
       overallNote = content;
       overallNoteDetails = {
         notedAt: optionalDate(record.notedAt, `${title} 的总备注日期`) || fallbackTimestamp.slice(0, 10),
@@ -204,12 +211,12 @@ function normalizeNotes(
 }
 
 function normalizeAnime(item: ImportAnimeItem, index: number): NormalizedAnime {
-  if (!item || typeof item !== 'object') throw new Error(`第 ${index + 1} 部番剧格式无效`);
+  if (!item || typeof item !== 'object') throw new ImportValidationError(`第 ${index + 1} 部番剧格式无效`);
   const title = optionalString(item.title, 500, `第 ${index + 1} 部番剧的标题`);
-  if (!title) throw new Error(`第 ${index + 1} 部番剧缺少标题`);
+  if (!title) throw new ImportValidationError(`第 ${index + 1} 部番剧缺少标题`);
 
   const statusValue = optionalString(item.status, 30, `${title} 的状态`) || 'plan_to_watch';
-  if (!VALID_STATUSES.has(statusValue as AnimeStatus)) throw new Error(`${title} 的状态无效：${statusValue}`);
+  if (!VALID_STATUSES.has(statusValue as AnimeStatus)) throw new ImportValidationError(`${title} 的状态无效：${statusValue}`);
 
   const now = nowISO();
   const normalizedNotes = normalizeNotes(item.notes, title, now);
@@ -248,14 +255,14 @@ function normalizeAnime(item: ImportAnimeItem, index: number): NormalizedAnime {
 }
 
 function normalizeManga(item: ImportMangaItem, index: number): NormalizedManga {
-  if (!item || typeof item !== 'object') throw new Error(`第 ${index + 1} 部漫画格式无效`);
+  if (!item || typeof item !== 'object') throw new ImportValidationError(`第 ${index + 1} 部漫画格式无效`);
   const title = optionalString(item.title, 500, `第 ${index + 1} 部漫画的标题`);
-  if (!title) throw new Error(`第 ${index + 1} 部漫画缺少标题`);
+  if (!title) throw new ImportValidationError(`第 ${index + 1} 部漫画缺少标题`);
   const status = (optionalString(item.status, 30, `${title} 的阅读状态`) || 'plan_to_read') as MangaReadingStatus;
-  if (!VALID_MANGA_STATUSES.has(status)) throw new Error(`${title} 的阅读状态无效：${status}`);
+  if (!VALID_MANGA_STATUSES.has(status)) throw new ImportValidationError(`${title} 的阅读状态无效：${status}`);
   const publicationStatus = (optionalString(item.publicationStatus, 30, `${title} 的连载状态`) || 'unknown') as MangaPublicationStatus;
   if (!VALID_MANGA_PUBLICATION_STATUSES.has(publicationStatus)) {
-    throw new Error(`${title} 的连载状态无效：${publicationStatus}`);
+    throw new ImportValidationError(`${title} 的连载状态无效：${publicationStatus}`);
   }
   const now = nowISO();
   const importedCoverUrl = optionalString(item.coverUrl, 2000, `${title} 的封面地址`);
@@ -323,9 +330,9 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
   const availableDatasets = getAvailableImportDatasets(body);
   const requestedDatasets = parseDatasetList(body.selectedDatasets);
   const selectedDatasets = Array.isArray(body.selectedDatasets) ? requestedDatasets : availableDatasets;
-  if (selectedDatasets.length === 0) throw new Error('请至少选择一类要导入的数据');
+  if (selectedDatasets.length === 0) throw new ImportValidationError('请至少选择一类要导入的数据');
   for (const dataset of selectedDatasets) {
-    if (!availableDatasets.includes(dataset)) throw new Error('导入文件不包含所选的数据');
+    if (!availableDatasets.includes(dataset)) throw new ImportValidationError('导入文件不包含所选的数据');
   }
 
   const importsAnime = selectedDatasets.includes('anime');
@@ -338,7 +345,7 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
 
   if ((importsAnime && (animeRecords.length > 10000 || historyRecords.length > 100000))
     || (importsManga && mangaRecords.length > 10000)) {
-    throw new Error('导入文件过大：番剧和漫画各最多 10000 部，历史最多 100000 条');
+    throw new ImportValidationError('导入文件过大：番剧和漫画各最多 10000 部，历史最多 100000 条');
   }
 
   const normalizedAnime = importsAnime ? animeRecords.map(normalizeAnime) : [];
@@ -347,7 +354,7 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
   for (const item of normalizedAnime) {
     const key = sourceKey(item.sourceId);
     if (!key) continue;
-    if (seenSourceIds.has(key)) throw new Error(`导入文件包含重复的番剧 ID：${key}`);
+    if (seenSourceIds.has(key)) throw new ImportValidationError(`导入文件包含重复的番剧 ID：${key}`);
     seenSourceIds.add(key);
   }
 
@@ -422,11 +429,11 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
 
     for (let index = 0; importsAnime && index < historyRecords.length; index++) {
       const item = historyRecords[index];
-      if (!item || typeof item !== 'object') throw new Error(`第 ${index + 1} 条观看历史格式无效`);
+      if (!item || typeof item !== 'object') throw new ImportValidationError(`第 ${index + 1} 条观看历史格式无效`);
       const episode = optionalNumber(item.episode, `第 ${index + 1} 条历史的集数`, { min: 1, integer: true });
       const watchedAt = optionalString(item.watchedAt, 100, `第 ${index + 1} 条历史的时间`);
       if (!episode || !watchedAt || Number.isNaN(new Date(watchedAt).getTime())) {
-        throw new Error(`第 ${index + 1} 条观看历史缺少有效的集数或时间`);
+        throw new ImportValidationError(`第 ${index + 1} 条观看历史缺少有效的集数或时间`);
       }
 
       let animeId = sourceIdMap.get(sourceKey(item.animeId) || '');

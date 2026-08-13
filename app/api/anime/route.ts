@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { listAnimeRecordsWithLastWatched, listAnimeRecordsPaginated, createAnimeRecord, updateAnimeRecord, CreateAnimeDTO, AnimeStatus } from '@/lib/anime';
 import { normalizeStringArray } from '@/lib/anime-cast';
-import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
+import { apiSuccess, apiError, apiInternalError, requireAdmin } from '@/lib/api-response';
 import { createAnimeSchema } from '@/lib/validations';
 import { resolveDisplayCoverUrl, resolveLocalCoverImage, resolveThumbnailCoverUrl } from '@/lib/cover-image';
 
@@ -40,8 +40,11 @@ export async function GET(request: NextRequest) {
     const list = await listAnimeRecordsWithLastWatched({ status: status || undefined, limit: safeLimit, offset: safeOffset, search });
     return apiSuccess(list, 200, { 'Cache-Control': 'no-store' });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : '读取失败';
-    return apiError(message);
+    return apiInternalError(error, {
+      operation: '读取动漫列表',
+      message: '读取动漫列表失败，请稍后重试',
+      context: { page, hasSearch: Boolean(search), hasStatus: Boolean(status) },
+    });
   }
 }
 
@@ -97,8 +100,9 @@ export async function POST(request: NextRequest) {
 
     return apiSuccess(newRecord);
   } catch (error: unknown) {
-    console.error('Anime create error:', error);
-    const message = error instanceof Error ? error.message : '创建失败';
-    return apiError(message);
+    return apiInternalError(error, {
+      operation: '创建动漫记录',
+      message: '创建动漫失败，请稍后重试',
+    });
   }
 }

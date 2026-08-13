@@ -6,7 +6,7 @@ import {
   type QuickRecordParseMethod,
 } from '@/lib/ai';
 import { enrichAnimeInput } from '@/lib/anime-enrichment';
-import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
+import { apiError, apiInternalError, apiSuccess, logApiInternalError, requireAdmin } from '@/lib/api-response';
 import { resolveDisplayCoverUrl, resolveLocalCoverImage, resolveThumbnailCoverUrl } from '@/lib/cover-image';
 import type {
   QuickRecordProgressEvent,
@@ -15,7 +15,7 @@ import type {
 } from '@/lib/quick-record-progress';
 import {
   detectRewatchTag, resolveNextRewatchTag, validateSeasonSelection,
-  mergeStringArrays, buildRecognition,
+  mergeStringArrays, buildRecognition, QuickRecordValidationError,
 } from './_helpers';
 
 type QuickRecordResult = {
@@ -67,7 +67,7 @@ async function processQuickRecordIntent(
   });
 
   input.title = input.title.trim();
-  if (!input.title) throw new Error('资料搜索未返回有效标题');
+  if (!input.title) throw new QuickRecordValidationError('资料搜索未返回有效标题');
 
   const sameTitleRecords = await listAnimeRecordsByExactTitle(input.title);
   const explicitRewatchTag = parsed.rewatchTag
@@ -228,7 +228,13 @@ async function runQuickRecord(
         message: `${prefix}「${result.entry.title}」处理完成`,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : '处理失败';
+      const isValidationError = error instanceof QuickRecordValidationError;
+      const message = isValidationError
+        ? error.message
+        : '录入这部动漫时发生内部错误，请稍后重试';
+      if (!isValidationError) {
+        logApiInternalError(error, '处理 AI 快速录入条目', { itemIndex: index + 1 });
+      }
       errors.push({ title: parsed.animeTitle, error: message });
       report?.({
         type: 'progress',
@@ -284,10 +290,15 @@ function createQuickRecordStream(body: QuickRecordBody): Response {
         const result = await runQuickRecord(body, (event: QuickRecordProgressEvent) => send(event));
         send({ type: 'result', data: result });
       } catch (error) {
-        console.error('Quick record stream error:', error);
+        const message = error instanceof QuickRecordRunError
+          ? error.message
+          : 'AI 录入失败，请稍后重试';
+        if (!(error instanceof QuickRecordRunError)) {
+          logApiInternalError(error, '执行 AI 流式快速录入');
+        }
         send({
           type: 'error',
-          error: error instanceof Error ? error.message : 'AI 录入失败',
+          error: message,
         });
       } finally {
         controller.close();
@@ -324,10 +335,12 @@ export async function POST(request: NextRequest) {
   try {
     return apiSuccess(await runQuickRecord(body));
   } catch (error: unknown) {
-    console.error('Quick record error:', error);
     if (error instanceof QuickRecordRunError) {
       return apiError(error.message, error.status, error.errors ? { errors: error.errors } : undefined);
     }
-    return apiError(error instanceof Error ? error.message : 'AI 录入失败', 500);
+    return apiInternalError(error, {
+      operation: '执行 AI 快速录入',
+      message: 'AI 录入失败，请稍后重试',
+    });
   }
 }
