@@ -14,8 +14,8 @@ export function apiError(message: string, status = 500, extra?: Record<string, u
 
 export async function requireAdmin(message = '只有管理员可以执行此操作') {
   const session = await getServerSession(authOptions);
-  const role = (session?.user as SessionUser | undefined)?.role;
-  if (role !== 'admin') {
+  const user = session?.user as SessionUser | undefined;
+  if (user?.accountValid !== true || user.role !== 'admin') {
     return { authorized: false as const, response: apiError(message, 403) };
   }
   return { authorized: true as const, source: 'admin-session' as const, session };

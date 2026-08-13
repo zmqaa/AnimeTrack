@@ -24,7 +24,7 @@ export default function TopNav({ children }: TopNavProps) {
   const nextTheme = themes[(themes.findIndex((t) => t.value === theme) + 1) % themes.length];
 
   const isAuthPage = pathname === '/login' || pathname === '/register';
-  const isAuthenticated = status === 'authenticated';
+  const isAuthenticated = status === 'authenticated' && canManage;
 
   const visibleItems = navigationItems.filter(
     (item) => !item.adminOnly || canManage

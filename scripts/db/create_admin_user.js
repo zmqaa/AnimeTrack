@@ -1,6 +1,4 @@
 const bcrypt = require('bcryptjs');
-const path = require('path');
-const fs = require('fs');
 const { getDb, loadDatabaseEnv } = require('../shared/db_env');
 
 async function main() {
@@ -20,7 +18,7 @@ async function main() {
 
     if (existing) {
       db.prepare(
-        'UPDATE users SET password_hash = ?, name = ?, role = ? WHERE username = ?'
+        "UPDATE users SET password_hash = ?, name = ?, role = ?, updatedAt = datetime('now', 'localtime') WHERE username = ?"
       ).run(passwordHash, displayName, 'admin', username);
       console.log(`Updated existing user ${username} as admin.`);
       return;

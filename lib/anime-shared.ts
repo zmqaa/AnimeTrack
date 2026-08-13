@@ -10,7 +10,10 @@ export const ANIME_STATUS_LABELS: Record<AnimeStatus, string> = {
 export type AnimeSortBy = 'lastWatchedAt' | 'updatedAt' | 'createdAt' | 'score' | 'progress' | 'title' | 'startDate' | 'endDate';
 
 export interface SessionUser {
+  id?: string;
+  username?: string;
   role?: string;
+  accountValid?: boolean;
 }
 
 export interface AnimeNoteEntry {

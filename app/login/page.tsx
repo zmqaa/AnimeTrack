@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from 'next/link';
 import AsyncButton from '@/components/shared/AsyncButton';
+import type { SessionUser } from '@/lib/anime-shared';
 
 function resolveCallbackUrl(rawValue: string | null) {
   if (!rawValue || !rawValue.startsWith('/')) {
@@ -15,7 +16,7 @@ function resolveCallbackUrl(rawValue: string | null) {
 }
 
 export default function LoginPage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -33,10 +34,11 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (status === 'authenticated') {
+    const user = session?.user as SessionUser | undefined;
+    if (status === 'authenticated' && user?.accountValid === true && user.role === 'admin') {
       router.replace(callbackUrl);
     }
-  }, [callbackUrl, router, status]);
+  }, [callbackUrl, router, session, status]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

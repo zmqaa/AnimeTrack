@@ -1,16 +1,22 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
-import type { JWT } from 'next-auth/jwt';
 
 import { query } from '@/lib/db';
+import {
+  createAuthenticatedAccount,
+  initializeAccountToken,
+  invalidateAccountToken,
+  refreshAccountToken,
+  type AccountJWT,
+  type AuthenticatedAccount,
+  type StoredAuthAccount,
+} from '@/lib/auth-account';
 
-interface AuthUserRow {
-  id: number;
-  username: string;
-  password_hash: string;
-  name: string;
-  role: string;
+function getAuthSecret(): string {
+  const secret = String(process.env.NEXTAUTH_SECRET || '').trim();
+  if (!secret) throw new Error('NEXTAUTH_SECRET 未配置');
+  return secret;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -26,7 +32,7 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        const users = await query<AuthUserRow[]>(
+        const users = await query<StoredAuthAccount[]>(
           'SELECT id, username, password_hash, name, role FROM users WHERE username = ?',
           [credentials.username]
         );
@@ -35,12 +41,7 @@ export const authOptions: NextAuthOptions = {
           const user = users[0];
           const isValid = await bcrypt.compare(credentials.password, user.password_hash);
           if (isValid) {
-            return {
-              id: user.id.toString(),
-              name: user.name,
-              username: user.username,
-              role: user.role,
-            };
+            return createAuthenticatedAccount(user, getAuthSecret());
           }
         }
 
@@ -50,15 +51,31 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user }) {
-      const nextToken = token as JWT & { role?: string };
+      const nextToken = token as AccountJWT;
       if (user) {
-        nextToken.role = (user as { role?: string }).role;
+        return initializeAccountToken(nextToken, user as AuthenticatedAccount);
       }
-      return nextToken;
+
+      const userId = Number(nextToken.userId || nextToken.sub);
+      if (!Number.isInteger(userId) || userId <= 0 || !nextToken.accountSignature) {
+        return invalidateAccountToken(nextToken);
+      }
+
+      const users = await query<StoredAuthAccount[]>(
+        'SELECT id, username, password_hash, name, role FROM users WHERE id = ?',
+        [userId],
+      );
+      return refreshAccountToken(nextToken, users[0] || null, getAuthSecret());
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as typeof session.user & { role?: string }).role = (token as JWT & { role?: string }).role;
+        const accountToken = token as AccountJWT;
+        Object.assign(session.user, {
+          id: accountToken.userId,
+          username: accountToken.username,
+          role: accountToken.accountValid ? accountToken.role : undefined,
+          accountValid: accountToken.accountValid === true,
+        });
       }
       return session;
     },
