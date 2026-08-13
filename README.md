@@ -93,6 +93,10 @@ SQLite 数据库默认保存在 `data/animetrack.db`。打开 `http://localhost:
 
 [Ubuntu 服务器部署指南](docs/ubuntu-deployment.md)
 
+全面检查后仍需逐项推进的安全、稳定性和模块化工作见：
+
+[项目全面检查与长期维护路线图](docs/project-maintenance-roadmap.md)
+
 ## 中国大陆网络说明
 
 AnimeTrack 的 Bangumi 元数据和封面请求由运行 AnimeTrack 的服务器发起，而不是由浏览器直接请求。
