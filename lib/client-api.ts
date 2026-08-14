@@ -1,15 +1,20 @@
-type ApiErrorPayload = {
+import { isApiErrorCode, type ApiErrorCode } from '@/lib/api-errors';
+
+type ClientApiErrorPayload = {
   error?: string;
   message?: string;
+  code?: unknown;
 };
 
 export class ApiRequestError extends Error {
   readonly status: number;
+  readonly code?: ApiErrorCode;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: ApiErrorCode) {
     super(message);
     this.name = 'ApiRequestError';
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -80,14 +85,20 @@ function extractErrorMessage(payload: unknown, fallbackMessage: string, status?:
   return fallbackMessage;
 }
 
+function extractErrorCode(payload: unknown): ApiErrorCode | undefined {
+  if (!isRecord(payload)) return undefined;
+  return isApiErrorCode(payload.code) ? payload.code : undefined;
+}
+
 export async function fetchJson<T>(input: RequestInfo | URL, init?: RequestInit, fallbackMessage = '请求失败'): Promise<T> {
   const response = await fetch(input, init);
-  const payload = await readResponsePayload<T & ApiErrorPayload>(response);
+  const payload = await readResponsePayload<T & ClientApiErrorPayload>(response);
 
   if (!response.ok) {
     throw new ApiRequestError(
       extractErrorMessage(payload, fallbackMessage, response.status),
       response.status,
+      extractErrorCode(payload),
     );
   }
 
@@ -98,10 +109,11 @@ export async function fetchBlob(input: RequestInfo | URL, init?: RequestInit, fa
   const response = await fetch(input, init);
 
   if (!response.ok) {
-    const payload = await readResponsePayload<ApiErrorPayload>(response);
+    const payload = await readResponsePayload<ClientApiErrorPayload>(response);
     throw new ApiRequestError(
       extractErrorMessage(payload, fallbackMessage, response.status),
       response.status,
+      extractErrorCode(payload),
     );
   }
 
@@ -117,10 +129,11 @@ export async function fetchNdjson<T>(
   const response = await fetch(input, init);
 
   if (!response.ok) {
-    const payload = await readResponsePayload<ApiErrorPayload>(response);
+    const payload = await readResponsePayload<ClientApiErrorPayload>(response);
     throw new ApiRequestError(
       extractErrorMessage(payload, fallbackMessage, response.status),
       response.status,
+      extractErrorCode(payload),
     );
   }
 

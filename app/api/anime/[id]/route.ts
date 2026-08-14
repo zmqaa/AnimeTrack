@@ -1,7 +1,14 @@
 import { adjustAnimeProgressWithHistory, deleteAnimeRecord, getAnimeRecord, updateAnimeRecordWithHistory, AnimeRecord, parseAnimeId } from '@/lib/anime';
 import { buildVoiceActorAliases } from '@/lib/ai';
 import { normalizeStringArray, areStringArraysEqual } from '@/lib/anime-cast';
-import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
+import {
+  apiSuccess,
+  apiError,
+  logApiInternalError,
+  readApiJson,
+  requireAdmin,
+  withApiErrorBoundary,
+} from '@/lib/api-response';
 import { resolveLocalCoverImage } from '@/lib/cover-image';
 import { patchAnimeBodySchema } from '@/lib/validations';
 import { nowISO } from '@/lib/date-utils';
@@ -24,21 +31,21 @@ function areAllowedFieldValuesEqual(key: string, nextValue: unknown, currentValu
   return nextValue === currentValue;
 }
 
-export async function GET(
+async function handleGet(
   _request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   const { id: rawId } = await context.params;
   const id = parseAnimeId(rawId);
-  if (!id) return apiError('Invalid ID', 400);
+  if (!id) return apiError('无效的动漫 ID', 'BAD_REQUEST');
 
   const record = await getAnimeRecord(id);
-  if (!record) return apiError('Not found', 404);
+  if (!record) return apiError('动漫不存在', 'NOT_FOUND');
 
   return apiSuccess({ ...record, noteEntries: listAnimeNotes(id) });
 }
 
-export async function DELETE(
+async function handleDelete(
   _request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
@@ -47,15 +54,15 @@ export async function DELETE(
 
   const { id: rawId } = await context.params;
   const id = parseAnimeId(rawId);
-  if (!id) return apiError('Invalid ID', 400);
+  if (!id) return apiError('无效的动漫 ID', 'BAD_REQUEST');
 
   const deleted = await deleteAnimeRecord(id);
-  if (!deleted) return apiError('Not found', 404);
+  if (!deleted) return apiError('动漫不存在', 'NOT_FOUND');
   
   return apiSuccess({ ok: true });
 }
 
-export async function PATCH(
+async function handlePatch(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
@@ -64,15 +71,15 @@ export async function PATCH(
 
   const { id: rawId } = await context.params;
   const id = parseAnimeId(rawId);
-  if (!id) return apiError('Invalid ID', 400);
+  if (!id) return apiError('无效的动漫 ID', 'BAD_REQUEST');
 
   const before = await getAnimeRecord(id);
-  if (!before) return apiError('Not found', 404);
+  if (!before) return apiError('动漫不存在', 'NOT_FOUND');
 
-  const rawBody = await request.json();
+  const rawBody = await readApiJson<unknown>(request);
   const parsedBody = patchAnimeBodySchema.safeParse(rawBody);
   if (!parsedBody.success) {
-    return apiError(parsedBody.error.issues[0]?.message || '参数校验失败', 400);
+    return apiError(parsedBody.error.issues[0]?.message || '参数校验失败', 'BAD_REQUEST');
   }
   const body = parsedBody.data;
 
@@ -81,7 +88,7 @@ export async function PATCH(
       recordHistory: Boolean(body.recordHistory),
       trimHistoryOnProgressDecrease: Boolean(body.trimHistoryOnProgressDecrease),
     });
-    if (!updated) return apiError('Not found', 404);
+    if (!updated) return apiError('动漫不存在', 'NOT_FOUND');
     return apiSuccess({ ok: true, entry: { ...updated, noteEntries: listAnimeNotes(id) } });
   }
 
@@ -121,7 +128,7 @@ export async function PATCH(
     try {
       updateData.castAliases = await buildVoiceActorAliases(updateData.cast, updateData.castAliases || before?.castAliases || []);
     } catch (error) {
-      console.error('Voice actor alias generation failed:', error);
+      logApiInternalError(error, '生成声优别名', { animeId: id });
     }
   }
 
@@ -151,7 +158,7 @@ export async function PATCH(
     startDate: updateData.startDate !== undefined ? updateData.startDate : before.startDate,
     endDate: updateData.endDate !== undefined ? updateData.endDate : before.endDate,
   });
-  if (dateOrderIssue) return apiError(dateOrderIssue.message, 400);
+  if (dateOrderIssue) return apiError(dateOrderIssue.message, 'BAD_REQUEST');
 
   // 如果更新了 coverUrl，同步下载封面到本地
   if (updateData.coverUrl !== undefined) {
@@ -162,7 +169,16 @@ export async function PATCH(
     recordHistory: Boolean(body.recordHistory),
     trimHistoryOnProgressDecrease: Boolean(body.trimHistoryOnProgressDecrease),
   });
-  if (!updated) return apiError('Not found', 404);
+  if (!updated) return apiError('动漫不存在', 'NOT_FOUND');
 
   return apiSuccess({ ok: true, entry: { ...updated, noteEntries: listAnimeNotes(id) } });
 }
+
+const animeDetailBoundary = {
+  operation: '处理动漫详情请求',
+  message: '处理动漫详情失败，请稍后重试',
+};
+
+export const GET = withApiErrorBoundary(animeDetailBoundary, handleGet);
+export const DELETE = withApiErrorBoundary(animeDetailBoundary, handleDelete);
+export const PATCH = withApiErrorBoundary(animeDetailBoundary, handlePatch);

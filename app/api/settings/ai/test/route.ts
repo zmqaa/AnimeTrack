@@ -9,7 +9,7 @@ export async function POST() {
     const runtime = createAiRuntimeConfig();
 
     if (!runtime.apiKey) {
-      return apiError('尚未配置 API Key', 400);
+      return apiError('尚未配置 API Key', 'BAD_REQUEST');
     }
 
     const startedAt = Date.now();
@@ -25,7 +25,7 @@ export async function POST() {
     });
 
     if (!result?.ok) {
-      return apiError('AI 服务未返回预期结果，请检查地址、模型和密钥', 502);
+      return apiError('AI 服务未返回预期结果，请检查地址、模型和密钥', 'UPSTREAM_ERROR');
     }
 
     return apiSuccess({
@@ -37,7 +37,7 @@ export async function POST() {
     return apiInternalError(error, {
       operation: '测试 AI 连接',
       message: 'AI 连接测试失败，请检查配置或稍后重试',
-      status: 502,
+      code: 'UPSTREAM_ERROR',
     });
   }
 }

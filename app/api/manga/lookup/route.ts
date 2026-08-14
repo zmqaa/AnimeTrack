@@ -1,10 +1,16 @@
-import { apiError, apiSuccess, logApiInternalError, requireAdmin } from '@/lib/api-response';
+import {
+  apiError,
+  apiSuccess,
+  logApiInternalError,
+  requireAdmin,
+  withApiErrorBoundary,
+} from '@/lib/api-response';
 import { lookupMangaTitle, type MangaLookupResult } from '@/lib/manga-lookup';
 
 const MAX_TITLES = 10;
 const MAX_TITLE_LENGTH = 200;
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   const auth = await requireAdmin('只有管理员可以查询漫画资料');
   if (!auth.authorized) return auth.response;
 
@@ -12,22 +18,22 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return apiError('请求内容必须是 JSON', 400);
+    return apiError('请求内容必须是 JSON', 'BAD_REQUEST');
   }
 
   const rawTitles = (body as { titles?: unknown } | null)?.titles;
   if (!Array.isArray(rawTitles)) {
-    return apiError('titles 必须是漫画名称数组', 400);
+    return apiError('titles 必须是漫画名称数组', 'BAD_REQUEST');
   }
 
   const titles = Array.from(new Set(rawTitles
     .filter((title): title is string => typeof title === 'string')
     .map((title) => title.trim())
     .filter(Boolean)));
-  if (titles.length === 0) return apiError('请至少提供一个漫画名称', 400);
-  if (titles.length > MAX_TITLES) return apiError(`一次最多查询 ${MAX_TITLES} 个漫画名称`, 400);
+  if (titles.length === 0) return apiError('请至少提供一个漫画名称', 'BAD_REQUEST');
+  if (titles.length > MAX_TITLES) return apiError(`一次最多查询 ${MAX_TITLES} 个漫画名称`, 'BAD_REQUEST');
   if (titles.some((title) => title.length > MAX_TITLE_LENGTH)) {
-    return apiError(`漫画名称不能超过 ${MAX_TITLE_LENGTH} 个字符`, 400);
+    return apiError(`漫画名称不能超过 ${MAX_TITLE_LENGTH} 个字符`, 'BAD_REQUEST');
   }
 
   const results: MangaLookupResult[] = [];
@@ -52,3 +58,8 @@ export async function POST(request: Request) {
 
   return apiSuccess({ results });
 }
+
+export const POST = withApiErrorBoundary({
+  operation: '查询漫画外部资料',
+  message: '查询漫画资料失败，请稍后重试',
+}, handlePost);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listAnimeRecords } from '@/lib/anime';
 import { getAllWatchHistory } from '@/lib/history';
-import { requireAdmin } from '@/lib/api-response';
+import { apiError, requireAdmin, withApiErrorBoundary } from '@/lib/api-response';
 import { buildExportFilename } from '@/lib/export-filename';
 import { buildPortableExport } from '@/scripts/shared/portable_export';
 import { listAllAnimeNotes } from '@/lib/anime-notes';
@@ -19,17 +19,17 @@ function parseDatasets(request: NextRequest): ExportDataset[] {
 }
 
 /** GET — 将选中的动漫数据和漫画数据导出为 JSON 或 XLSX。 */
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest) {
   const auth = await requireAdmin('需要管理员权限');
   if (!auth.authorized) return auth.response;
 
   const format = request.nextUrl.searchParams.get('format') || 'json';
   const datasets = parseDatasets(request);
   if (datasets.length === 0) {
-    return NextResponse.json({ error: '请至少选择一类导出数据' }, { status: 400 });
+    return apiError('请至少选择一类导出数据', 'BAD_REQUEST');
   }
   if (format !== 'json' && format !== 'xlsx') {
-    return NextResponse.json({ error: '不支持的导出格式' }, { status: 400 });
+    return apiError('不支持的导出格式', 'BAD_REQUEST');
   }
 
   const includesAnime = datasets.includes('anime');
@@ -75,3 +75,8 @@ export async function GET(request: NextRequest) {
     },
   });
 }
+
+export const GET = withApiErrorBoundary({
+  operation: '导出动漫数据',
+  message: '导出失败，请稍后重试',
+}, handleGet);

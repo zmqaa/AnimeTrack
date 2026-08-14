@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { apiError, requireAdmin } from '@/lib/api-response';
+import { apiError, requireAdmin, withApiErrorBoundary } from '@/lib/api-response';
 import { getBackupsDirectory } from '@/lib/runtime-paths';
 
 /** GET — download a backup file */
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest) {
   const auth = await requireAdmin('需要管理员权限');
   if (!auth.authorized) {
     return auth.response;
@@ -13,13 +13,13 @@ export async function GET(request: NextRequest) {
 
   const fileName = request.nextUrl.searchParams.get('file');
   if (!fileName) {
-    return apiError('缺少文件名参数', 400);
+    return apiError('缺少文件名参数', 'BAD_REQUEST');
   }
 
   // Security: prevent path traversal, only allow .sql files from backups dir
   const baseName = path.basename(fileName);
   if (baseName !== fileName || !baseName.endsWith('.sql') || baseName.includes('..')) {
-    return apiError('无效的文件名', 400);
+    return apiError('无效的文件名', 'BAD_REQUEST');
   }
 
   const backupsDirectory = getBackupsDirectory();
@@ -28,11 +28,11 @@ export async function GET(request: NextRequest) {
   // Ensure resolved path is within backups dir
   const resolved = path.resolve(filePath);
   if (path.dirname(resolved) !== path.resolve(backupsDirectory)) {
-    return apiError('无效的文件路径', 400);
+    return apiError('无效的文件路径', 'BAD_REQUEST');
   }
 
   if (!fs.existsSync(filePath)) {
-    return apiError('文件不存在', 404);
+    return apiError('文件不存在', 'NOT_FOUND');
   }
 
   const content = fs.readFileSync(filePath);
@@ -44,3 +44,8 @@ export async function GET(request: NextRequest) {
     },
   });
 }
+
+export const GET = withApiErrorBoundary({
+  operation: '下载数据库备份',
+  message: '下载备份失败，请稍后重试',
+}, handleGet);

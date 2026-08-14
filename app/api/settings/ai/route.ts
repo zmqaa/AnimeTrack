@@ -1,4 +1,4 @@
-import { apiSuccess, requireAdmin } from '@/lib/api-response';
+import { apiSuccess, requireAdmin, withApiErrorBoundary } from '@/lib/api-response';
 import { createAiRuntimeConfig } from '@/lib/ai-runtime';
 
 function apiKeyPreview(apiKey: string): string {
@@ -21,8 +21,13 @@ function responsePayload() {
   };
 }
 
-export async function GET() {
+async function handleGet() {
   const auth = await requireAdmin('需要管理员权限');
   if (!auth.authorized) return auth.response;
   return apiSuccess(responsePayload());
 }
+
+export const GET = withApiErrorBoundary({
+  operation: '读取 AI 设置',
+  message: '读取 AI 设置失败，请稍后重试',
+}, handleGet);

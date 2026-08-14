@@ -83,7 +83,10 @@ describe('date validation in update routes', () => {
     );
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: '看完日期不能早于开始观看日期' });
+    expect(await response.json()).toEqual({
+      error: '看完日期不能早于开始观看日期',
+      code: 'BAD_REQUEST',
+    });
     expect(updateAnimeRecordWithHistory).not.toHaveBeenCalled();
   });
 
@@ -108,7 +111,10 @@ describe('date validation in update routes', () => {
     );
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: '读完日期不能早于开始阅读日期' });
+    expect(await response.json()).toEqual({
+      error: '读完日期不能早于开始阅读日期',
+      code: 'BAD_REQUEST',
+    });
     expect(updateMangaRecord).not.toHaveBeenCalled();
   });
 
@@ -119,7 +125,10 @@ describe('date validation in update routes', () => {
     );
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: '观看时间格式无效' });
+    expect(await response.json()).toEqual({
+      error: '观看时间格式无效',
+      code: 'BAD_REQUEST',
+    });
     expect(updateWatchHistoryTime).not.toHaveBeenCalled();
   });
 });

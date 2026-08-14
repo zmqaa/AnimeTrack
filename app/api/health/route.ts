@@ -1,29 +1,21 @@
-import { NextResponse } from 'next/server';
-
 import { getRawDb } from '@/lib/db';
+import { apiInternalError, apiSuccess } from '@/lib/api-response';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
     getRawDb().prepare('SELECT 1 AS ok').get();
-    return NextResponse.json({
+    return apiSuccess({
       database: 'available',
-    }, {
-      status: 200,
-      headers: {
-        'Cache-Control': 'no-store',
-      },
-    });
+    }, 200, { 'Cache-Control': 'no-store' });
   } catch (error) {
-    console.error('[health] 数据库健康检查失败:', error);
-    return NextResponse.json({
-      database: 'unavailable',
-    }, {
-      status: 503,
-      headers: {
-        'Cache-Control': 'no-store',
-      },
+    return apiInternalError(error, {
+      operation: '执行数据库健康检查',
+      message: '数据库暂时不可用',
+      code: 'SERVICE_UNAVAILABLE',
+      extra: { database: 'unavailable' },
+      headers: { 'Cache-Control': 'no-store' },
     });
   }
 }

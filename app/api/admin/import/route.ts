@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json() as ImportPayload;
   } catch {
-    return apiError('导入内容不是有效的 JSON', 400);
+    return apiError('导入内容不是有效的 JSON', 'BAD_REQUEST');
   }
 
   try {
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     return apiSuccess(result);
   } catch (error: unknown) {
     if (error instanceof ImportValidationError) {
-      return apiError(error.message, 400);
+      return apiError(error.message, 'BAD_REQUEST');
     }
     return apiInternalError(error, {
       operation: '导入便携数据',

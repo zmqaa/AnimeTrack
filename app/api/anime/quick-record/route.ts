@@ -7,6 +7,7 @@ import {
 } from '@/lib/ai';
 import { enrichAnimeInput } from '@/lib/anime-enrichment';
 import { apiError, apiInternalError, apiSuccess, logApiInternalError, requireAdmin } from '@/lib/api-response';
+import type { ApiErrorCode } from '@/lib/api-errors';
 import { resolveDisplayCoverUrl, resolveLocalCoverImage, resolveThumbnailCoverUrl } from '@/lib/cover-image';
 import type {
   QuickRecordProgressEvent,
@@ -140,7 +141,7 @@ type QuickRecordBody = {
 class QuickRecordRunError extends Error {
   constructor(
     message: string,
-    readonly status: number,
+    readonly code: ApiErrorCode,
     readonly errors?: Array<{ title: string; error: string }>,
   ) {
     super(message);
@@ -153,7 +154,7 @@ async function runQuickRecord(
 ) {
   const text = typeof body.text === 'string' ? body.text.trim() : '';
   if (!text) {
-    throw new QuickRecordRunError('请输入动漫名称', 400);
+    throw new QuickRecordRunError('请输入动漫名称', 'BAD_REQUEST');
   }
 
   report?.({
@@ -177,7 +178,7 @@ async function runQuickRecord(
     },
   });
   if (!Array.isArray(parsedBatch.records) || parsedBatch.records.length === 0) {
-    throw new QuickRecordRunError('未能识别番剧名称，请换一种说法', 400);
+    throw new QuickRecordRunError('未能识别番剧名称，请换一种说法', 'BAD_REQUEST');
   }
   report?.({
     type: 'progress',
@@ -247,7 +248,7 @@ async function runQuickRecord(
   }
 
   if (results.length === 0) {
-    throw new QuickRecordRunError(errors[0]?.error || 'AI 录入失败', 500, errors);
+    throw new QuickRecordRunError(errors[0]?.error || 'AI 录入失败', 'INTERNAL_ERROR', errors);
   }
 
   const first = results[0];
@@ -325,7 +326,7 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json() as QuickRecordBody;
   } catch {
-    return apiError('请求内容不是有效的 JSON', 400);
+    return apiError('请求内容不是有效的 JSON', 'BAD_REQUEST');
   }
 
   if (body.stream === true) {
@@ -336,7 +337,7 @@ export async function POST(request: NextRequest) {
     return apiSuccess(await runQuickRecord(body));
   } catch (error: unknown) {
     if (error instanceof QuickRecordRunError) {
-      return apiError(error.message, error.status, error.errors ? { errors: error.errors } : undefined);
+      return apiError(error.message, error.code, error.errors ? { errors: error.errors } : undefined);
     }
     return apiInternalError(error, {
       operation: '执行 AI 快速录入',

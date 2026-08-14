@@ -10,18 +10,18 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json() as { records?: unknown };
   } catch {
-    return apiError('导入内容不是有效的 JSON', 400);
+    return apiError('导入内容不是有效的 JSON', 'BAD_REQUEST');
   }
 
   const records = Array.isArray(body.records) ? body.records : [];
-  if (records.length === 0) return apiError('records 不能为空', 400);
+  if (records.length === 0) return apiError('records 不能为空', 'BAD_REQUEST');
 
   try {
     const result = await importAnimeData({ records });
     return apiSuccess(result);
   } catch (error: unknown) {
     if (error instanceof ImportValidationError) {
-      return apiError(error.message, 400);
+      return apiError(error.message, 'BAD_REQUEST');
     }
     return apiInternalError(error, {
       operation: '导入动漫数据',

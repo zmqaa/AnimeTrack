@@ -21,27 +21,27 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json() as { name?: unknown };
   } catch {
-    return apiError('请求内容不是有效的 JSON', 400);
+    return apiError('请求内容不是有效的 JSON', 'BAD_REQUEST');
   }
 
   try {
     if (typeof body.name !== 'string') {
-      return apiError('缺少备份文件名', 400);
+      return apiError('缺少备份文件名', 'BAD_REQUEST');
     }
 
     const baseName = path.basename(body.name);
     if (baseName !== body.name || !baseName.endsWith('.sql') || baseName.includes('..')) {
-      return apiError('无效的备份文件名', 400);
+      return apiError('无效的备份文件名', 'BAD_REQUEST');
     }
 
     const backupsDirectory = getBackupsDirectory();
     const filePath = path.join(backupsDirectory, baseName);
     const resolvedPath = path.resolve(filePath);
     if (path.dirname(resolvedPath) !== path.resolve(backupsDirectory)) {
-      return apiError('无效的备份文件路径', 400);
+      return apiError('无效的备份文件路径', 'BAD_REQUEST');
     }
     if (!fs.existsSync(resolvedPath)) {
-      return apiError('备份文件不存在', 404);
+      return apiError('备份文件不存在', 'NOT_FOUND');
     }
 
     // Read and validate the selected snapshot before creating the safety backup.
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     if (error instanceof BackupValidationError) {
-      return apiError(error.message, 400);
+      return apiError(error.message, 'BAD_REQUEST');
     }
     return apiInternalError(error, {
       operation: '恢复数据库备份',

@@ -1,8 +1,15 @@
-import { apiSuccess, apiError, apiInternalError, requireAdmin } from '@/lib/api-response';
+import {
+  apiSuccess,
+  apiError,
+  apiInternalError,
+  readApiJson,
+  requireAdmin,
+  withApiErrorBoundary,
+} from '@/lib/api-response';
 import { deleteAnimeRecords, listAnimeRecordsWithLastWatched } from '@/lib/anime';
 import { query } from '@/lib/db';
 
-export async function GET(request: Request) {
+async function handleGet(request: Request) {
   const { authorized, response } = await requireAdmin();
   if (!authorized) return response;
 
@@ -36,18 +43,18 @@ export async function GET(request: Request) {
   }
 }
 
-export async function DELETE(request: Request) {
+async function handleDelete(request: Request) {
   const { authorized, response } = await requireAdmin();
   if (!authorized) return response;
 
-  const body = await request.json();
+  const body = await readApiJson<{ ids?: unknown }>(request);
   const ids: unknown = body.ids;
 
   if (!Array.isArray(ids) || ids.length === 0 || !ids.every((id) => typeof id === 'number' && Number.isInteger(id) && id > 0)) {
-    return apiError('请提供有效的 ID 数组', 400);
+    return apiError('请提供有效的 ID 数组', 'BAD_REQUEST');
   }
 
-  if (ids.length > 100) return apiError('单次最多删除 100 条记录', 400);
+  if (ids.length > 100) return apiError('单次最多删除 100 条记录', 'BAD_REQUEST');
 
   try {
     const deleted = await deleteAnimeRecords(ids);
@@ -60,3 +67,13 @@ export async function DELETE(request: Request) {
     });
   }
 }
+
+export const GET = withApiErrorBoundary({
+  operation: '处理后台动漫列表请求',
+  message: '处理动漫列表请求失败，请稍后重试',
+}, handleGet);
+
+export const DELETE = withApiErrorBoundary({
+  operation: '处理批量删除动漫请求',
+  message: '删除动漫失败，请稍后重试',
+}, handleDelete);

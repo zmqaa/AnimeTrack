@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { NextResponse } from 'next/server';
 
-import { apiError } from '@/lib/api-response';
+import { apiError, apiInternalError } from '@/lib/api-response';
 import { getCoversDirectory } from '@/lib/runtime-paths';
 
 const COVER_FILE_PATTERN = /^(?:\d+\.(?:jpg|jpeg|png|webp|gif)|\d+\.thumb\.webp)$/i;
@@ -13,13 +13,13 @@ export async function GET(
 ) {
   const { file: fileName } = await context.params;
   if (!COVER_FILE_PATTERN.test(fileName) || path.basename(fileName) !== fileName) {
-    return apiError('无效的封面文件名', 400);
+    return apiError('无效的封面文件名', 'BAD_REQUEST');
   }
 
   const coversDirectory = path.resolve(getCoversDirectory());
   const filePath = path.resolve(coversDirectory, fileName);
   if (path.dirname(filePath) !== coversDirectory) {
-    return apiError('无效的封面文件路径', 400);
+    return apiError('无效的封面文件路径', 'BAD_REQUEST');
   }
 
   try {
@@ -47,8 +47,12 @@ export async function GET(
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code === 'ENOENT') {
-      return apiError('封面不存在', 404);
+      return apiError('封面不存在', 'NOT_FOUND');
     }
-    return apiError('读取封面失败', 500);
+    return apiInternalError(error, {
+      operation: '读取本地封面',
+      message: '读取封面失败，请稍后重试',
+      context: { fileName },
+    });
   }
 }

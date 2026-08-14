@@ -1,4 +1,4 @@
-import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
+import { apiError, apiSuccess, requireAdmin, withApiErrorBoundary } from '@/lib/api-response';
 import {
   getMangaRecord,
   parseMangaId,
@@ -7,7 +7,7 @@ import {
 } from '@/lib/manga';
 import { getMangaMetadataCandidate } from '@/lib/manga-provider';
 
-export async function POST(
+async function handlePost(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
@@ -16,14 +16,14 @@ export async function POST(
 
   const { id: rawId } = await context.params;
   const id = parseMangaId(rawId);
-  if (!id) return apiError('无效的漫画 ID', 400);
+  if (!id) return apiError('无效的漫画 ID', 'BAD_REQUEST');
 
   const record = await getMangaRecord(id);
-  if (!record) return apiError('漫画不存在', 404);
-  if (!record.bangumiId) return apiError('这部漫画没有关联 Bangumi 条目', 400);
+  if (!record) return apiError('漫画不存在', 'NOT_FOUND');
+  if (!record.bangumiId) return apiError('这部漫画没有关联 Bangumi 条目', 'BAD_REQUEST');
 
   const metadata = await getMangaMetadataCandidate(record.bangumiId);
-  if (!metadata) return apiError('未能从 Bangumi 读取漫画资料', 502);
+  if (!metadata) return apiError('未能从 Bangumi 读取漫画资料', 'UPSTREAM_ERROR');
 
   const patch: Partial<CreateMangaDTO> = {};
   const assignText = <K extends keyof CreateMangaDTO>(key: K, value: CreateMangaDTO[K] | undefined) => {
@@ -58,7 +58,11 @@ export async function POST(
   }
 
   const updated = await updateMangaRecord(id, patch);
-  return updated
-    ? apiSuccess({ ok: true, appliedFields, entry: updated })
-    : apiError('更新漫画资料失败', 500);
+  if (!updated) throw new Error('更新漫画资料后无法读取记录');
+  return apiSuccess({ ok: true, appliedFields, entry: updated });
 }
+
+export const POST = withApiErrorBoundary({
+  operation: '补全漫画资料',
+  message: '补全漫画资料失败，请稍后重试',
+}, handlePost);

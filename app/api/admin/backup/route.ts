@@ -98,22 +98,22 @@ export async function DELETE(request: NextRequest) {
   try {
     ({ name } = await request.json() as { name?: unknown });
   } catch {
-    return apiError('请求内容不是有效的 JSON', 400);
+    return apiError('请求内容不是有效的 JSON', 'BAD_REQUEST');
   }
   if (!name || typeof name !== 'string') {
-    return apiError('缺少文件名', 400);
+    return apiError('缺少文件名', 'BAD_REQUEST');
   }
 
   // Security: only allow .sql files from backups dir, no path traversal
   const baseName = path.basename(name);
   if (baseName !== name || !baseName.endsWith('.sql') || baseName.includes('..')) {
-    return apiError('无效的文件名', 400);
+    return apiError('无效的文件名', 'BAD_REQUEST');
   }
 
   try {
     const filePath = path.join(getBackupsDirectory(), baseName);
     if (!fs.existsSync(filePath)) {
-      return apiError('文件不存在', 404);
+      return apiError('文件不存在', 'NOT_FOUND');
     }
 
     fs.unlinkSync(filePath);

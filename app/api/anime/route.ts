@@ -1,7 +1,14 @@
 import { NextRequest } from 'next/server';
 import { listAnimeRecordsWithLastWatched, listAnimeRecordsPaginated, createAnimeRecord, updateAnimeRecord, CreateAnimeDTO, AnimeStatus } from '@/lib/anime';
 import { normalizeStringArray } from '@/lib/anime-cast';
-import { apiSuccess, apiError, apiInternalError, requireAdmin } from '@/lib/api-response';
+import {
+  apiSuccess,
+  apiError,
+  apiExceptionResponse,
+  apiInternalError,
+  readApiJson,
+  requireAdmin,
+} from '@/lib/api-response';
 import { createAnimeSchema } from '@/lib/validations';
 import { resolveDisplayCoverUrl, resolveLocalCoverImage, resolveThumbnailCoverUrl } from '@/lib/cover-image';
 
@@ -53,11 +60,11 @@ export async function POST(request: NextRequest) {
   if (!auth.authorized) return auth.response;
 
   try {
-    const json = await request.json();
+    const json = await readApiJson<unknown>(request);
     const parsed = createAnimeSchema.safeParse(json);
     if (!parsed.success) {
       const firstError = parsed.error.issues[0];
-      return apiError(firstError?.message || '参数校验失败', 400);
+      return apiError(firstError?.message || '参数校验失败', 'BAD_REQUEST');
     }
 
     const v = parsed.data;
@@ -100,7 +107,7 @@ export async function POST(request: NextRequest) {
 
     return apiSuccess(newRecord);
   } catch (error: unknown) {
-    return apiInternalError(error, {
+    return apiExceptionResponse(error, {
       operation: '创建动漫记录',
       message: '创建动漫失败，请稍后重试',
     });

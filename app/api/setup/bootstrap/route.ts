@@ -79,17 +79,18 @@ async function getSetupStatus(): Promise<SetupStatus> {
 
 export async function GET() {
   const status = await getSetupStatus();
-  return apiSuccess(status, status.allowed ? 200 : 403);
+  // 这是初始化能力的状态查询；即使当前环境禁用初始化，也正常返回状态对象。
+  return apiSuccess(status);
 }
 
 export async function POST() {
   if (!isSetupAllowed()) {
-    return apiError('当前环境禁止通过网页初始化数据库。', 403);
+    return apiError('当前环境禁止通过网页初始化数据库。', 'FORBIDDEN');
   }
 
   const currentStatus = await getSetupStatus();
   if (currentStatus.seeded && currentStatus.animeCount > 0) {
-    return apiError('数据库已初始化完成，不允许重复执行。如需重置请使用命令行工具。', 409);
+    return apiError('数据库已初始化完成，不允许重复执行。如需重置请使用命令行工具。', 'CONFLICT');
   }
 
   try {

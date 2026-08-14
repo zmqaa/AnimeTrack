@@ -1,7 +1,14 @@
 import { NextRequest } from 'next/server';
 
 import { normalizeStringArray } from '@/lib/anime-cast';
-import { apiError, apiInternalError, apiSuccess, requireAdmin } from '@/lib/api-response';
+import {
+  apiError,
+  apiExceptionResponse,
+  apiSuccess,
+  readApiJson,
+  requireAdmin,
+  withApiErrorBoundary,
+} from '@/lib/api-response';
 import {
   createMangaRecord,
   listMangaRecords,
@@ -20,7 +27,7 @@ const PUBLICATION_STATUSES = new Set<MangaPublicationStatus>([
   'ongoing', 'completed', 'hiatus', 'unknown',
 ]);
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest) {
   const statusValue = request.nextUrl.searchParams.get('status');
   const publicationValue = request.nextUrl.searchParams.get('publicationStatus');
   const records = await listMangaRecords({
@@ -35,13 +42,13 @@ export async function GET(request: NextRequest) {
   return apiSuccess({ records, total: records.length });
 }
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   const auth = await requireAdmin('只有管理员可以添加漫画');
   if (!auth.authorized) return auth.response;
 
   try {
-    const parsed = createMangaSchema.safeParse(await request.json());
-    if (!parsed.success) return apiError(parsed.error.issues[0]?.message || '参数校验失败', 400);
+    const parsed = createMangaSchema.safeParse(await readApiJson<unknown>(request));
+    if (!parsed.success) return apiError(parsed.error.issues[0]?.message || '参数校验失败', 'BAD_REQUEST');
     const value = parsed.data;
     const today = formatAppDateKey(new Date());
     const shouldStart = ['reading', 'caught_up', 'completed'].includes(value.status);
@@ -68,16 +75,24 @@ export async function POST(request: Request) {
       totalChapters: value.totalChapters ?? undefined,
     };
     const dateOrderIssue = getMangaDateOrderIssue(data);
-    if (dateOrderIssue) return apiError(dateOrderIssue.message, 400);
+    if (dateOrderIssue) return apiError(dateOrderIssue.message, 'BAD_REQUEST');
     return apiSuccess(await createMangaRecord(data), 201);
   } catch (error) {
     const message = error instanceof Error ? error.message : '漫画创建失败';
     if (/UNIQUE constraint failed: manga\.bangumi_id/i.test(message)) {
-      return apiError('这部 Bangumi 漫画已经加入书架', 409);
+      return apiError('这部 Bangumi 漫画已经加入书架', 'CONFLICT');
     }
-    return apiInternalError(error, {
+    return apiExceptionResponse(error, {
       operation: '创建漫画记录',
       message: '创建漫画失败，请稍后重试',
     });
   }
 }
+
+const mangaListBoundary = {
+  operation: '处理漫画列表请求',
+  message: '处理漫画列表请求失败，请稍后重试',
+};
+
+export const GET = withApiErrorBoundary(mangaListBoundary, handleGet);
+export const POST = withApiErrorBoundary(mangaListBoundary, handlePost);

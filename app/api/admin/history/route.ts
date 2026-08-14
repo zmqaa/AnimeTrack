@@ -1,7 +1,13 @@
 import { getWatchHistoryPaginated, deleteWatchHistoryBatch } from '@/lib/history';
-import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
+import {
+  apiSuccess,
+  apiError,
+  readApiJson,
+  requireAdmin,
+  withApiErrorBoundary,
+} from '@/lib/api-response';
 
-export async function GET(request: Request) {
+async function handleGet(request: Request) {
   const { authorized, response } = await requireAdmin();
   if (!authorized) return response;
 
@@ -14,21 +20,31 @@ export async function GET(request: Request) {
   return apiSuccess({ records, total, page, pageSize });
 }
 
-export async function DELETE(request: Request) {
+async function handleDelete(request: Request) {
   const { authorized, response } = await requireAdmin();
   if (!authorized) return response;
 
-  const body = await request.json();
+  const body = await readApiJson<{ ids?: unknown }>(request);
   const ids: unknown = body.ids;
 
   if (!Array.isArray(ids) || ids.length === 0 || !ids.every((id) => typeof id === 'number' && Number.isInteger(id) && id > 0)) {
-    return apiError('请提供有效的记录 ID 数组', 400);
+    return apiError('请提供有效的记录 ID 数组', 'BAD_REQUEST');
   }
 
   if (ids.length > 500) {
-    return apiError('单次最多删除 500 条记录', 400);
+    return apiError('单次最多删除 500 条记录', 'BAD_REQUEST');
   }
 
   const deleted = await deleteWatchHistoryBatch(ids as number[]);
   return apiSuccess({ deleted });
 }
+
+export const GET = withApiErrorBoundary({
+  operation: '读取后台观看历史',
+  message: '读取观看历史失败，请稍后重试',
+}, handleGet);
+
+export const DELETE = withApiErrorBoundary({
+  operation: '批量删除观看历史',
+  message: '删除观看历史失败，请稍后重试',
+}, handleDelete);

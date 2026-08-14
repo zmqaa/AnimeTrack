@@ -1,11 +1,11 @@
 import { getAnimeRecord, updateAnimeRecord, CreateAnimeDTO, parseAnimeId, animeRecordToDTO } from '@/lib/anime';
 import { enrichAnimeInput } from '@/lib/anime-enrichment';
 import { DEFAULT_METADATA_FIELDS, buildMetadataPatch } from '@/lib/metadata/merge-policy';
-import { apiError, apiSuccess, requireAdmin } from '@/lib/api-response';
+import { apiError, apiSuccess, requireAdmin, withApiErrorBoundary } from '@/lib/api-response';
 import { isPlaceholderCoverPath, resolveLocalCoverImage } from '@/lib/cover-image';
 import { listAnimeNotes } from '@/lib/anime-notes';
 
-export async function POST(
+async function handlePost(
   _request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
@@ -17,12 +17,12 @@ export async function POST(
   const { id: rawId } = await context.params;
   const id = parseAnimeId(rawId);
   if (!id) {
-    return apiError('Invalid ID', 400);
+    return apiError('无效的动漫 ID', 'BAD_REQUEST');
   }
 
   const record = await getAnimeRecord(id);
   if (!record) {
-    return apiError('Not found', 404);
+    return apiError('动漫不存在', 'NOT_FOUND');
   }
 
   const baseInput = animeRecordToDTO(record);
@@ -72,8 +72,13 @@ export async function POST(
 
   const updated = await updateAnimeRecord(id, patch);
   if (!updated) {
-    return apiError('更新失败', 500);
+    throw new Error('更新动漫资料后无法读取记录');
   }
 
   return apiSuccess({ ok: true, appliedFields, entry: { ...updated, noteEntries: listAnimeNotes(id) } });
 }
+
+export const POST = withApiErrorBoundary({
+  operation: '补全动漫资料',
+  message: '补全动漫资料失败，请稍后重试',
+}, handlePost);

@@ -1,7 +1,7 @@
 import { getAllWatchHistory, getWatchHistory, getWatchHistorySince } from '@/lib/history';
-import { apiSuccess } from '@/lib/api-response';
+import { apiSuccess, withApiErrorBoundary } from '@/lib/api-response';
 
-export async function GET(request: Request) {
+async function handleGet(request: Request) {
   const { searchParams } = new URL(request.url);
   const limit = Number(searchParams.get('limit') ?? '800');
   const days = Number(searchParams.get('days') ?? '');
@@ -19,3 +19,8 @@ export async function GET(request: Request) {
   }
   return apiSuccess({ ok: true, entries }, 200, { 'Cache-Control': 'no-store' });
 }
+
+export const GET = withApiErrorBoundary({
+  operation: '读取观看历史',
+  message: '读取观看历史失败，请稍后重试',
+}, handleGet);

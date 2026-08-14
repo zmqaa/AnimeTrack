@@ -49,7 +49,7 @@ describe('fetchNdjson', () => {
 describe('fetchJson', () => {
   it('preserves the HTTP status on API errors', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(
-      { error: 'Not found' },
+      { error: 'Not found', code: 'NOT_FOUND' },
       { status: 404 },
     )));
 
@@ -59,6 +59,7 @@ describe('fetchJson', () => {
       name: 'ApiRequestError',
       message: 'Not found',
       status: 404,
+      code: 'NOT_FOUND',
     } satisfies Partial<ApiRequestError>);
   });
 });

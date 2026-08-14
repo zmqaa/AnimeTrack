@@ -2,7 +2,9 @@ import { deleteWatchHistoryById, updateWatchHistoryTime } from '@/lib/history';
 import { getRawDb } from '@/lib/db';
 import { isValidDateTimeString, nowISO } from '@/lib/date-utils';
 import { syncAnimeStartDateFromHistory } from '@/lib/anime-start-date';
-import { apiSuccess, apiError, requireAdmin } from '@/lib/api-response';
+import { apiSuccess, apiError, requireAdmin, withApiErrorBoundary } from '@/lib/api-response';
+
+type RouteContext = { params: Promise<{ id: string }> };
 
 interface UndoContextRow {
   id: number;
@@ -53,27 +55,27 @@ function getUndoPreview(id: number) {
   };
 }
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handleGet(_request: Request, { params }: RouteContext) {
   const { authorized, response } = await requireAdmin();
   if (!authorized) return response;
 
   const { id: idStr } = await params;
   const id = parseHistoryId(idStr);
-  if (!id) return apiError('无效的记录 ID', 400);
+  if (!id) return apiError('无效的记录 ID', 'BAD_REQUEST');
 
   const preview = getUndoPreview(id);
-  if (!preview) return apiError('记录或对应番剧不存在', 404);
+  if (!preview) return apiError('记录或对应番剧不存在', 'NOT_FOUND');
 
   return apiSuccess({ preview });
 }
 
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handlePost(_request: Request, { params }: RouteContext) {
   const { authorized, response } = await requireAdmin();
   if (!authorized) return response;
 
   const { id: idStr } = await params;
   const id = parseHistoryId(idStr);
-  if (!id) return apiError('无效的记录 ID', 400);
+  if (!id) return apiError('无效的记录 ID', 'BAD_REQUEST');
 
   const db = getRawDb();
   const undo = db.transaction(() => {
@@ -102,55 +104,65 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   });
 
   const result = undo();
-  if (!result) return apiError('记录或对应番剧不存在', 404);
+  if (!result) return apiError('记录或对应番剧不存在', 'NOT_FOUND');
 
   return apiSuccess({ undone: true, result });
 }
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handlePatch(request: Request, { params }: RouteContext) {
   const { authorized, response } = await requireAdmin();
   if (!authorized) return response;
 
   const { id: idStr } = await params;
   const id = parseHistoryId(idStr);
-  if (!id) return apiError('无效的记录 ID', 400);
+  if (!id) return apiError('无效的记录 ID', 'BAD_REQUEST');
 
   let body: { watchedAt?: unknown };
   try {
     body = await request.json();
   } catch {
-    return apiError('请求内容不是有效的 JSON', 400);
+    return apiError('请求内容不是有效的 JSON', 'BAD_REQUEST');
   }
 
   if (typeof body.watchedAt !== 'string' || !body.watchedAt.trim()) {
-    return apiError('观看时间不能为空', 400);
+    return apiError('观看时间不能为空', 'BAD_REQUEST');
   }
 
   if (!isValidDateTimeString(body.watchedAt)) {
-    return apiError('观看时间格式无效', 400);
+    return apiError('观看时间格式无效', 'BAD_REQUEST');
   }
   const watchedAt = new Date(body.watchedAt);
 
   const record = await updateWatchHistoryTime(id, watchedAt);
-  if (!record) return apiError('记录不存在', 404);
+  if (!record) return apiError('记录不存在', 'NOT_FOUND');
 
   return apiSuccess({ updated: true, record });
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function handleDelete(_request: Request, { params }: RouteContext) {
   const { authorized, response } = await requireAdmin();
   if (!authorized) return response;
 
   const { id: idStr } = await params;
   const id = parseHistoryId(idStr);
   if (!id) {
-    return apiError('无效的记录 ID', 400);
+    return apiError('无效的记录 ID', 'BAD_REQUEST');
   }
 
   const deleted = await deleteWatchHistoryById(id);
   if (!deleted) {
-    return apiError('记录不存在', 404);
+    return apiError('记录不存在', 'NOT_FOUND');
   }
 
   return apiSuccess({ deleted: true });
 }
+
+const historyBoundary = {
+  operation: '处理后台观看历史记录',
+  message: '处理观看历史失败，请稍后重试',
+};
+
+export const GET = withApiErrorBoundary(historyBoundary, handleGet);
+export const POST = withApiErrorBoundary(historyBoundary, handlePost);
+export const PATCH = withApiErrorBoundary(historyBoundary, handlePatch);
+export const DELETE = withApiErrorBoundary(historyBoundary, handleDelete);
