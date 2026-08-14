@@ -132,6 +132,9 @@ function isMigrationAlreadySatisfied(
   if (migration.version === 23) {
     return hasColumn(db, 'anime', 'start_date_source');
   }
+  if (migration.version === 25) {
+    return hasColumn(db, 'manga', 'localCoverUrl');
+  }
   return false;
 }
 

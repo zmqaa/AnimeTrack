@@ -451,7 +451,7 @@ export default function MangaPageClient() {
               {records.map((record) => (
                 <div key={record.id} className="group surface-card-muted flex items-center gap-4 rounded-2xl p-3 transition-all duration-200 hover:border-[var(--border-light)]">
                   <Link href={`/manga/${record.id}`} className="relative h-[74px] w-14 shrink-0 overflow-hidden rounded-xl bg-[var(--tag-bg)]">
-                    {record.coverUrl ? <Image src={record.coverUrl} alt={record.title} fill unoptimized sizes="56px" className="object-cover" /> : <div className="flex h-full items-center justify-center"><BookOpenIcon className="h-6 w-6 text-[var(--text-muted)]" /></div>}
+                    {(record.thumbnailCoverUrl || record.displayCoverUrl) ? <Image src={record.thumbnailCoverUrl || record.displayCoverUrl || ''} alt={record.title} fill unoptimized sizes="56px" className="object-cover" /> : <div className="flex h-full items-center justify-center"><BookOpenIcon className="h-6 w-6 text-[var(--text-muted)]" /></div>}
                   </Link>
                   <div className="min-w-0 flex-1">
                     <Link href={`/manga/${record.id}`} className="block truncate text-sm font-medium text-[var(--text-primary)] group-hover:text-[var(--color-plan)]">{record.title}</Link>
@@ -478,8 +478,8 @@ export default function MangaPageClient() {
               {records.map((record) => (
                 <article key={record.id} className="group surface-card-muted theme-hover-elevated overflow-hidden rounded-2xl transition-all duration-300">
                   <Link href={`/manga/${record.id}`} className="relative block aspect-[3/4] overflow-hidden bg-[var(--tag-bg)]">
-                    {record.coverUrl ? (
-                      <Image src={record.coverUrl} alt={record.title} fill unoptimized sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw" className="object-cover opacity-75 transition-all duration-500 group-hover:scale-110 group-hover:opacity-100" />
+                    {(record.thumbnailCoverUrl || record.displayCoverUrl) ? (
+                      <Image src={record.thumbnailCoverUrl || record.displayCoverUrl || ''} alt={record.title} fill unoptimized sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw" className="object-cover opacity-75 transition-all duration-500 group-hover:scale-110 group-hover:opacity-100" />
                     ) : <div className="flex h-full items-center justify-center text-[var(--text-muted)]"><BookOpenIcon className="h-10 w-10" /></div>}
                     <div className="cover-gradient-overlay absolute inset-0 opacity-60" />
                     <div className="absolute left-2 top-2 flex flex-wrap gap-1">

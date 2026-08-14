@@ -97,7 +97,7 @@ describe('API internal error boundaries', () => {
       code: 'INTERNAL_ERROR',
     });
     expect(JSON.stringify(payload)).not.toContain('/srv/animetrack');
-    expect(log).toHaveBeenCalledWith('[api] 创建数据库备份失败', {}, error);
+    expect(log).toHaveBeenCalledWith('[api] 创建应用 JSON 备份失败', {}, error);
     log.mockRestore();
   });
 

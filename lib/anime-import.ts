@@ -1,7 +1,7 @@
 import 'server-only';
 import { getRawDb } from './db';
 import { backfillMissingAnimeStartDates } from './anime-start-date';
-import { clearAllCoverImages } from './cover-image';
+import { clearAnimeCoverImages, clearMangaCoverImages } from './cover-image';
 import type { AnimeStatus, CreateAnimeDTO } from './anime';
 import type { CreateMangaDTO, MangaPublicationStatus, MangaReadingStatus } from './manga';
 import { getAnimeDateOrderIssue, getMangaDateOrderIssue } from './date-validation';
@@ -490,25 +490,25 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
 
     const insertMangaWithId = db.prepare(`
       INSERT INTO manga (
-        id, bangumi_id, title, original_title, aliases, coverUrl, status, publication_status,
+        id, bangumi_id, title, original_title, aliases, coverUrl, localCoverUrl, status, publication_status,
+        score, current_volume, current_chapter, total_volumes, total_chapters, notes,
+        tags, summary, authors, illustrators, publishers, serializations,
+        start_date, end_date, release_date, createdAt, updatedAt
+      ) VALUES (${Array.from({ length: 26 }, () => '?').join(', ')})
+    `);
+    const insertMangaWithoutId = db.prepare(`
+      INSERT INTO manga (
+        bangumi_id, title, original_title, aliases, coverUrl, localCoverUrl, status, publication_status,
         score, current_volume, current_chapter, total_volumes, total_chapters, notes,
         tags, summary, authors, illustrators, publishers, serializations,
         start_date, end_date, release_date, createdAt, updatedAt
       ) VALUES (${Array.from({ length: 25 }, () => '?').join(', ')})
     `);
-    const insertMangaWithoutId = db.prepare(`
-      INSERT INTO manga (
-        bangumi_id, title, original_title, aliases, coverUrl, status, publication_status,
-        score, current_volume, current_chapter, total_volumes, total_chapters, notes,
-        tags, summary, authors, illustrators, publishers, serializations,
-        start_date, end_date, release_date, createdAt, updatedAt
-      ) VALUES (${Array.from({ length: 24 }, () => '?').join(', ')})
-    `);
     for (const item of normalizedManga) {
       const p = item.payload;
       const values = [
         p.bangumiId ?? null, p.title, p.originalTitle || null, JSON.stringify(p.aliases || []),
-        p.coverUrl || null, p.status, p.publicationStatus, p.score ?? null,
+        p.coverUrl || null, null, p.status, p.publicationStatus, p.score ?? null,
         p.currentVolume || null, p.currentChapter || null, p.totalVolumes ?? null,
         p.totalChapters ?? null, p.notes || null, JSON.stringify(p.tags || []), p.summary || null,
         JSON.stringify(p.authors || []), JSON.stringify(p.illustrators || []),
@@ -525,7 +525,8 @@ export async function importAnimeData(body: ImportPayload): Promise<ImportResult
   });
 
   replaceTransaction();
-  if (importsAnime) await clearAllCoverImages();
+  if (importsAnime) await clearAnimeCoverImages();
+  if (importsManga) await clearMangaCoverImages();
   return {
     success: true,
     mode: 'replace',

@@ -66,7 +66,7 @@ describe('database migrations', () => {
 
     const result = migrationModule.runDatabaseMigrations(database, databasePath);
 
-    expect(result.applied).toEqual([21, 22, 23, 24]);
+    expect(result.applied).toEqual([21, 22, 23, 24, 25]);
     expect(result.baselined).toEqual([2, 8, 11, 12, 15, 16, 17, 18, 19, 20]);
     expect(result.backupPath).not.toBeNull();
     expect(existsSync(result.backupPath!)).toBe(true);
@@ -94,6 +94,8 @@ describe('database migrations', () => {
 
     expect(backupColumns.some((column) => column.name === 'localCoverUrl')).toBe(false);
     expect(backupLocalCover.coverUrl).toBe('/covers/1.jpg');
+    expect((database.pragma('table_info(manga)') as Array<{ name: string }>)
+      .some((column) => column.name === 'localCoverUrl')).toBe(true);
   });
 
   it('is idempotent when the same database starts again', () => {
@@ -124,7 +126,7 @@ describe('database migrations', () => {
       WHERE version = 21
     `).get() as { execution_kind: string };
 
-    expect(result.applied).toEqual([22, 23, 24]);
+    expect(result.applied).toEqual([22, 23, 24, 25]);
     expect(result.baselined).toContain(21);
     expect(result.backupPath).not.toBeNull();
     expect(migration.execution_kind).toBe('satisfied');

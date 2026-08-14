@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -14,6 +14,8 @@ beforeAll(async () => {
   temporaryDirectory = mkdtempSync(join(tmpdir(), 'animetrack-manga-test-'));
   process.env.DB_PATH = join(temporaryDirectory, 'animetrack.db');
   process.env.ANIMETRACK_BACKUPS_DIR = join(temporaryDirectory, 'backups');
+  process.env.ANIMETRACK_COVERS_DIR = join(temporaryDirectory, 'covers');
+  mkdirSync(process.env.ANIMETRACK_COVERS_DIR);
   mangaModule = await import('../../lib/manga');
   dbModule = await import('../../lib/db');
   dbModule.getRawDb();
@@ -24,6 +26,7 @@ afterAll(() => {
   if (temporaryDirectory) rmSync(temporaryDirectory, { recursive: true, force: true });
   delete process.env.DB_PATH;
   delete process.env.ANIMETRACK_BACKUPS_DIR;
+  delete process.env.ANIMETRACK_COVERS_DIR;
 });
 
 describe('漫画书架数据', () => {
@@ -52,6 +55,17 @@ describe('漫画书架数据', () => {
     });
     expect(await mangaModule.listMangaRecords({ search: '失语少女' })).toHaveLength(1);
 
+    const coverPath = join(temporaryDirectory, 'covers', `manga-${created.id}.jpg`);
+    const thumbnailPath = join(temporaryDirectory, 'covers', `manga-${created.id}.thumb.webp`);
+    writeFileSync(coverPath, 'manga image');
+    writeFileSync(thumbnailPath, 'manga thumbnail');
+    const withLocalCover = await mangaModule.updateMangaRecord(created.id, {
+      coverUrl: 'https://lain.bgm.tv/pic/cover/l/manga.jpg',
+      localCoverUrl: `/api/local-covers/manga-${created.id}.jpg`,
+    });
+    expect(withLocalCover?.displayCoverUrl).toMatch(`/api/local-covers/manga-${created.id}.jpg?v=`);
+    expect(withLocalCover?.thumbnailCoverUrl).toMatch(`/api/local-covers/manga-${created.id}.thumb.webp?v=`);
+
     const updated = await mangaModule.updateMangaRecord(created.id, {
       status: 'caught_up',
       currentChapter: '番外 3',
@@ -61,6 +75,7 @@ describe('漫画书架数据', () => {
 
     await expect(mangaModule.deleteMangaRecord(created.id)).resolves.toBe(true);
     await expect(mangaModule.getMangaRecord(created.id)).resolves.toBeNull();
+    expect(existsSync(coverPath)).toBe(false);
+    expect(existsSync(thumbnailPath)).toBe(false);
   });
 });
-

@@ -34,6 +34,13 @@ export function getBackupsDirectory(): string {
   );
 }
 
+export function getJsonBackupsDirectory(): string {
+  return resolveConfiguredPath(
+    process.env.ANIMETRACK_JSON_BACKUPS_DIR,
+    path.join(getBackupsDirectory(), 'json'),
+  );
+}
+
 export function getCoversDirectory(): string {
   return resolveConfiguredPath(
     process.env.ANIMETRACK_COVERS_DIR,

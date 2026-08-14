@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -22,6 +22,9 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
+  const coversDirectory = join(temporaryDirectory, 'covers');
+  rmSync(coversDirectory, { recursive: true, force: true });
+  mkdirSync(coversDirectory, { recursive: true });
   dbModule.getRawDb().exec(`
     DROP TRIGGER IF EXISTS reject_imported_anime;
     DELETE FROM watch_history;
@@ -324,5 +327,27 @@ describe('portable data replacement import', () => {
     expect(result.datasets).toEqual(['anime']);
     expect(result.manga.selected).toBe(false);
     expect(dbModule.getRawDb().prepare('SELECT title FROM manga').get()).toEqual({ title: '保留的漫画' });
+  });
+
+  it('clears only the selected data group local cover files', async () => {
+    const coversDirectory = join(temporaryDirectory, 'covers');
+    const animeCover = join(coversDirectory, '1.jpg');
+    const mangaCover = join(coversDirectory, 'manga-1.jpg');
+    writeFileSync(animeCover, 'anime');
+    writeFileSync(mangaCover, 'manga');
+
+    await importModule.importAnimeData({
+      datasets: ['anime'],
+      anime: { records: [{ title: '新番剧', status: 'watching' }] },
+      watchHistory: { records: [] },
+    });
+    expect(existsSync(animeCover)).toBe(false);
+    expect(existsSync(mangaCover)).toBe(true);
+
+    await importModule.importAnimeData({
+      datasets: ['manga'],
+      manga: { records: [{ title: '新漫画', status: 'reading' }] },
+    });
+    expect(existsSync(mangaCover)).toBe(false);
   });
 });

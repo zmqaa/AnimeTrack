@@ -9,6 +9,7 @@ function toPortableAnimeRecord(record) {
     : [];
   delete portableRecord.localCoverUrl;
   delete portableRecord.displayCoverUrl;
+  delete portableRecord.thumbnailCoverUrl;
   delete portableRecord.noteEntries;
 
   if (!isRemoteUrl(portableRecord.coverUrl)) {
@@ -35,6 +36,9 @@ function toPortableAnimeRecord(record) {
 
 function toPortableMangaRecord(record) {
   const portableRecord = { ...record };
+  delete portableRecord.localCoverUrl;
+  delete portableRecord.displayCoverUrl;
+  delete portableRecord.thumbnailCoverUrl;
   if (!isRemoteUrl(portableRecord.coverUrl)) delete portableRecord.coverUrl;
   return portableRecord;
 }

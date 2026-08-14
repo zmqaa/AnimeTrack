@@ -69,6 +69,7 @@ function mapAnimeRow(row) {
     castAliases: parseStringArray(row.cast_aliases),
     ...(row.summary ? { summary: row.summary } : {}),
     ...(row.start_date ? { startDate: row.start_date } : {}),
+    ...(row.start_date_source ? { startDateSource: row.start_date_source } : {}),
     ...(row.end_date ? { endDate: row.end_date } : {}),
     ...(row.premiere_date ? { premiereDate: row.premiere_date } : {}),
     ...(row.isFinished !== null ? { isFinished: Boolean(row.isFinished) } : {}),
@@ -110,11 +111,12 @@ function mapMangaRow(row) {
 function rotateBackups(outputDir, keep) {
   const files = fs.readdirSync(outputDir)
     .filter((name) => name.startsWith(BACKUP_PREFIX) && name.endsWith('.json'))
-    .sort();
+    .map((name) => ({ name, modifiedAt: fs.statSync(path.join(outputDir, name)).mtimeMs }))
+    .sort((left, right) => left.modifiedAt - right.modifiedAt || left.name.localeCompare(right.name));
   const expired = files.slice(0, Math.max(0, files.length - keep));
-  for (const name of expired) {
-    fs.unlinkSync(path.join(outputDir, name));
-    console.log(`[json-backup] 删除旧备份: ${name}`);
+  for (const file of expired) {
+    fs.unlinkSync(path.join(outputDir, file.name));
+    console.log(`[json-backup] 删除旧备份: ${file.name}`);
   }
 }
 

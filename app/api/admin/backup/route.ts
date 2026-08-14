@@ -1,12 +1,11 @@
 import { NextRequest } from 'next/server';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
-import fs from 'fs';
-import path from 'path';
 import { apiError, apiInternalError, apiSuccess, requireAdmin } from '@/lib/api-response';
-import { getBackupsDirectory, getDatabasePath } from '@/lib/runtime-paths';
-
-const execFileAsync = promisify(execFile);
+import {
+  createJsonBackup,
+  deleteJsonBackupFile,
+  JsonBackupFileError,
+  listJsonBackupFiles,
+} from '@/lib/json-backups';
 
 
 /** GET — list backup files */
@@ -17,27 +16,10 @@ export async function GET() {
   }
 
   try {
-    const backupsDirectory = getBackupsDirectory();
-    if (!fs.existsSync(backupsDirectory)) {
-      return apiSuccess({ backups: [] });
-    }
-
-    const files = fs.readdirSync(backupsDirectory)
-      .filter((f) => f.endsWith('.sql'))
-      .map((name) => {
-        const stat = fs.statSync(path.join(backupsDirectory, name));
-        return {
-          name,
-          size: stat.size,
-          createdAt: stat.mtime.toISOString(),
-        };
-      })
-      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-
-    return apiSuccess({ backups: files });
+    return apiSuccess({ backups: listJsonBackupFiles() });
   } catch (error) {
     return apiInternalError(error, {
-      operation: '读取备份列表',
+      operation: '读取应用 JSON 备份列表',
       message: '读取备份列表失败，请稍后重试',
     });
   }
@@ -51,37 +33,11 @@ export async function POST() {
   }
 
   try {
-    const backupsDirectory = getBackupsDirectory();
-    const scriptPath = path.join(process.cwd(), 'scripts/db/scheduled_backup.js');
-    const { stdout, stderr } = await execFileAsync(process.execPath, [scriptPath], {
-      cwd: process.cwd(),
-      timeout: 30000,
-      env: {
-        ...process.env,
-        DB_PATH: getDatabasePath(),
-        ANIMETRACK_BACKUPS_DIR: backupsDirectory,
-      },
-    });
-
-    const output = (stdout + '\n' + stderr).trim();
-
-    // Find the newly created file
-    const match = output.match(/备份完成: (.+\.sql)/);
-    const fileName = match?.[1] || null;
-
-    let fileInfo = null;
-    if (fileName) {
-      const filePath = path.join(backupsDirectory, fileName);
-      if (fs.existsSync(filePath)) {
-        const stat = fs.statSync(filePath);
-        fileInfo = { name: fileName, size: stat.size, createdAt: stat.mtime.toISOString() };
-      }
-    }
-
-    return apiSuccess({ success: true, backup: fileInfo, output });
-  } catch (err) {
-    return apiInternalError(err, {
-      operation: '创建数据库备份',
+    const backup = await createJsonBackup();
+    return apiSuccess({ success: true, backup });
+  } catch (error) {
+    return apiInternalError(error, {
+      operation: '创建应用 JSON 备份',
       message: '创建备份失败，请检查服务器日志',
     });
   }
@@ -104,23 +60,15 @@ export async function DELETE(request: NextRequest) {
     return apiError('缺少文件名', 'BAD_REQUEST');
   }
 
-  // Security: only allow .sql files from backups dir, no path traversal
-  const baseName = path.basename(name);
-  if (baseName !== name || !baseName.endsWith('.sql') || baseName.includes('..')) {
-    return apiError('无效的文件名', 'BAD_REQUEST');
-  }
-
   try {
-    const filePath = path.join(getBackupsDirectory(), baseName);
-    if (!fs.existsSync(filePath)) {
-      return apiError('文件不存在', 'NOT_FOUND');
-    }
-
-    fs.unlinkSync(filePath);
-    return apiSuccess({ success: true });
+    const deleted = deleteJsonBackupFile(name);
+    return apiSuccess({ success: true, deleted });
   } catch (error) {
+    if (error instanceof JsonBackupFileError) {
+      return apiError(error.message, error.apiCode);
+    }
     return apiInternalError(error, {
-      operation: '删除数据库备份',
+      operation: '删除应用 JSON 备份',
       message: '删除备份失败，请稍后重试',
     });
   }

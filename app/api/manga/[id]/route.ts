@@ -18,6 +18,7 @@ import { updateMangaSchema } from '@/lib/validations';
 import { buildMangaStatusDatePatch } from '@/lib/manga-status';
 import { getMangaDateOrderIssue } from '@/lib/date-validation';
 import { formatAppDateKey } from '@/lib/date-utils';
+import { resolveLocalMangaCoverImage } from '@/lib/cover-image';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -66,6 +67,10 @@ async function handlePatch(request: Request, context: RouteContext) {
     endDate: patch.endDate !== undefined ? patch.endDate : before.endDate,
   });
   if (dateOrderIssue) return apiError(dateOrderIssue.message, 'BAD_REQUEST');
+
+  if (value.coverUrl !== undefined && value.coverUrl !== before.coverUrl) {
+    patch.localCoverUrl = await resolveLocalMangaCoverImage(value.coverUrl, id);
+  }
 
   try {
     const updated = await updateMangaRecord(id, patch);

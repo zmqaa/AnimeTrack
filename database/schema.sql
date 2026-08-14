@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS manga (
     original_title TEXT,
     aliases TEXT,
     coverUrl TEXT,
+    localCoverUrl TEXT,
     status TEXT NOT NULL DEFAULT 'plan_to_read'
         CHECK (status IN ('plan_to_read', 'reading', 'caught_up', 'completed', 'paused', 'dropped')),
     publication_status TEXT NOT NULL DEFAULT 'unknown'

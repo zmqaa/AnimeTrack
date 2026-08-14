@@ -19,8 +19,10 @@ const requiredBuildFiles = [
 ];
 
 const requiredRuntimeFiles = [
-  path.join('scripts', 'db', 'scheduled_backup.js'),
+  path.join('scripts', 'db', 'scheduled_json_backup.js'),
   path.join('scripts', 'shared', 'db_env.js'),
+  path.join('scripts', 'shared', 'portable_export.js'),
+  path.join('scripts', 'shared', 'private_files.js'),
   path.join('database', 'schema.sql'),
 ];
 

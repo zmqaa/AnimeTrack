@@ -12,6 +12,7 @@ import {
 import {
   createMangaRecord,
   listMangaRecords,
+  updateMangaRecord,
   type CreateMangaDTO,
   type MangaPublicationStatus,
   type MangaReadingStatus,
@@ -19,6 +20,7 @@ import {
 import { createMangaSchema } from '@/lib/validations';
 import { getMangaDateOrderIssue } from '@/lib/date-validation';
 import { formatAppDateKey } from '@/lib/date-utils';
+import { resolveLocalMangaCoverImage } from '@/lib/cover-image';
 
 const READING_STATUSES = new Set<MangaReadingStatus>([
   'plan_to_read', 'reading', 'caught_up', 'completed', 'paused', 'dropped',
@@ -76,7 +78,12 @@ async function handlePost(request: Request) {
     };
     const dateOrderIssue = getMangaDateOrderIssue(data);
     if (dateOrderIssue) return apiError(dateOrderIssue.message, 'BAD_REQUEST');
-    return apiSuccess(await createMangaRecord(data), 201);
+    let created = await createMangaRecord(data);
+    if (created.coverUrl) {
+      const localCoverUrl = await resolveLocalMangaCoverImage(created.coverUrl, created.id);
+      created = await updateMangaRecord(created.id, { localCoverUrl }) || created;
+    }
+    return apiSuccess(created, 201);
   } catch (error) {
     const message = error instanceof Error ? error.message : '漫画创建失败';
     if (/UNIQUE constraint failed: manga\.bangumi_id/i.test(message)) {

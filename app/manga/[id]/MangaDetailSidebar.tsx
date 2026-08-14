@@ -24,13 +24,17 @@ type Props = {
 };
 
 export default function MangaDetailSidebar({ record, draft, canEdit, onChange }: Props) {
+  const coverUrl = draft.coverUrl !== (record.coverUrl || '')
+    ? draft.coverUrl
+    : (record.displayCoverUrl || draft.coverUrl);
+
   return (
     <aside className="space-y-5 xl:sticky xl:top-8 xl:self-start">
       <div className="glass-panel-strong shadow-theme-lg overflow-hidden rounded-[28px]">
         <div className="aspect-[2/3] w-full bg-[var(--bg-card)]">
-          {draft.coverUrl ? (
+          {coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={draft.coverUrl} alt={draft.title} className="h-full w-full object-cover" />
+            <img src={coverUrl} alt={draft.title} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full items-center justify-center text-sm text-[var(--text-muted)]">暂无封面</div>
           )}

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { apiError, apiInternalError, apiSuccess, requireAdmin } from '@/lib/api-response';
 import { ImportValidationError, importAnimeData, type ImportPayload } from '@/lib/anime-import';
 import { getRawDb } from '@/lib/db';
+import { createJsonBackup, getJsonBackupRetention } from '@/lib/json-backups';
 
 export async function GET() {
   const auth = await requireAdmin('只有管理员可以查看导入信息');
@@ -33,6 +34,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    await createJsonBackup(getJsonBackupRetention() + 1);
     const result = await importAnimeData(body);
     return apiSuccess(result);
   } catch (error: unknown) {

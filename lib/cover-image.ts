@@ -16,6 +16,8 @@ const DEFAULT_ALLOWED_COVER_HOSTS = ['lain.bgm.tv', 'cdn.myanimelist.net'];
 const COVER_THUMBNAIL_WIDTH = 600;
 const COVER_THUMBNAIL_HEIGHT = 800;
 const COVER_THUMBNAIL_QUALITY = 82;
+const ANIME_COVER_FILE_PATTERN = /^\d+\.(?:(?:jpg|jpeg|png|webp|gif)|thumb\.webp)$/i;
+const MANGA_COVER_FILE_PATTERN = /^manga-\d+\.(?:(?:jpg|jpeg|png|webp|gif)|thumb\.webp)$/i;
 
 function allowedCoverHosts(): Set<string> {
   const configured = (process.env.COVER_ALLOWED_HOSTS || '')
@@ -68,6 +70,18 @@ export function isLocalCoverPath(value: string | null | undefined): boolean {
     || trimmed.startsWith(DATA_COVERS_PUBLIC_PREFIX);
 }
 
+function localCoverFilePath(localCoverUrl: string): string {
+  const fileName = basename(localCoverUrl.split(/[?#]/, 1)[0]);
+  return localCoverUrl.startsWith(DATA_COVERS_PUBLIC_PREFIX)
+    ? join(getCoversDirectory(), fileName)
+    : join(process.cwd(), 'public', 'covers', fileName);
+}
+
+export function hasLocalCoverImage(localCoverUrl: string | null | undefined): boolean {
+  const local = String(localCoverUrl || '').trim();
+  return Boolean(local && isLocalCoverPath(local) && existsSync(localCoverFilePath(local)));
+}
+
 export function resolveDisplayCoverUrl(
   localCoverUrl: string | null | undefined,
   remoteCoverUrl: string | null | undefined,
@@ -80,9 +94,7 @@ export function resolveDisplayCoverUrl(
   }
 
   const fileName = basename(local.split(/[?#]/, 1)[0]);
-  const localFilePath = local.startsWith(DATA_COVERS_PUBLIC_PREFIX)
-    ? join(getCoversDirectory(), fileName)
-    : join(process.cwd(), 'public', 'covers', fileName);
+  const localFilePath = localCoverFilePath(local);
 
   // public/ 下运行时新增的文件不会被 Next.js 生产服务稳定识别。
   // 无论数据库保存的是旧版 /covers 路径还是新版动态路径，展示时都
@@ -111,7 +123,7 @@ export function resolveThumbnailCoverUrl(
   if (!local || !isLocalCoverPath(local)) return displayUrl;
 
   const fileName = basename(local.split(/[?#]/, 1)[0]);
-  const match = /^(\d+)\.(?:jpg|jpeg|png|webp|gif)$/i.exec(fileName);
+  const match = /^((?:manga-)?\d+)\.(?:jpg|jpeg|png|webp|gif)$/i.exec(fileName);
   if (!match) return displayUrl;
 
   const thumbnailName = `${match[1]}.thumb.webp`;
@@ -132,38 +144,42 @@ export function isPlaceholderCoverPath(value: string | null | undefined): boolea
 }
 
 /** 获取封面文件的磁盘绝对路径 */
-function coverFilePath(animeId: number): string {
-  return join(getCoversDirectory(), `${animeId}.jpg`);
+function coverKey(owner: 'anime' | 'manga', id: number): string {
+  return owner === 'manga' ? `manga-${id}` : String(id);
 }
 
-function coverThumbnailFilePath(animeId: number): string {
-  return join(getCoversDirectory(), `${animeId}.thumb.webp`);
+function coverFilePath(key: string): string {
+  return join(getCoversDirectory(), `${key}.jpg`);
 }
 
-/** 获取某个番剧可能拥有的全部本地封面路径（含旧版 public/covers 目录）。 */
-function coverFilePaths(animeId: number): string[] {
+function coverThumbnailFilePath(key: string): string {
+  return join(getCoversDirectory(), `${key}.thumb.webp`);
+}
+
+/** 获取某条记录可能拥有的全部本地封面路径（含旧版 public/covers 目录）。 */
+function coverFilePaths(key: string): string[] {
   const directories = new Set([
     resolve(getCoversDirectory()),
     resolve(process.cwd(), 'public', 'covers'),
   ]);
 
   return [...directories].flatMap((directory) => [
-    ...COVER_FILE_EXTENSIONS.map((extension) => join(directory, `${animeId}.${extension}`)),
-    join(directory, `${animeId}.thumb.webp`),
+    ...COVER_FILE_EXTENSIONS.map((extension) => join(directory, `${key}.${extension}`)),
+    join(directory, `${key}.thumb.webp`),
   ]);
 }
 
 /** 获取封面文件的公开 URL 路径 */
-function coverPublicPath(animeId: number): string {
-  return `${DATA_COVERS_PUBLIC_PREFIX}/${animeId}.jpg`;
+function coverPublicPath(key: string): string {
+  return `${DATA_COVERS_PUBLIC_PREFIX}/${key}.jpg`;
 }
 
-export async function generateCoverThumbnail(sourcePath: string, animeId: number): Promise<string> {
+async function generateCoverThumbnailForKey(sourcePath: string, key: string): Promise<string> {
   ensureCoversDir();
-  const outputPath = coverThumbnailFilePath(animeId);
+  const outputPath = coverThumbnailFilePath(key);
   const temporaryPath = join(
     getCoversDirectory(),
-    `${animeId}.thumb-${process.pid}-${Date.now()}.webp`,
+    `${key}.thumb-${process.pid}-${Date.now()}.webp`,
   );
 
   try {
@@ -184,13 +200,17 @@ export async function generateCoverThumbnail(sourcePath: string, animeId: number
   }
 }
 
+export async function generateCoverThumbnail(sourcePath: string, animeId: number): Promise<string> {
+  return generateCoverThumbnailForKey(sourcePath, coverKey('anime', animeId));
+}
+
 /**
  * 下载远程封面图到本地 public/covers/
  * @returns 本地公开路径，失败返回 null
  */
-export async function downloadCoverImage(
+async function downloadCoverImageForKey(
   remoteUrl: string,
-  animeId: number,
+  key: string,
 ): Promise<string | null> {
   const url = remoteUrl.trim();
   if (!url) return null;
@@ -232,16 +252,16 @@ export async function downloadCoverImage(
     }
 
     ensureCoversDir();
-    const localFilePath = coverFilePath(animeId);
+    const localFilePath = coverFilePath(key);
     await writeFile(localFilePath, buffer);
     try {
-      await generateCoverThumbnail(localFilePath, animeId);
+      await generateCoverThumbnailForKey(localFilePath, key);
     } catch (error) {
-      await unlink(coverThumbnailFilePath(animeId)).catch(() => undefined);
-      console.warn(`[cover] 缩略图生成失败 id=${animeId}:`, (error as Error).message);
+      await unlink(coverThumbnailFilePath(key)).catch(() => undefined);
+      console.warn(`[cover] 缩略图生成失败 key=${key}:`, (error as Error).message);
     }
 
-    return coverPublicPath(animeId);
+    return coverPublicPath(key);
   } catch (error) {
     console.warn(`[cover] 下载异常: ${url}`, (error as Error)?.message);
     return null;
@@ -250,18 +270,34 @@ export async function downloadCoverImage(
   }
 }
 
+export async function downloadCoverImage(remoteUrl: string, animeId: number): Promise<string | null> {
+  return downloadCoverImageForKey(remoteUrl, coverKey('anime', animeId));
+}
+
+export async function downloadMangaCoverImage(remoteUrl: string, mangaId: number): Promise<string | null> {
+  return downloadCoverImageForKey(remoteUrl, coverKey('manga', mangaId));
+}
+
 /**
  * 删除本地封面文件（如果存在）
  */
 export async function deleteCoverImage(animeId: number): Promise<void> {
-  await Promise.all(coverFilePaths(animeId).map(async (filePath) => {
+  await deleteCoverFiles(coverKey('anime', animeId));
+}
+
+export async function deleteMangaCoverImage(mangaId: number): Promise<void> {
+  await deleteCoverFiles(coverKey('manga', mangaId));
+}
+
+async function deleteCoverFiles(key: string): Promise<void> {
+  await Promise.all(coverFilePaths(key).map(async (filePath) => {
     try {
       await unlink(filePath);
     } catch (error) {
       const err = error as NodeJS.ErrnoException;
       // 文件不存在不算错误
       if (err.code !== 'ENOENT') {
-        console.warn(`[cover] 删除封面文件失败 id=${animeId}:`, err.message);
+        console.warn(`[cover] 删除封面文件失败 key=${key}:`, err.message);
       }
     }
   }));
@@ -269,27 +305,46 @@ export async function deleteCoverImage(animeId: number): Promise<void> {
 
 /** 同步删除封面文件 */
 export function deleteCoverImageSync(animeId: number): void {
-  for (const filePath of coverFilePaths(animeId)) {
+  const key = coverKey('anime', animeId);
+  for (const filePath of coverFilePaths(key)) {
     try {
       unlinkSync(filePath);
     } catch (error) {
       const err = error as NodeJS.ErrnoException;
       if (err.code !== 'ENOENT') {
-        console.warn(`[cover] 删除封面文件失败 id=${animeId}:`, err.message);
+        console.warn(`[cover] 删除封面文件失败 key=${key}:`, err.message);
       }
     }
   }
 }
 
-/** 清空系统管理的本地封面文件，保留封面目录本身。 */
-export async function clearAllCoverImages(): Promise<number> {
+async function clearCoverImages(pattern: RegExp): Promise<number> {
   const coversDirectory = getCoversDirectory();
   if (!existsSync(coversDirectory)) return 0;
 
   const entries = await readdir(coversDirectory, { withFileTypes: true });
-  const files = entries.filter((entry) => entry.isFile());
+  const files = entries.filter((entry) => entry.isFile() && pattern.test(entry.name));
   await Promise.all(files.map((entry) => unlink(join(coversDirectory, entry.name))));
   return files.length;
+}
+
+/** 清空系统管理的动漫本地封面文件，保留漫画封面和目录本身。 */
+export async function clearAnimeCoverImages(): Promise<number> {
+  return clearCoverImages(ANIME_COVER_FILE_PATTERN);
+}
+
+/** 清空系统管理的漫画本地封面文件，保留动漫封面和目录本身。 */
+export async function clearMangaCoverImages(): Promise<number> {
+  return clearCoverImages(MANGA_COVER_FILE_PATTERN);
+}
+
+/** 清空系统管理的全部本地封面文件，保留封面目录本身。 */
+export async function clearAllCoverImages(): Promise<number> {
+  const [animeCount, mangaCount] = await Promise.all([
+    clearAnimeCoverImages(),
+    clearMangaCoverImages(),
+  ]);
+  return animeCount + mangaCount;
 }
 
 /**
@@ -333,5 +388,25 @@ export async function resolveLocalCoverImage(
 
   // 既不是远程 URL 也不是本地路径（异常值）→ 清理
   await deleteCoverImage(animeId);
+  return null;
+}
+
+export async function resolveLocalMangaCoverImage(
+  coverUrl: string | null | undefined,
+  mangaId: number,
+): Promise<string | null> {
+  const trimmed = (coverUrl ?? '').trim();
+  if (!trimmed) {
+    await deleteMangaCoverImage(mangaId);
+    return null;
+  }
+  if (isLocalCoverPath(trimmed)) return trimmed;
+  if (isRemoteUrl(trimmed)) {
+    const localPath = await downloadMangaCoverImage(trimmed, mangaId);
+    if (localPath) return localPath;
+    console.warn(`[cover] 漫画封面下载失败，将继续使用远程来源地址: ${trimmed}`);
+    return null;
+  }
+  await deleteMangaCoverImage(mangaId);
   return null;
 }

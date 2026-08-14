@@ -135,13 +135,17 @@ export default function MangaDetailPage() {
     return <PageContainer as="main"><div className="surface-card rounded-3xl p-10 text-center text-[var(--text-muted)]">漫画不存在或暂时无法读取。</div></PageContainer>;
   }
 
+  const backgroundCoverUrl = draft.coverUrl !== (record.coverUrl || '')
+    ? draft.coverUrl
+    : (record.displayCoverUrl || draft.coverUrl);
+
   return (
     <PageContainer as="main" width="wide" spacing="detail" animation="zoom">
       <div className="shadow-theme-xl relative overflow-hidden rounded-[32px] border border-[var(--border)]" style={{ backgroundColor: 'var(--bg-card)' }}>
-        {draft.coverUrl ? (
+        {backgroundCoverUrl ? (
           <div className="absolute inset-0 opacity-[0.08]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={draft.coverUrl} alt={record.title} className="h-full w-full scale-110 object-cover blur-3xl" />
+            <img src={backgroundCoverUrl} alt={record.title} className="h-full w-full scale-110 object-cover blur-3xl" />
           </div>
         ) : null}
         <div className="theme-detail-aura absolute inset-0" />

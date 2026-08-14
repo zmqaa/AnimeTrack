@@ -52,7 +52,7 @@ server {
         include /etc/nginx/snippets/animetrack-proxy.conf;
     }
 
-    # 导入、创建 SQL 备份和恢复均为低频数据操作。
+    # 导入、创建应用 JSON 备份和恢复均为低频数据操作。
     location ~ ^/api/admin/(?:import|backup|backup/restore)/?$ {
         limit_req zone=animetrack_data_write burst=3 nodelay;
         include /etc/nginx/snippets/animetrack-proxy.conf;

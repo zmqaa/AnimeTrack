@@ -10,8 +10,9 @@ AnimeTrack 是一个个人动漫记录 Web 应用。它用来管理想看、在�
 - 快速记录：追加观看进度和观看历史
 - 数据视图：Dashboard、时间线、季度视图和图谱视图
 - 元数据：简介、封面、原名、首播日期、声优等资料维护
+- 本地封面缓存：动漫和漫画均保留远程来源，并可批量下载原图与缩略图
 - AI 辅助：标题和 Bangumi 元数据补全，支持 OpenAI 兼容接口
-- 数据管理：JSON 导入导出、SQL 备份、恢复和定时备份
+- 数据管理：JSON 导入导出、应用 JSON 备份、恢复和定时备份
 - 多主题界面和响应式布局
 - 支持自定义数据库、备份和封面存储路径
 
@@ -140,16 +141,16 @@ curl.exe -sS -o NUL -w "HTTP %{http_code} 连接 %{time_connect}s 总计 %{time_
 
 `db:full-backup` 不导出 `users` 表，恢复时会保留目标数据库中已有的管理员账号。完整 SQL 可通过 `npm run db:apply-sql -- <备份文件>` 恢复；如果账号丢失，使用 `npm run user:create-admin -- <用户名> <密码> [显示名]` 重新创建即可。JSON 便携备份同样不包含账号。
 
-## 服务器定时 JSON 备份
+## JSON 备份与定时执行
 
-`db:scheduled-json-backup` 生成与 Web 页面“导出 JSON”相同格式的完整便携备份，包含总备注和按集数记录的分集随记，默认保存到 `backups/json/`，并保留最近 10 份：
+备份页面和 `db:scheduled-json-backup` 使用同一种完整便携 JSON 格式，包含动漫、总备注、分集随记、观看历史和漫画，默认保存到 `backups/json/`，并保留最近 10 份：
 
 ```bash
 npm run db:scheduled-json-backup
 npm run db:scheduled-json-backup -- --keep 60
 ```
 
-服务器可以通过 `crontab -e` 每天执行一次。下面示例每天北京时间 03:20 备份；请按实际项目路径和 `npm` 路径调整：
+定时执行方式取决于运行环境。服务器可以通过 `crontab -e` 每天执行一次；本地开发环境可以手动运行，或使用操作系统的任务计划工具。下面示例每天北京时间 03:20 备份，请按实际项目路径和 `npm` 路径调整：
 
 ```cron
 CRON_TZ=Asia/Shanghai
@@ -163,7 +164,7 @@ mkdir -p logs
 npm run db:scheduled-json-backup
 ```
 
-可通过 `ANIMETRACK_JSON_BACKUPS_DIR` 修改保存目录，通过 `ANIMETRACK_JSON_BACKUP_KEEP` 修改默认保留份数。JSON 备份包含全部番剧、观看历史和漫画，不包含用户账号或本地封面文件。
+可通过 `ANIMETRACK_JSON_BACKUPS_DIR` 修改保存目录，通过 `ANIMETRACK_JSON_BACKUP_KEEP` 修改默认保留份数。未来桌面版需要将同一备份流程接入桌面应用的用户数据目录和系统定时能力，不能直接依赖服务器 cron。JSON 备份不包含用户账号或本地封面文件。
 
 ## 数据与安全
 

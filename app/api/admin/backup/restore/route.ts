@@ -1,15 +1,16 @@
 import { NextRequest } from 'next/server';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
-import fs from 'fs';
-import path from 'path';
 import { apiError, apiInternalError, apiSuccess, requireAdmin } from '@/lib/api-response';
-import { getRawDb } from '@/lib/db';
-import { getBackupsDirectory, getDatabasePath } from '@/lib/runtime-paths';
-import { clearAllCoverImages } from '@/lib/cover-image';
-import { BackupValidationError, prepareBackupSqlForRestore } from '@/lib/sql-backup-validation';
-
-const execFileAsync = promisify(execFile);
+import {
+  createJsonBackup,
+  getJsonBackupRetention,
+  JsonBackupFileError,
+  readJsonBackupFile,
+} from '@/lib/json-backups';
+import {
+  getAvailableImportDatasets,
+  ImportValidationError,
+  importAnimeData,
+} from '@/lib/anime-import';
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin('需要管理员权限');
@@ -25,67 +26,35 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    if (typeof body.name !== 'string') {
-      return apiError('缺少备份文件名', 'BAD_REQUEST');
+    const backup = readJsonBackupFile(body.name);
+    const datasets = getAvailableImportDatasets(backup.payload);
+    if (!datasets.includes('anime') || !datasets.includes('manga')) {
+      return apiError('应用备份必须同时包含动漫和漫画数据', 'BAD_REQUEST');
     }
 
-    const baseName = path.basename(body.name);
-    if (baseName !== body.name || !baseName.endsWith('.sql') || baseName.includes('..')) {
-      return apiError('无效的备份文件名', 'BAD_REQUEST');
-    }
-
-    const backupsDirectory = getBackupsDirectory();
-    const filePath = path.join(backupsDirectory, baseName);
-    const resolvedPath = path.resolve(filePath);
-    if (path.dirname(resolvedPath) !== path.resolve(backupsDirectory)) {
-      return apiError('无效的备份文件路径', 'BAD_REQUEST');
-    }
-    if (!fs.existsSync(resolvedPath)) {
-      return apiError('备份文件不存在', 'NOT_FOUND');
-    }
-
-    // Read and validate the selected snapshot before creating the safety backup.
-    const sql = fs.readFileSync(resolvedPath, 'utf8');
-    const restoreSql = prepareBackupSqlForRestore(sql);
-
-    const scriptPath = path.join(process.cwd(), 'scripts/db/scheduled_backup.js');
-    await execFileAsync(process.execPath, [scriptPath], {
-      cwd: process.cwd(),
-      timeout: 30000,
-      env: {
-        ...process.env,
-        DB_PATH: getDatabasePath(),
-        ANIMETRACK_BACKUPS_DIR: backupsDirectory,
-        ANIMETRACK_BACKUP_PREFIX: 'pre-restore-backup-',
-      },
+    // 多保留一份，避免创建恢复前快照时轮转掉用户刚选中的最旧备份。
+    await createJsonBackup(getJsonBackupRetention() + 1);
+    const result = await importAnimeData({
+      ...backup.payload,
+      selectedDatasets: ['anime', 'manga'],
     });
-
-    const db = getRawDb();
-    db.transaction(() => {
-      // 兼容漫画功能加入前创建的旧备份：旧快照等价于没有漫画记录。
-      db.prepare('DELETE FROM manga').run();
-      db.exec(restoreSql);
-      db.prepare('UPDATE anime SET localCoverUrl = NULL').run();
-    })();
-    await clearAllCoverImages();
-
-    const animeCount = (db.prepare('SELECT COUNT(*) AS count FROM anime').get() as { count: number }).count;
-    const historyCount = (db.prepare('SELECT COUNT(*) AS count FROM watch_history').get() as { count: number }).count;
-    const mangaCount = (db.prepare('SELECT COUNT(*) AS count FROM manga').get() as { count: number }).count;
 
     return apiSuccess({
       success: true,
-      restored: baseName,
-      animeCount,
-      historyCount,
-      mangaCount,
+      restored: backup.name,
+      animeCount: result.anime.replaced,
+      historyCount: result.watchHistory.replaced,
+      mangaCount: result.manga.replaced,
     });
   } catch (error) {
-    if (error instanceof BackupValidationError) {
+    if (error instanceof JsonBackupFileError) {
+      return apiError(error.message, error.apiCode);
+    }
+    if (error instanceof ImportValidationError) {
       return apiError(error.message, 'BAD_REQUEST');
     }
     return apiInternalError(error, {
-      operation: '恢复数据库备份',
+      operation: '恢复应用 JSON 备份',
       message: '恢复备份失败，请检查服务器日志后确认当前数据状态',
     });
   }

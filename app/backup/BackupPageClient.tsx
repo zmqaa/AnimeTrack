@@ -44,10 +44,16 @@ interface RestoreResult {
   mangaCount: number;
 }
 
-interface CoverBatchResult {
+interface CoverBatchGroupResult {
   total: number;
   downloaded: number;
+  skipped: number;
   failed: number;
+}
+
+interface CoverBatchResult extends CoverBatchGroupResult {
+  anime: CoverBatchGroupResult;
+  manga: CoverBatchGroupResult;
 }
 
 type DataGroup = 'anime' | 'manga';
@@ -248,13 +254,18 @@ export default function BackupPageClient() {
         method: 'POST',
       }, '批量下载封面失败');
       if (result.total === 0) {
-        toast('没有可下载的远程封面');
-      } else if (result.failed > 0) {
-        toast.success(`封面下载完成：成功 ${result.downloaded} 张，失败 ${result.failed} 张`);
+        toast('还没有动漫或漫画记录');
+      } else if (result.downloaded === 0 && result.failed === 0) {
+        toast.success('动漫和漫画封面都已缓存到本地');
       } else {
-        toast.success(`已下载 ${result.downloaded} 张封面`);
+        const describe = (label: string, value: CoverBatchGroupResult) => (
+          `${label}新下载 ${value.downloaded} 张、已有 ${value.skipped} 张、失败 ${value.failed} 张`
+        );
+        toast.success(`封面缓存完成：${describe('动漫', result.anime)}；${describe('漫画', result.manga)}`);
       }
-      await globalMutate((key) => typeof key === 'string' && key.startsWith('/api/anime'));
+      await globalMutate((key) => typeof key === 'string' && (
+        key.startsWith('/api/anime') || key.startsWith('/api/manga')
+      ));
       globalMutate(DASHBOARD_OVERVIEW_KEY);
       globalMutate(isTimelineKey);
     } catch (error) {
@@ -357,7 +368,7 @@ export default function BackupPageClient() {
       {/* Header */}
       <div>
         <h1 className="text-2xl md:text-3xl font-display tracking-tight text-[var(--text-primary)]">备份与导出</h1>
-        <p className="text-base text-[var(--text-muted)] mt-2">导出可迁移文件，或创建应用侧的 SQL 数据快照</p>
+        <p className="text-base text-[var(--text-muted)] mt-2">导出可迁移文件，或管理当前运行环境保存的 JSON 备份</p>
       </div>
 
       {/* Export Section */}
@@ -449,28 +460,28 @@ export default function BackupPageClient() {
           onChange={handleImportFile}
         />
         <p className="text-xs text-[var(--text-muted)] mt-4">
-          只有 JSON 可以回导。上传后可再次选择覆盖动漫数据、漫画数据或两者；文件未包含或没有勾选的数据不会改动。覆盖动漫数据会同时替换番剧、备注与观看历史，并清空旧的本地番剧封面。
+          只有 JSON 可以回导。上传后可再次选择覆盖动漫数据、漫画数据或两者；文件未包含或没有勾选的数据不会改动。导入前会先在当前运行环境创建 JSON 安全备份。覆盖数据会清空对应的旧本地封面，之后可用“批量下载封面”重新缓存。
         </p>
       </section>
 
       {/* Backup Section */}
       <section className="glass-panel rounded-3xl border border-[var(--border)] p-6 md:p-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
-          <h2 className="text-lg font-medium text-[var(--text-primary)]">SQL 备份</h2>
+          <h2 className="text-lg font-medium text-[var(--text-primary)]">应用 JSON 备份</h2>
           <AsyncButton
             onClick={handleCreateBackup}
             busy={creating}
-            busyLabel="正在备份…"
+            busyLabel="正在创建备份…"
             className="theme-accent-button flex w-fit items-center gap-2.5 rounded-2xl px-5 py-3 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            立即备份
+            立即创建备份
           </AsyncButton>
         </div>
         <p className="text-sm text-[var(--text-muted)] mb-6">
-          将番剧、漫画和观看历史保存到应用的备份目录，常规备份默认保留最近 10 份。可以直接恢复到某个备份时间点；恢复前会自动保存当前状态。跨设备迁移仍优先使用 JSON。
+          完整备份包含动漫、备注、观看历史和漫画，不包含管理员账号和本地封面文件。当前服务器每天 03:20 自动生成并默认保留最近 10 份；本地运行时文件保存在本机，自动执行需要另行配置定时任务。恢复前会先保存当前状态。
         </p>
 
         {loading ? (
@@ -481,7 +492,7 @@ export default function BackupPageClient() {
           </div>
         ) : backups.length === 0 ? (
           <div className="text-center py-12 text-[var(--text-muted)]">
-            暂无备份文件，点击「立即备份」创建第一个
+            暂无 JSON 备份，点击「立即创建备份」创建第一个
           </div>
         ) : (
           <div className="space-y-2">
@@ -592,8 +603,8 @@ export default function BackupPageClient() {
 
       <ConfirmDialog
         open={restoreConfirm !== null}
-        title="恢复 SQL 备份"
-        message={`确定恢复到「${restoreConfirm || ''}」吗？当前番剧、漫画、观看历史和本地番剧封面会被替换；系统会先自动创建一份“恢复前备份”。`}
+        title="恢复应用 JSON 备份"
+        message={`确定恢复到「${restoreConfirm || ''}」吗？当前番剧、漫画、观看历史和本地封面会被替换；系统会先自动创建一份“恢复前备份”。`}
         confirmText={restoring ? '恢复中...' : '确认恢复'}
         variant="warning"
         busy={restoring !== null}

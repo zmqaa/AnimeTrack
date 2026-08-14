@@ -15,6 +15,9 @@ export interface MangaRecord {
   originalTitle?: string;
   aliases: string[];
   coverUrl?: string;
+  localCoverUrl?: string;
+  displayCoverUrl?: string;
+  thumbnailCoverUrl?: string;
   status: MangaReadingStatus;
   publicationStatus: MangaPublicationStatus;
   score?: number;
@@ -51,4 +54,3 @@ export const MANGA_PUBLICATION_STATUS_LABELS: Record<MangaPublicationStatus, str
   hiatus: '休载中',
   unknown: '连载状态未知',
 };
-

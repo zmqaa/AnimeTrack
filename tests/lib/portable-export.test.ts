@@ -67,6 +67,9 @@ describe('portable JSON export', () => {
       publicationStatus: 'ongoing',
       currentChapter: '87.5',
       authors: ['なもり'],
+      localCoverUrl: '/api/local-covers/manga-1.jpg',
+      displayCoverUrl: '/api/local-covers/manga-1.jpg?v=test',
+      thumbnailCoverUrl: '/api/local-covers/manga-1.thumb.webp?v=test',
     }]) as {
       manga: { count: number; records: Array<Record<string, unknown>> };
       watchHistory: { count: number };
@@ -77,6 +80,9 @@ describe('portable JSON export', () => {
       title: '大室家',
       currentChapter: '87.5',
     });
+    expect(result.manga.records[0]).not.toHaveProperty('localCoverUrl');
+    expect(result.manga.records[0]).not.toHaveProperty('displayCoverUrl');
+    expect(result.manga.records[0]).not.toHaveProperty('thumbnailCoverUrl');
     expect(result.watchHistory.count).toBe(0);
   });
 

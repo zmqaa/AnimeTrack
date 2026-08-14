@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 import { apiError, apiInternalError } from '@/lib/api-response';
 import { getCoversDirectory } from '@/lib/runtime-paths';
 
-const COVER_FILE_PATTERN = /^(?:\d+\.(?:jpg|jpeg|png|webp|gif)|\d+\.thumb\.webp)$/i;
+const COVER_FILE_PATTERN = /^(?:(?:manga-)?\d+\.(?:jpg|jpeg|png|webp|gif)|(?:manga-)?\d+\.thumb\.webp)$/i;
 
 export async function GET(
   request: Request,

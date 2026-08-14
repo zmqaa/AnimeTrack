@@ -1,13 +1,21 @@
 import 'server-only';
 
 import { parseJsonStringArray } from './anime-cast';
+import {
+  deleteMangaCoverImage,
+  resolveDisplayCoverUrl,
+  resolveThumbnailCoverUrl,
+} from './cover-image';
 import { query, type DbResult } from './db';
 import { nowISO } from './date-utils';
 import type { MangaPublicationStatus, MangaReadingStatus, MangaRecord } from './manga-shared';
 
 export type { MangaPublicationStatus, MangaReadingStatus, MangaRecord } from './manga-shared';
 
-export type CreateMangaDTO = Omit<MangaRecord, 'id' | 'createdAt' | 'updatedAt'>;
+export type CreateMangaDTO = Omit<
+  MangaRecord,
+  'id' | 'createdAt' | 'updatedAt' | 'localCoverUrl' | 'displayCoverUrl' | 'thumbnailCoverUrl'
+> & { localCoverUrl?: string | null };
 
 interface MangaRow {
   id: number;
@@ -16,6 +24,7 @@ interface MangaRow {
   original_title?: string | null;
   aliases?: string | null;
   coverUrl?: string | null;
+  localCoverUrl?: string | null;
   status: MangaReadingStatus;
   publication_status: MangaPublicationStatus;
   score?: number | string | null;
@@ -45,6 +54,9 @@ function mapMangaRow(row: MangaRow): MangaRecord {
     originalTitle: row.original_title || undefined,
     aliases: parseJsonStringArray(row.aliases),
     coverUrl: row.coverUrl || undefined,
+    localCoverUrl: row.localCoverUrl || undefined,
+    displayCoverUrl: resolveDisplayCoverUrl(row.localCoverUrl, row.coverUrl),
+    thumbnailCoverUrl: resolveThumbnailCoverUrl(row.localCoverUrl, row.coverUrl),
     status: row.status,
     publicationStatus: row.publication_status,
     score: row.score != null ? Number(row.score) : undefined,
@@ -112,6 +124,7 @@ function valuesForManga(input: CreateMangaDTO, createdAt: string, updatedAt: str
     input.originalTitle || null,
     JSON.stringify(input.aliases || []),
     input.coverUrl || null,
+    input.localCoverUrl || null,
     input.status,
     input.publicationStatus,
     input.score ?? null,
@@ -138,11 +151,11 @@ export async function createMangaRecord(input: CreateMangaDTO): Promise<MangaRec
   const now = nowISO();
   const result = await query<DbResult>(`
     INSERT INTO manga (
-      bangumi_id, title, original_title, aliases, coverUrl, status, publication_status,
+      bangumi_id, title, original_title, aliases, coverUrl, localCoverUrl, status, publication_status,
       score, current_volume, current_chapter, total_volumes, total_chapters, notes,
       tags, summary, authors, illustrators, publishers, serializations,
       start_date, end_date, release_date, createdAt, updatedAt
-    ) VALUES (${Array.from({ length: 24 }, () => '?').join(', ')})
+    ) VALUES (${Array.from({ length: 25 }, () => '?').join(', ')})
   `, valuesForManga(input, now, now));
   const created = await getMangaRecord(result.insertId);
   if (!created) throw new Error('漫画创建后读取失败');
@@ -155,6 +168,7 @@ const UPDATE_COLUMNS: Record<keyof CreateMangaDTO, string> = {
   originalTitle: 'original_title',
   aliases: 'aliases',
   coverUrl: 'coverUrl',
+  localCoverUrl: 'localCoverUrl',
   status: 'status',
   publicationStatus: 'publication_status',
   score: 'score',
@@ -200,5 +214,7 @@ export async function updateMangaRecord(
 
 export async function deleteMangaRecord(id: number): Promise<boolean> {
   const result = await query<DbResult>('DELETE FROM manga WHERE id = ?', [id]);
-  return result.affectedRows > 0;
+  if (result.affectedRows === 0) return false;
+  await deleteMangaCoverImage(id);
+  return true;
 }

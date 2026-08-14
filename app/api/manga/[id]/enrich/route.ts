@@ -6,6 +6,7 @@ import {
   type CreateMangaDTO,
 } from '@/lib/manga';
 import { getMangaMetadataCandidate } from '@/lib/manga-provider';
+import { resolveLocalMangaCoverImage } from '@/lib/cover-image';
 
 async function handlePost(
   _request: Request,
@@ -55,6 +56,10 @@ async function handlePost(
   const appliedFields = Object.keys(patch);
   if (appliedFields.length === 0) {
     return apiSuccess({ ok: true, appliedFields, entry: record });
+  }
+
+  if (patch.coverUrl) {
+    patch.localCoverUrl = await resolveLocalMangaCoverImage(patch.coverUrl, id);
   }
 
   const updated = await updateMangaRecord(id, patch);

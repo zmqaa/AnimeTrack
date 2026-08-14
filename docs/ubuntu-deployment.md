@@ -225,7 +225,7 @@ sudo systemctl reload nginx
 https://anime.example.com/login
 ```
 
-建议依次人工确认：首页与封面、管理员登录、AI 快速录入进度、JSON 导入导出、SQL 备份下载和恢复。响应头可用以下命令抽查：
+建议依次人工确认：首页与封面、管理员登录、AI 快速录入进度、JSON 导入导出、应用 JSON 备份创建、下载和恢复。响应头可用以下命令抽查：
 
 ```bash
 curl -sSI https://anime.example.com/login | grep -Ei 'strict-transport-security|content-security-policy|x-content-type-options|referrer-policy'
@@ -297,7 +297,7 @@ public/covers/
 backups/
 ```
 
-至少应定期备份 `data/animetrack.db` 和 `public/covers/`。完整 JSON 备份默认写入 `backups/json/`，不包含管理员账号和本地封面文件。
+至少应定期备份 `data/animetrack.db` 和 `public/covers/`。备份页面管理的完整 JSON 默认写入 `backups/json/`，包含动漫、备注、观看历史和漫画，不包含管理员账号和本地封面文件。服务器可用 cron 定时执行；本地运行时可手动执行同一命令，自动备份需要使用本机的任务计划工具。
 
 需要生成便于数据库维护的完整 SQL 时，可执行：
 
