@@ -35,6 +35,7 @@ export default function AnimeTimelinePage() {
   const [sortBy, setSortBy] = useState<TimelineSortBy>('newest');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<'day' | 'week' | 'month'>('day');
   const [page, setPage] = useState(1);
 
@@ -47,6 +48,7 @@ export default function AnimeTimelinePage() {
     page,
     pageSize: PAGE_SIZE,
     search: debouncedSearch,
+    date: selectedDate || '',
     sortBy,
   });
   const { data: overview, isLoading: overviewLoading } = useSWR<TimelineOverview>(
@@ -59,15 +61,15 @@ export default function AnimeTimelinePage() {
     { keepPreviousData: true },
   );
 
-  const prevFilters = useRef({ searchQuery, sortBy, groupBy, viewMode });
+  const prevFilters = useRef({ searchQuery, sortBy, selectedDate, groupBy, viewMode });
   useEffect(() => {
     const prev = prevFilters.current;
     if (prev.searchQuery !== searchQuery || prev.sortBy !== sortBy
-        || prev.groupBy !== groupBy || prev.viewMode !== viewMode) {
+        || prev.selectedDate !== selectedDate || prev.groupBy !== groupBy || prev.viewMode !== viewMode) {
       setPage(1);
     }
-    prevFilters.current = { searchQuery, sortBy, groupBy, viewMode };
-  }, [searchQuery, sortBy, groupBy, viewMode]);
+    prevFilters.current = { searchQuery, sortBy, selectedDate, groupBy, viewMode };
+  }, [searchQuery, sortBy, selectedDate, groupBy, viewMode]);
 
   const entries = useMemo<EnrichedEntry[]>(() => {
     return (entriesData?.records || []).map(({ history, anime }) => {
@@ -90,6 +92,10 @@ export default function AnimeTimelinePage() {
   const handleViewModeChange = useCallback((mode: TimelineViewMode) => setViewMode(mode), []);
   const handleSortByChange = useCallback((sort: TimelineSortBy) => setSortBy(sort), []);
   const handleSearchChange = useCallback((query: string) => setSearchQuery(query), []);
+  const handleDateChange = useCallback((date: string | null) => {
+    setSelectedDate(date);
+    setPage(1);
+  }, []);
   const handleGroupByChange = useCallback((group: 'day' | 'week' | 'month') => setGroupBy(group), []);
   const handlePageChange = useCallback((nextPage: number) => setPage(nextPage), []);
 
@@ -106,7 +112,7 @@ export default function AnimeTimelinePage() {
     );
   }
 
-  const summaries = debouncedSearch ? entriesData.summary || [] : overview.animeSummary;
+  const summaries = debouncedSearch || selectedDate ? entriesData.summary || [] : overview.animeSummary;
 
   return (
     <PageContainer as="main" width="wide" spacing="compact">
@@ -122,6 +128,8 @@ export default function AnimeTimelinePage() {
         <TimelineHeatmap
           dailyCounts={overview.heatmap.dailyCounts}
           months={overview.heatmap.months}
+          selectedDate={selectedDate}
+          onDateSelect={handleDateChange}
         />
       </LazyRender>
 
@@ -134,6 +142,8 @@ export default function AnimeTimelinePage() {
             onSortByChange={handleSortByChange}
             searchQuery={searchQuery}
             onSearchChange={handleSearchChange}
+            selectedDate={selectedDate}
+            onDateChange={handleDateChange}
             groupBy={groupBy}
             onGroupByChange={handleGroupByChange}
           />
@@ -143,7 +153,7 @@ export default function AnimeTimelinePage() {
               <TimelineEnhancedList
                 entries={entries}
                 groupBy={groupBy}
-                hasSearch={Boolean(debouncedSearch)}
+                hasFilter={Boolean(debouncedSearch || selectedDate)}
                 page={entriesData.page}
                 totalPages={entriesData.totalPages}
                 totalItems={entriesData.total}
@@ -154,7 +164,7 @@ export default function AnimeTimelinePage() {
             <LazyRender fallback={<PanelSkeleton height="xlarge" />}>
               <TimelineTable
                 entries={entries}
-                hasSearch={Boolean(debouncedSearch)}
+                hasFilter={Boolean(debouncedSearch || selectedDate)}
                 sortBy={sortBy}
                 onSortByChange={handleSortByChange}
                 page={entriesData.page}
@@ -171,6 +181,7 @@ export default function AnimeTimelinePage() {
             <TimelineAnimeSummary
               summaries={summaries}
               searchQuery={debouncedSearch}
+              selectedDate={selectedDate}
             />
           </LazyRender>
         </div>

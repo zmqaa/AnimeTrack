@@ -84,6 +84,42 @@ describe('timeline paginated queries', () => {
     expect(result.records.map((entry) => entry.history.id)).toEqual([4, 2, 3, 1]);
   });
 
+  it('filters entries and summaries by an application-time calendar date', async () => {
+    dbModule.getRawDb().exec(`
+      INSERT INTO watch_history (id, animeId, animeTitle, episode, watchedAt)
+      VALUES
+        (5, 1, '作品甲', 4, '2026-07-26T16:00:00.000Z'),
+        (6, 2, '作品乙', 11, '2026-07-27T16:00:00.000Z');
+    `);
+
+    const result = await timelineModule.getTimelineEntries({
+      page: 1,
+      pageSize: 10,
+      date: '2026-07-27',
+      sortBy: 'newest',
+    });
+
+    expect(result.total).toBe(2);
+    expect(result.records.map((entry) => entry.history.id)).toEqual([2, 5]);
+    expect(result.summary).toMatchObject([{
+      animeId: 1,
+      totalWatched: 2,
+      latestEpisode: 4,
+      lastEpisode: 3,
+      firstWatched: '2026-07-26T16:00:00.000Z',
+      lastWatched: '2026-07-27T01:00:00.000Z',
+    }]);
+  });
+
+  it('rejects invalid calendar dates in timeline filters', async () => {
+    await expect(timelineModule.getTimelineEntries({
+      page: 1,
+      pageSize: 10,
+      date: '2026-02-31',
+      sortBy: 'newest',
+    })).rejects.toThrow('无效的日期筛选条件');
+  });
+
   it('searches titles and original titles and summarizes every match', async () => {
     const result = await timelineModule.getTimelineEntries({
       page: 1,

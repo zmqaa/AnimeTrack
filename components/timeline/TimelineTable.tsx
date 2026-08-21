@@ -12,7 +12,7 @@ import { APP_TIME_ZONE } from '@/lib/date-utils';
 
 interface TimelineTableProps {
   entries: EnrichedEntry[];
-  hasSearch: boolean;
+  hasFilter: boolean;
   sortBy: TimelineSortBy;
   onSortByChange: (sort: TimelineSortBy) => void;
   page: number;
@@ -34,7 +34,7 @@ function getSortIcon(currentSort: TimelineSortBy, column: SortColumn): boolean {
 
 export default memo(function TimelineTable({
   entries,
-  hasSearch,
+  hasFilter,
   sortBy,
   onSortByChange,
   page,
@@ -67,8 +67,8 @@ export default memo(function TimelineTable({
   if (entries.length === 0) {
     return (
       <EmptyState
-        title={hasSearch ? '没有匹配的记录' : totalItems === 0 ? '暂无观看记录' : '当前页没有记录'}
-        description={hasSearch ? '试试缩短关键词，或清除搜索条件。' : totalItems === 0 ? '更新番剧进度后，这里会生成可排序的记录表格。' : '请返回上一页后重试。'}
+        title={hasFilter ? '没有匹配的记录' : totalItems === 0 ? '暂无观看记录' : '当前页没有记录'}
+        description={hasFilter ? '请调整或清除当前筛选条件。' : totalItems === 0 ? '更新番剧进度后，这里会生成可排序的记录表格。' : '请返回上一页后重试。'}
         surface="panel"
       />
     );

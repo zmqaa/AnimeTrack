@@ -23,6 +23,8 @@ interface TimelineControlsProps {
   onSortByChange: (sort: TimelineSortBy) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  selectedDate: string | null;
+  onDateChange: (date: string | null) => void;
   groupBy: 'day' | 'week' | 'month';
   onGroupByChange: (group: 'day' | 'week' | 'month') => void;
 }
@@ -51,6 +53,8 @@ export default memo(function TimelineControls({
   onSortByChange,
   searchQuery,
   onSearchChange,
+  selectedDate,
+  onDateChange,
   groupBy,
   onGroupByChange,
 }: TimelineControlsProps) {
@@ -137,6 +141,33 @@ export default memo(function TimelineControls({
         )}
 
         <div className="flex-1" />
+
+        {/* Date filter — shared by the timeline and table views */}
+        <div className="flex items-center gap-2">
+          <label htmlFor="timeline-date-filter" className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
+            日期
+          </label>
+          <div className="relative">
+            <input
+              id="timeline-date-filter"
+              type="date"
+              value={selectedDate || ''}
+              onChange={(event) => onDateChange(event.target.value || null)}
+              aria-label="按日期筛选观看记录"
+              className="surface-input min-w-[148px] rounded-xl px-3 py-2 pr-8 text-xs font-mono outline-none transition-all focus:ring-2 focus:ring-primary/30"
+            />
+            {selectedDate && (
+              <button
+                type="button"
+                onClick={() => onDateChange(null)}
+                aria-label="清除日期筛选"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+              >
+                <XMarkIcon className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
 
         {/* Search */}
         <div className="relative min-w-[180px] max-w-[260px]">

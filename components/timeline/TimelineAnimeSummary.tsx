@@ -12,22 +12,24 @@ const SUMMARY_PAGE_SIZE = 10;
 interface TimelineAnimeSummaryProps {
   summaries: TimelineAnimeSummaryData[];
   searchQuery: string;
+  selectedDate?: string | null;
 }
-export default memo(function TimelineAnimeSummary({ summaries, searchQuery }: TimelineAnimeSummaryProps) {
+export default memo(function TimelineAnimeSummary({ summaries, searchQuery, selectedDate = null }: TimelineAnimeSummaryProps) {
   const [page, setPage] = useState(1);
+  const hasFilter = Boolean(searchQuery || selectedDate);
 
   const totalPages = Math.max(1, Math.ceil(summaries.length / SUMMARY_PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pagedSummaries = summaries.slice((safePage - 1) * SUMMARY_PAGE_SIZE, safePage * SUMMARY_PAGE_SIZE);
 
-  // Reset page when search changes
-  useEffect(() => { setPage(1); }, [searchQuery]);
+  // Reset page when the active filter changes.
+  useEffect(() => { setPage(1); }, [searchQuery, selectedDate]);
 
   if (summaries.length === 0) {
     return (
       <EmptyState
-        title={searchQuery ? '没有匹配的作品' : '暂无最近观看'}
-        description={searchQuery ? '当前搜索条件没有匹配到观看记录。' : '产生观看记录后，这里会显示最近看过的作品。'}
+        title={hasFilter ? '没有匹配的作品' : '暂无最近观看'}
+        description={hasFilter ? '当前筛选条件没有匹配到观看记录。' : '产生观看记录后，这里会显示最近看过的作品。'}
         size="compact"
         surface="panel"
         className="min-h-[200px]"
@@ -39,7 +41,7 @@ export default memo(function TimelineAnimeSummary({ summaries, searchQuery }: Ti
 
   return (
     <Panel
-      title="最近观看作品"
+      title={selectedDate ? '当日观看作品' : '最近观看作品'}
       description={(
         <>
           {totalAnime} 部番剧 · 按最近观看时间排序

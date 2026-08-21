@@ -17,7 +17,7 @@ export interface EnrichedEntry {
 interface TimelineEnhancedListProps {
   entries: EnrichedEntry[];
   groupBy: 'day' | 'week' | 'month';
-  hasSearch: boolean;
+  hasFilter: boolean;
   page: number;
   totalPages: number;
   totalItems: number;
@@ -122,7 +122,7 @@ export function TimelinePagination({ page, totalPages, totalItems, onPageChange 
   );
 }
 
-export default memo(function TimelineEnhancedList({ entries, groupBy, hasSearch, page, totalPages, totalItems, onPageChange }: TimelineEnhancedListProps) {
+export default memo(function TimelineEnhancedList({ entries, groupBy, hasFilter, page, totalPages, totalItems, onPageChange }: TimelineEnhancedListProps) {
   const grouped = useMemo(() => {
     const groups: { key: string; label: string; entries: EnrichedEntry[] }[] = [];
     const groupMap = new Map<string, EnrichedEntry[]>();
@@ -157,8 +157,8 @@ export default memo(function TimelineEnhancedList({ entries, groupBy, hasSearch,
   if (entries.length === 0) {
     return (
       <EmptyState
-        title={hasSearch ? '没有匹配的记录' : totalItems === 0 ? '暂无观看记录' : '当前页没有记录'}
-        description={hasSearch ? '试试缩短关键词，或清除搜索条件。' : totalItems === 0 ? '去更新一下番剧进度，观看记录会自动出现在这里。' : '请返回上一页后重试。'}
+        title={hasFilter ? '没有匹配的记录' : totalItems === 0 ? '暂无观看记录' : '当前页没有记录'}
+        description={hasFilter ? '请调整或清除当前筛选条件。' : totalItems === 0 ? '去更新一下番剧进度，观看记录会自动出现在这里。' : '请返回上一页后重试。'}
         surface="panel"
       />
     );

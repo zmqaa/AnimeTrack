@@ -9,6 +9,8 @@ import { dateKeyToAppDate, formatAppDateKey, shiftDateKey } from '@/lib/date-uti
 interface TimelineHeatmapProps {
   dailyCounts: Record<string, number>;
   months?: number; // default 12, for compact mode pass e.g. 6
+  selectedDate?: string | null;
+  onDateSelect?: (date: string) => void;
 }
 
 const LEVEL_COLORS = [
@@ -35,7 +37,12 @@ const CELL_SIZE = 20;
 const CELL_GAP = 6;
 const CELL_STEP = CELL_SIZE + CELL_GAP;
 
-export default memo(function TimelineHeatmap({ dailyCounts, months = 12 }: TimelineHeatmapProps) {
+export default memo(function TimelineHeatmap({
+  dailyCounts,
+  months = 12,
+  selectedDate = null,
+  onDateSelect,
+}: TimelineHeatmapProps) {
   const [activeDate, setActiveDate] = useState<string | null>(null);
 
   const { cells, monthMarkers, totalDays, activeDays, maxInDay, totalWeeks } = useMemo(() => {
@@ -199,8 +206,8 @@ export default memo(function TimelineHeatmap({ dailyCounts, months = 12 }: Timel
                   height={cellSize}
                   rx={cellSize >= 12 ? 3 : 2}
                   fill={color}
-                  stroke={activeDate === cell.dateStr || cell.isToday ? 'var(--chart-line-start)' : 'transparent'}
-                  strokeWidth={activeDate === cell.dateStr ? 2.5 : cell.isToday ? 1.5 : 0}
+                  stroke={selectedDate === cell.dateStr || activeDate === cell.dateStr || cell.isToday ? 'var(--chart-line-start)' : 'transparent'}
+                  strokeWidth={selectedDate === cell.dateStr || activeDate === cell.dateStr ? 2.5 : cell.isToday ? 1.5 : 0}
                   className="transition-colors duration-150"
                 />
                 {/* Wider hit area */}
@@ -217,6 +224,13 @@ export default memo(function TimelineHeatmap({ dailyCounts, months = 12 }: Timel
                   onFocus={() => setActiveDate(cell.dateStr)}
                   onBlur={() => setActiveDate(null)}
                   onPointerDown={() => setActiveDate(cell.dateStr)}
+                  onClick={() => onDateSelect?.(cell.dateStr)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onDateSelect?.(cell.dateStr);
+                    }
+                  }}
                   style={{ cursor: 'pointer', outline: 'none' }}
                 />
               </g>

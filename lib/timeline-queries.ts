@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { resolveDisplayCoverUrl, resolveThumbnailCoverUrl } from './cover-image';
+import { dateKeyToAppDate, isValidCalendarDate, shiftDateKey } from './date-utils';
 import { query } from './db';
 import type { WatchHistoryRecord } from './dashboard-types';
 import type { AnimeStatus } from './anime-shared';
@@ -39,6 +40,11 @@ interface TimelineSummaryRow extends TimelineAnimeRow {
   lastWatched: string;
 }
 
+interface TimelineDateRange {
+  start: string;
+  end: string;
+}
+
 function mapAnime(row: TimelineAnimeRow): TimelineAnimeItem {
   return {
     id: row.id,
@@ -51,13 +57,35 @@ function mapAnime(row: TimelineAnimeRow): TimelineAnimeItem {
   };
 }
 
-function buildSearchClause(search?: string) {
-  const normalized = search?.trim();
-  if (!normalized) return { sql: '', params: [] as unknown[] };
-  const escaped = normalized.replace(/[\\%_]/g, '\\$&');
+function getTimelineDateRange(date?: string): TimelineDateRange | undefined {
+  if (!date) return undefined;
+  if (!isValidCalendarDate(date)) throw new Error('无效的日期筛选条件');
+
   return {
-    sql: " WHERE (a.title LIKE ? ESCAPE '\\' OR a.original_title LIKE ? ESCAPE '\\')",
-    params: [`%${escaped}%`, `%${escaped}%`],
+    start: dateKeyToAppDate(date).toISOString(),
+    end: dateKeyToAppDate(shiftDateKey(date, 1)).toISOString(),
+  };
+}
+
+function buildTimelineFilter(search?: string, date?: string) {
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+  const normalized = search?.trim();
+  if (normalized) {
+    const escaped = normalized.replace(/[\\%_]/g, '\\$&');
+    clauses.push("(a.title LIKE ? ESCAPE '\\' OR a.original_title LIKE ? ESCAPE '\\')");
+    params.push(`%${escaped}%`, `%${escaped}%`);
+  }
+
+  const dateRange = getTimelineDateRange(date);
+  if (dateRange) {
+    clauses.push('h.watchedAt >= ? AND h.watchedAt < ?');
+    params.push(dateRange.start, dateRange.end);
+  }
+
+  return {
+    sql: clauses.length > 0 ? ` WHERE ${clauses.join(' AND ')}` : '',
+    params,
   };
 }
 
@@ -84,8 +112,11 @@ export async function listTimelineHistory(): Promise<WatchHistoryRecord[]> {
   `);
 }
 
-async function getTimelineSummary(search: string): Promise<TimelineAnimeSummaryData[]> {
-  const filter = buildSearchClause(search);
+async function getTimelineSummary(search?: string, date?: string): Promise<TimelineAnimeSummaryData[]> {
+  const filter = buildTimelineFilter(search, date);
+  const dateRange = getTimelineDateRange(date);
+  const latestEpisodeParams = dateRange ? [dateRange.start, dateRange.end] : [];
+  const latestHistoryParams = dateRange ? [dateRange.start, dateRange.end] : [];
   const rows = await query<TimelineSummaryRow[]>(`
     SELECT
       a.id,
@@ -102,6 +133,7 @@ async function getTimelineSummary(search: string): Promise<TimelineAnimeSummaryD
         SELECT latest.episode
         FROM watch_history latest
         WHERE latest.animeId = a.id
+        ${dateRange ? 'AND latest.watchedAt >= ? AND latest.watchedAt < ?' : ''}
         ORDER BY latest.watchedAt DESC, latest.id DESC
         LIMIT 1
       ) AS lastEpisode,
@@ -109,6 +141,7 @@ async function getTimelineSummary(search: string): Promise<TimelineAnimeSummaryD
         SELECT latest.id
         FROM watch_history latest
         WHERE latest.animeId = a.id
+        ${dateRange ? 'AND latest.watchedAt >= ? AND latest.watchedAt < ?' : ''}
         ORDER BY latest.watchedAt DESC, latest.id DESC
         LIMIT 1
       ) AS lastHistoryId,
@@ -119,7 +152,7 @@ async function getTimelineSummary(search: string): Promise<TimelineAnimeSummaryD
     ${filter.sql}
     GROUP BY a.id
     ORDER BY lastWatched DESC, lastHistoryId DESC, a.id ASC
-  `, filter.params);
+  `, [...latestEpisodeParams, ...latestHistoryParams, ...filter.params]);
 
   return rows.map((row) => ({
     animeId: row.animeId,
@@ -141,9 +174,10 @@ export async function getTimelineEntries(options: {
   page: number;
   pageSize: number;
   search?: string;
+  date?: string;
   sortBy: TimelineSortBy;
 }): Promise<TimelineEntriesResponse> {
-  const filter = buildSearchClause(options.search);
+  const filter = buildTimelineFilter(options.search, options.date);
   const orderBy = options.sortBy === 'oldest'
     ? 'h.watchedAt ASC, h.id ASC'
     : options.sortBy === 'mostEpisodes'
@@ -192,7 +226,9 @@ export async function getTimelineEntries(options: {
       },
       anime: mapAnime(row),
     })),
-    summary: options.search?.trim() ? await getTimelineSummary(options.search) : undefined,
+    summary: options.search?.trim() || options.date
+      ? await getTimelineSummary(options.search, options.date)
+      : undefined,
     total,
     page,
     pageSize: options.pageSize,
