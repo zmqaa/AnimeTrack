@@ -21,6 +21,14 @@ const {
 } = require('../shared/db_env');
 
 const BACKUP_PREFIX = 'table-backup-';
+// 账号、OAuth 凭据和迁移内部状态不属于可迁移业务数据，不写入逐表备份。
+const EXCLUDED_TABLES = new Set([
+  'users',
+  'mcp_oauth_clients',
+  'mcp_oauth_codes',
+  'mcp_oauth_tokens',
+  'schema_migrations',
+]);
 
 function ensureDir(dirPath) {
   ensurePrivateDirectory(dirPath);
@@ -58,7 +66,8 @@ function parseArgs() {
 
 function listTables(db) {
   return db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all()
-    .map((row) => row.name);
+    .map((row) => row.name)
+    .filter((tableName) => !EXCLUDED_TABLES.has(tableName));
 }
 
 function getTableSchema(db, tableName) {

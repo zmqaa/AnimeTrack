@@ -58,6 +58,14 @@ server {
         include /etc/nginx/snippets/animetrack-proxy.conf;
     }
 
+    # 远程 MCP 与 OAuth 端点：保留请求体和响应的实时转发，并单独限流。
+    location ~ ^/mcp(?:/|$) {
+        limit_req zone=animetrack_mcp burst=30 nodelay;
+        proxy_buffering off;
+        proxy_cache off;
+        include /etc/nginx/snippets/animetrack-proxy.conf;
+    }
+
     location / {
         include /etc/nginx/snippets/animetrack-proxy.conf;
     }

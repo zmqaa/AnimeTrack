@@ -63,7 +63,11 @@ nano .env.local
 ```dotenv
 NEXTAUTH_URL=https://anime.example.com
 NEXTAUTH_SECRET=替换为刚生成的随机长字符串
+MCP_PUBLIC_BASE_URL=https://anime.example.com
+MCP_SOURCE_BASE_URL=https://anime.example.com
 ```
+
+`MCP_PUBLIC_BASE_URL` 和 `MCP_SOURCE_BASE_URL` 用于连接公网 ChatGPT 的公开只读 MCP。若暂时不使用 MCP，可以先不填写；正式启用时必须使用外网可访问的 HTTPS 地址。
 
 需要使用 AI 录入和资料补充时，再填写：
 

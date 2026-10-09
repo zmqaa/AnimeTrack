@@ -98,6 +98,33 @@ SQLite 数据库默认保存在 `data/animetrack.db`。打开 `http://localhost:
 
 [项目全面检查与长期维护路线图](docs/project-maintenance-roadmap.md)
 
+## 连接公网 ChatGPT 的只读 MCP
+
+项目提供了一个只读的远程 MCP（模型上下文协议）入口，允许支持远程 MCP 的 AI 查询动漫、漫画、观看历史、时间线、备注和库概览。它不会提供新增、修改、删除、导入、备份、账号管理或任意 SQL 工具。
+
+公网部署前，在 `.env.local` 中明确填写站点的 HTTPS 地址：
+
+```dotenv
+MCP_PUBLIC_BASE_URL=https://anime.example.com
+MCP_SOURCE_BASE_URL=https://anime.example.com
+```
+
+其中 `MCP_PUBLIC_BASE_URL` 是 MCP 服务的公开地址；`MCP_SOURCE_BASE_URL` 用于返回可引用的数据来源链接，通常与前者相同。Nginx 使用仓库内的入口模板时，`/mcp` 已包含在代理和限流配置中。配置完成后按正常流程部署：
+
+```bash
+npm run deploy:prod
+```
+
+在 ChatGPT 的开发者模式中创建自定义连接器，填写：
+
+```text
+https://anime.example.com/mcp
+```
+
+这是公开只读连接，不需要 AnimeTrack 登录。ChatGPT 不能访问本机的 `localhost`，因此正式连接必须使用外网可访问的 HTTPS 域名。具体连接器配置可参考 [OpenAI 的 MCP 部署说明](https://developers.openai.com/plugins/deploy/connect-chatgpt)。
+
+这套接口与网站现有公开读取权限一致；后台写入、备份和账号管理仍沿用原有的管理员保护。
+
 ## 中国大陆网络说明
 
 AnimeTrack 的 Bangumi 元数据和封面请求由运行 AnimeTrack 的服务器发起，而不是由浏览器直接请求。
